@@ -1,0 +1,18 @@
+{
+  "version": "1.0.0",
+  "title": "",
+  "description": "",
+  "completionLevel": 3,
+  "createdAt": "",
+  "updatedAt": "",
+  "userStories": [],
+  "risks": [],
+  "scope": {
+    "inScope": [],
+    "outOfScope": []
+  },
+  "metadata": {
+    "taskFolder": null,
+    "tag": "master"
+  }
+}
