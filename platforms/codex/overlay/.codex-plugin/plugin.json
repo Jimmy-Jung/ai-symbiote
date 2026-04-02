@@ -1,0 +1,39 @@
+{
+  "name": "ai-symbiote",
+  "version": "0.1.0",
+  "description": "AI Symbiote 오케스트레이션 플러그인 번들.",
+  "author": {
+    "name": "JunyoungJung",
+    "url": "https://github.com/Jimmy-Jung"
+  },
+  "homepage": "https://github.com/Jimmy-Jung/ai-symbiote",
+  "repository": "https://github.com/Jimmy-Jung/ai-symbiote",
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "symbiote",
+    "codex",
+    "claude",
+    "orchestration"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "AI Symbiote",
+    "shortDescription": "Codex용 AI Symbiote 오케스트레이션 플러그인",
+    "longDescription": "ai-symbiote 코어를 Codex 플러그인 번들로 제공하는 플랫폼 오버레이입니다.",
+    "developerName": "JunyoungJung",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/Jimmy-Jung/ai-symbiote",
+    "defaultPrompt": [
+      "ai-symbiote:setup으로 현재 프로젝트를 초기화해줘",
+      "ai-symbiote:auto-loop로 이 기능을 끝까지 구현해줘",
+      "ai-symbiote:review로 현재 변경사항을 점검해줘"
+    ],
+    "brandColor": "#2563EB"
+  }
+}

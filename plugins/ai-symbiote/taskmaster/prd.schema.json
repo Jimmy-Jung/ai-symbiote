@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-symbiote.local/schemas/taskmaster/prd.schema.json",
+  "title": "Symbiote Taskmaster PRD",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "title", "description", "userStories"],
+  "properties": {
+    "version": { "type": "string", "minLength": 1 },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "completionLevel": { "type": "integer", "minimum": 1, "maximum": 5, "default": 3 },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "updatedAt": { "type": "string", "format": "date-time" },
+    "userStories": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/userStory" }
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "scope": { "$ref": "#/$defs/scope" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "taskFolder": { "type": ["string", "null"] },
+        "tag": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "$defs": {
+    "userStory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "as", "iWant", "soThat", "acceptanceCriteria"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^US-[0-9]{3}$" },
+        "title": { "type": "string" },
+        "as": { "type": "string", "minLength": 1 },
+        "iWant": { "type": "string", "minLength": 1 },
+        "soThat": { "type": "string", "minLength": 1 },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_progress", "done", "blocked"],
+          "default": "pending"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "default": "medium"
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^US-[0-9]{3}$" },
+          "uniqueItems": true
+        },
+        "acceptanceCriteria": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "implementedIn": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "blockedReason": { "type": ["string", "null"] }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["description", "impact", "mitigation"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "impact": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        },
+        "mitigation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inScope": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "outOfScope": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

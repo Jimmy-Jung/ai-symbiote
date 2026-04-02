@@ -1,0 +1,17 @@
+{
+  "name": "ai-symbiote",
+  "owner": {
+    "name": "JunyoungJung"
+  },
+  "plugins": [
+    {
+      "name": "ai-symbiote",
+      "source": "./plugins/ai-symbiote",
+      "description": "AI Symbiote 오케스트레이션 플러그인",
+      "version": "0.1.0",
+      "author": {
+        "name": "JunyoungJung"
+      }
+    }
+  ]
+}
