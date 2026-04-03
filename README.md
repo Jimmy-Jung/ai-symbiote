@@ -9,8 +9,15 @@ Claude Code와 Codex CLI에서 **동일한 스킬, 훅, 태스크 매니저**를
 
 ### Claude Code
 
+1. marketplace 등록:
+
 ```text
 /plugin marketplace add Jimmy-Jung/ai-symbiote
+```
+
+2. 플러그인 설치:
+
+```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
@@ -18,6 +25,9 @@ Claude Code와 Codex CLI에서 **동일한 스킬, 훅, 태스크 매니저**를
 
 ```text
 /plugin marketplace add /path/to/ai-symbiote
+```
+
+```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
