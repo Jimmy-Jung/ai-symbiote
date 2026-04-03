@@ -40,6 +40,10 @@ export interface MessengerConfig {
   discord?: DiscordConfig;
   telegram?: TelegramConfig;
   preferences: MessengerPreferences;
+  /** AI CLI 릴레이용 프로젝트 디렉터리 */
+  projectDir?: string;
+  /** 기본 AI 백엔드: 'claude' | 'codex' (기본값: claude) */
+  defaultBackend?: 'claude' | 'codex';
 }
 
 const DEFAULT_PREFERENCES: MessengerPreferences = {

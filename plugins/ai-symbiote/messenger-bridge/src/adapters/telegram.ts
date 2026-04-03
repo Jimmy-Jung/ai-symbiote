@@ -90,7 +90,11 @@ export class TelegramAdapter implements MessengerAdapter {
       }
     });
 
-    await this.bot.launch();
+    // launch()는 long-polling 루프를 시작하므로 await하면 영원히 block됨
+    this.bot.launch().catch((err) => {
+      console.error('[Telegram] launch 오류:', err);
+      this.connected = false;
+    });
     this.connected = true;
   }
 

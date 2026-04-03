@@ -98,7 +98,7 @@ async function main(): Promise<void> {
   // 핸들러 생성
   const notificationHandler = new NotificationHandler(adapter, config);
   const approvalHandler = new ApprovalHandler(adapter, config, msgDir);
-  const sessionControlHandler = new SessionControlHandler(adapter, stateDir, msgDir);
+  const sessionControlHandler = new SessionControlHandler(adapter, stateDir, msgDir, config.projectDir, config.defaultBackend);
 
   // 어댑터 이벤트 등록
   adapter.onAction(async (action) => {

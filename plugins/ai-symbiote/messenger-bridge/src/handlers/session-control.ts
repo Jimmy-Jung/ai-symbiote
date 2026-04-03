@@ -15,8 +15,9 @@ import type { MessengerAdapter, UserMessage } from '../adapters/types.js';
 import { writeJsonAtomic, ensureDir, fileTimestamp } from '../utils/file-protocol.js';
 import { findActiveTaskFolders, parseRalphState, readNotepad } from '../utils/state-reader.js';
 import { formatStatusMessage } from '../formatters/messages.ko.js';
+import { ClaudeRelayHandler, type AIBackend } from './claude-relay.js';
 
-type Command = 'start' | 'stop' | 'resume' | 'cancel' | 'status' | 'instruct';
+type Command = 'start' | 'stop' | 'resume' | 'cancel' | 'status' | 'instruct' | 'chat' | 'claude' | 'codex';
 
 interface ParsedCommand {
   command: Command;
@@ -31,24 +32,35 @@ interface CommandFile {
 }
 
 export class SessionControlHandler {
+  private claudeRelay: ClaudeRelayHandler;
+
   constructor(
     private adapter: MessengerAdapter,
     private stateDir: string,
     private messengerDir: string,
-  ) {}
+    projectDir?: string,
+    defaultBackend?: AIBackend,
+  ) {
+    this.claudeRelay = new ClaudeRelayHandler(adapter, projectDir, defaultBackend);
+  }
 
   /** 메신저 텍스트 메시지를 명령으로 처리 */
   async handleMessage(msg: UserMessage): Promise<void> {
     const parsed = this.parseCommand(msg.text);
     if (!parsed) {
-      // 명령이 아닌 자유 텍스트 → instruct로 취급
-      await this.writeCommand('instruct', { instruction: msg.text });
-      await this.adapter.sendNotification(msg.channelId, {
-        title: '지시 수신',
-        body: `"${msg.text.slice(0, 100)}" — 다음 반복에 주입됩니다.`,
-        level: 'info',
-        timestamp: new Date().toISOString(),
-      });
+      // 명령이 아닌 자유 텍스트 → 루프 활성 여부에 따라 분기
+      const loopActive = await this.isLoopActive();
+      if (loopActive) {
+        await this.writeCommand('instruct', { instruction: msg.text });
+        await this.adapter.sendNotification(msg.channelId, {
+          title: '지시 수신',
+          body: `"${msg.text.slice(0, 100)}" — 다음 반복에 주입됩니다.`,
+          level: 'info',
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        await this.claudeRelay.handle(msg);
+      }
       return;
     }
 
@@ -76,7 +88,23 @@ export class SessionControlHandler {
         await this.writeCommand('instruct', { instruction: parsed.args });
         await this.reply(msg.channelId, `📝 지시 수신: "${parsed.args.slice(0, 100)}"\n다음 반복에 주입됩니다.`);
         break;
+      case 'chat':
+        await this.claudeRelay.handle(msg);
+        break;
+      case 'claude':
+      case 'codex':
+        await this.claudeRelay.handle(
+          { ...msg, text: parsed.args },
+          parsed.command as AIBackend,
+        );
+        break;
     }
+  }
+
+  /** 활성 루프가 존재하는지 확인 */
+  private async isLoopActive(): Promise<boolean> {
+    const folders = await findActiveTaskFolders(this.stateDir);
+    return folders.length > 0;
   }
 
   /** 상태 조회 → 메신저로 응답 */
@@ -157,7 +185,7 @@ export class SessionControlHandler {
     const trimmed = text.trim();
 
     // 슬래시 명령
-    const slashMatch = trimmed.match(/^\/(start|stop|resume|cancel|status|instruct)\s*(.*)/i);
+    const slashMatch = trimmed.match(/^\/(start|stop|resume|cancel|status|instruct|chat|claude|codex)\s*(.*)/i);
     if (slashMatch) {
       return { command: slashMatch[1].toLowerCase() as Command, args: slashMatch[2].trim() };
     }

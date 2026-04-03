@@ -32,19 +32,22 @@ export class BridgeWatcher {
   start(): void {
     const { messengerDir } = this.handlers;
 
-    this.watcher = watch(
-      [
-        join(messengerDir, 'notifications', '*.json'),
-        join(messengerDir, 'approvals', '*_request.json'),
-        join(messengerDir, 'commands', '*.json'),
-      ],
-      {
-        ignoreInitial: false,
-        awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
-      },
-    );
+    const watchPaths = [
+      join(messengerDir, 'notifications'),
+      join(messengerDir, 'approvals'),
+      join(messengerDir, 'commands'),
+    ];
 
-    this.watcher.on('add', (filePath) => this.handleNewFile(filePath));
+    this.watcher = watch(watchPaths, {
+      ignoreInitial: false,
+      awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
+    });
+
+    this.watcher.on('add', (filePath) => {
+      console.log('[Watcher] 파일 감지:', filePath);
+      this.handleNewFile(filePath);
+    });
+    this.watcher.on('error', (err) => console.error('[Watcher] 오류:', err));
   }
 
   async stop(): Promise<void> {
