@@ -67,6 +67,9 @@ Claude:
 
 ```text
 /plugin marketplace add Jimmy-Jung/ai-symbiote
+```
+
+```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
