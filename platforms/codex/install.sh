@@ -17,10 +17,6 @@ DEFAULT_MARKETPLACE_NAME="${CODEX_MARKETPLACE_NAME:-jimmy-local}"
 DEFAULT_DISPLAY_NAME="${CODEX_MARKETPLACE_DISPLAY_NAME:-Jimmy Local Plugins}"
 CODEX_CONFIG_PATH="${CODEX_CONFIG_PATH:-$HOME/.codex/config.toml}"
 CODEX_CACHE_ROOT="${CODEX_CACHE_ROOT:-$HOME/.codex/plugins/cache}"
-CODEX_TMP_ROOT="${CODEX_TMP_ROOT:-$HOME/.codex/.tmp/plugins}"
-CODEX_TMP_PLUGIN_DIR="$CODEX_TMP_ROOT/plugins/$PLUGIN_NAME"
-CODEX_TMP_MARKETPLACE_PATH="$CODEX_TMP_ROOT/.agents/plugins/marketplace.json"
-
 if ! command -v python3 >/dev/null 2>&1; then
   echo "error: python3 is required" >&2
   exit 1
@@ -107,10 +103,10 @@ PY
 
 mkdir -p "$TARGET_PLUGINS_DIR" "$AGENTS_DIR"
 
-echo "[1/6] plugin bundle sync"
+echo "[1/5] plugin bundle sync"
 sync_plugin_dir "$SOURCE_PLUGIN_DIR" "$TARGET_PLUGIN_DIR"
 
-echo "[2/6] home marketplace update"
+echo "[2/5] home marketplace update"
 update_marketplace "$MARKETPLACE_PATH" "$DEFAULT_MARKETPLACE_NAME" "$DEFAULT_DISPLAY_NAME"
 
 MARKETPLACE_NAME="$(python3 - "$MARKETPLACE_PATH" <<'PY'
@@ -125,7 +121,7 @@ PY
 
 CACHE_PLUGIN_DIR="$CODEX_CACHE_ROOT/$MARKETPLACE_NAME/$PLUGIN_NAME/local"
 
-echo "[3/6] Codex config update"
+echo "[3/5] Codex config update (plugin + hooks feature flag)"
 python3 - "$MARKETPLACE_PATH" "$CODEX_CONFIG_PATH" "$PLUGIN_NAME" <<'PY'
 import json
 import sys
@@ -140,8 +136,10 @@ with marketplace_path.open("r", encoding="utf-8") as fh:
 
 marketplace_name = marketplace["name"]
 plugin_key = f'{plugin_name}@{marketplace_name}'
-header = f'[plugins."{plugin_key}"]'
-enabled_line = "enabled = true"
+plugin_header = f'[plugins."{plugin_key}"]'
+plugin_enabled_line = "enabled = true"
+features_header = "[features]"
+hooks_enabled_line = "codex_hooks = true"
 
 config_path.parent.mkdir(parents=True, exist_ok=True)
 if config_path.exists():
@@ -149,42 +147,68 @@ if config_path.exists():
 else:
     lines = []
 
+# --- ensure plugin enabled ---
+plugin_found = False
 for index, line in enumerate(lines):
-    if line.strip() != header:
-      continue
+    if line.strip() != plugin_header:
+        continue
 
     cursor = index + 1
     found_enabled = False
     while cursor < len(lines) and not lines[cursor].startswith("["):
         if lines[cursor].strip().startswith("enabled"):
-            lines[cursor] = enabled_line
+            lines[cursor] = plugin_enabled_line
             found_enabled = True
             break
         cursor += 1
 
     if not found_enabled:
-        lines.insert(index + 1, enabled_line)
+        lines.insert(index + 1, plugin_enabled_line)
 
-    config_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    plugin_found = True
     break
-else:
+
+if not plugin_found:
     if lines and lines[-1].strip():
         lines.append("")
-    lines.append(header)
-    lines.append(enabled_line)
-    config_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
+    lines.append(plugin_header)
+    lines.append(plugin_enabled_line)
+
+# --- ensure [features] codex_hooks = true ---
+features_found = False
+for index, line in enumerate(lines):
+    if line.strip() != features_header:
+        continue
+
+    cursor = index + 1
+    found_hooks = False
+    while cursor < len(lines) and not lines[cursor].startswith("["):
+        if lines[cursor].strip().startswith("codex_hooks"):
+            lines[cursor] = hooks_enabled_line
+            found_hooks = True
+            break
+        cursor += 1
+
+    if not found_hooks:
+        lines.insert(index + 1, hooks_enabled_line)
+
+    features_found = True
+    break
+
+if not features_found:
+    if lines and lines[-1].strip():
+        lines.append("")
+    lines.append(features_header)
+    lines.append(hooks_enabled_line)
+
+config_path.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
 PY
 
-echo "[4/6] Codex cache install sync"
+echo "[4/5] Codex cache install sync"
 sync_plugin_dir "$SOURCE_PLUGIN_DIR" "$CACHE_PLUGIN_DIR"
 
-echo "[5/6] Codex tmp plugin mirror sync"
-sync_plugin_dir "$SOURCE_PLUGIN_DIR" "$CODEX_TMP_PLUGIN_DIR"
-update_marketplace "$CODEX_TMP_MARKETPLACE_PATH" "$DEFAULT_MARKETPLACE_NAME" "$DEFAULT_DISPLAY_NAME"
-
-echo "[6/6] install summary"
+echo "[5/5] install summary"
 echo "plugin: $TARGET_PLUGIN_DIR"
 echo "marketplace: $MARKETPLACE_PATH"
 echo "config: $CODEX_CONFIG_PATH"
 echo "cache: $CACHE_PLUGIN_DIR"
-echo "tmp mirror: $CODEX_TMP_PLUGIN_DIR"

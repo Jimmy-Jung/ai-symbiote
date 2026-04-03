@@ -7,5 +7,7 @@
     "url": "https://github.com/Jimmy-Jung"
   },
   "repository": "https://github.com/Jimmy-Jung/ai-symbiote",
-  "license": "MIT"
+  "license": "MIT",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
 }
