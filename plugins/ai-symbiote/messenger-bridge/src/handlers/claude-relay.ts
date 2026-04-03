@@ -60,13 +60,11 @@ export class ClaudeRelayHandler {
 
   private async callClaude(prompt: string): Promise<string> {
     const args = ['-p', prompt, '--output-format', 'text'];
-    if (this.projectDir) {
-      args.push('--cwd', this.projectDir);
-    }
 
     const { stdout, stderr } = await execFileAsync('claude', args, {
       timeout: 120_000,
       maxBuffer: 1024 * 1024,
+      cwd: this.projectDir ?? process.cwd(),
       env: { ...process.env, LANG: 'ko_KR.UTF-8' },
     });
 
