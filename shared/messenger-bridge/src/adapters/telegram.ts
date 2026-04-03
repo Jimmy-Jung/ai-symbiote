@@ -90,6 +90,21 @@ export class TelegramAdapter implements MessengerAdapter {
       }
     });
 
+    // Telegram 명령어 메뉴 등록
+    await this.bot.telegram.setMyCommands([
+      { command: 'new', description: '새 대화 시작 (세션 초기화)' },
+      { command: 'sessions', description: 'Claude Code 세션 목록' },
+      { command: 'connect', description: '기존 세션에 연결 (/connect id)' },
+      { command: 'disconnect', description: '세션 연결 해제' },
+      { command: 'session', description: '현재 세션 정보' },
+      { command: 'help', description: '사용 가능한 명령어 목록' },
+      { command: 'status', description: '루프 상태 확인' },
+      { command: 'start', description: '작업 시작 (/start 작업내용)' },
+      { command: 'stop', description: '루프 중지' },
+      { command: 'cancel', description: '루프 취소' },
+    ]);
+    console.log('[Telegram] 명령어 메뉴 등록 완료');
+
     // launch()는 long-polling 루프를 시작하므로 await하면 영원히 block됨
     this.bot.launch().catch((err) => {
       console.error('[Telegram] launch 오류:', err);

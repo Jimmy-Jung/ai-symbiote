@@ -17,7 +17,7 @@ import { findActiveTaskFolders, parseRalphState, readNotepad } from '../utils/st
 import { formatStatusMessage } from '../formatters/messages.ko.js';
 import { ClaudeRelayHandler, type AIBackend } from './claude-relay.js';
 
-type Command = 'start' | 'stop' | 'resume' | 'cancel' | 'status' | 'instruct' | 'chat' | 'claude' | 'codex';
+type Command = 'start' | 'stop' | 'resume' | 'cancel' | 'status' | 'instruct' | 'chat' | 'claude' | 'codex' | 'new' | 'session' | 'sessions' | 'connect' | 'disconnect' | 'help';
 
 interface ParsedCommand {
   command: Command;
@@ -65,6 +65,38 @@ export class SessionControlHandler {
     }
 
     switch (parsed.command) {
+      case 'new':
+        await this.claudeRelay.resetSession(msg.channelId);
+        return;
+      case 'session':
+        await this.claudeRelay.showSessionInfo(msg.channelId);
+        return;
+      case 'sessions':
+        await this.claudeRelay.listSessions(msg.channelId);
+        return;
+      case 'connect':
+        if (!parsed.args) {
+          await this.reply(msg.channelId, '사용법: /connect <session-id>\n\n/sessions 로 세션 목록을 확인하세요.');
+          return;
+        }
+        {
+          // 짧은 ID 지원 (8자 이상이면 resolve)
+          const fullId = parsed.args.length < 36
+            ? await this.claudeRelay.resolveSessionId(parsed.args)
+            : parsed.args;
+          if (!fullId) {
+            await this.reply(msg.channelId, `❌ 세션을 찾을 수 없습니다: ${parsed.args}\n\n/sessions 로 세션 목록을 확인하세요.`);
+            return;
+          }
+          await this.claudeRelay.connectSession(msg.channelId, fullId);
+        }
+        return;
+      case 'disconnect':
+        await this.claudeRelay.disconnectSession(msg.channelId);
+        return;
+      case 'help':
+        await this.showHelp(msg.channelId);
+        return;
       case 'status':
         await this.handleStatus(msg.channelId);
         break;
@@ -180,12 +212,38 @@ export class SessionControlHandler {
     });
   }
 
+  /** 도움말 표시 */
+  private async showHelp(channelId: string): Promise<void> {
+    const help = [
+      '📖 사용 가능한 명령',
+      '',
+      '💬 대화 (세션 유지)',
+      '├ 자유 텍스트 — Claude에 질문 (대화 이어감)',
+      '├ /new (새대화) — 새 대화 시작',
+      '├ /session (세션) — 현재 세션 정보',
+      '├ /sessions — Claude Code 세션 목록',
+      '├ /connect <id> — 기존 세션에 연결',
+      '├ /disconnect — 세션 연결 해제',
+      '└ /claude, /codex — 백엔드 지정 질문',
+      '',
+      '🔄 루프 제어',
+      '├ /start <작업> (시작) — 작업 시작',
+      '├ /stop (중지) — 루프 중지',
+      '├ /resume (재개) — 루프 재개',
+      '├ /cancel (취소) — 루프 취소',
+      '├ /status (상태) — 현재 상태 확인',
+      '└ /instruct <지시> — 다음 반복에 지시 주입',
+    ].join('\n');
+
+    await this.reply(channelId, help);
+  }
+
   /** 텍스트에서 명령 파싱 */
   private parseCommand(text: string): ParsedCommand | null {
     const trimmed = text.trim();
 
     // 슬래시 명령
-    const slashMatch = trimmed.match(/^\/(start|stop|resume|cancel|status|instruct|chat|claude|codex)\s*(.*)/i);
+    const slashMatch = trimmed.match(/^\/(start|stop|resume|cancel|status|instruct|chat|claude|codex|new|sessions?|connect|disconnect|help)\s*(.*)/i);
     if (slashMatch) {
       return { command: slashMatch[1].toLowerCase() as Command, args: slashMatch[2].trim() };
     }
@@ -197,6 +255,9 @@ export class SessionControlHandler {
       [/^재개$/i, 'resume'],
       [/^취소$/i, 'cancel'],
       [/^상태$/i, 'status'],
+      [/^새대화$/i, 'new'],
+      [/^세션$/i, 'session'],
+      [/^도움말$/i, 'help'],
     ];
 
     for (const [regex, cmd] of koMap) {
