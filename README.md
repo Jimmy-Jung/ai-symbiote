@@ -100,8 +100,19 @@ claude plugin install ai-symbiote@ai-symbiote --scope user
 
 ### Codex CLI
 
+**방법 1: 프롬프트로 자동 설치**
+
+Codex 세션에서 아래 프롬프트를 입력하면 자동으로 설치됩니다:
+
+```text
+https://github.com/Jimmy-Jung/ai-symbiote 저장소를 ~/ai-symbiote-repo에 클론하고 bash platforms/codex/install.sh를 실행해서 ai-symbiote 플러그인을 설치해줘
+```
+
+**방법 2: 직접 설치**
+
 ```bash
-bash platforms/codex/install.sh
+git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
+cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ```
 
 설치 스크립트가 다음을 자동 처리합니다:
