@@ -1,6 +1,6 @@
 ---
 name: update
-description: ai-symbiote 플러그인을 최신 버전으로 업데이트합니다. Triggers on: 업데이트, update, 플러그인 업데이트, 최신 버전.
+description: "ai-symbiote 플러그인을 최신 버전으로 업데이트합니다."
 user-invocable: true
 ---
 

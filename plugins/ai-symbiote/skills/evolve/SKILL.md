@@ -1,6 +1,6 @@
 ---
 name: evolve
-description: 프로젝트 변경사항을 감지하여 manifest.json과 context.md를 동기화합니다. 의존성 추가, 프레임워크 변경, 아키텍처 변화를 반영합니다. Triggers on: 프로젝트 업데이트, 상태 동기화, 스택 변경, evolve.
+description: "프로젝트 변경사항을 감지하여 manifest.json과 context.md를 동기화합니다."
 argument-hint:
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]

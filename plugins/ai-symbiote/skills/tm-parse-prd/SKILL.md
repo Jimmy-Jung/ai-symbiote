@@ -1,7 +1,7 @@
 ---
 name: tm-parse-prd
-description: prd.json을 읽어 작업별 task.json 초안을 생성하거나 갱신합니다.
-argument-hint: [task-folder] [--append]
+description: "prd.json을 읽어 작업별 task.json 초안을 생성하거나 갱신합니다."
+argument-hint: "task-folder --append"
 user-invocable: true
 allowed-tools: [Read, Write, Bash]
 ---

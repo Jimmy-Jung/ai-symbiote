@@ -1,7 +1,7 @@
 ---
 name: tm-board
-description: task graph를 상태별로 요약해 보여줍니다.
-argument-hint: [--tag <tag>] [--status <status>]
+description: "task graph를 상태별로 요약해 보여줍니다."
+argument-hint: "--tag <tag> --status <status>"
 user-invocable: true
 allowed-tools: [Read, Bash, Glob]
 ---
