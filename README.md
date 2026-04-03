@@ -63,34 +63,62 @@ bash scripts/build-all.sh
 
 ## 설치
 
-Claude:
+### Claude Code
+
+**방법 1: GitHub marketplace (권장)**
 
 ```text
 /plugin marketplace add Jimmy-Jung/ai-symbiote
-```
-
-```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
-Claude 로컬 marketplace 테스트:
+**방법 2: 로컬 marketplace**
 
 ```text
-/plugin marketplace add /Users/jimmy/Documents/GitHub/ai-symbiote
+/plugin marketplace add /path/to/ai-symbiote
 /plugin install ai-symbiote@ai-symbiote
 ```
 
-Claude 로컬 번들 준비:
+**방법 3: 설치 없이 즉시 로드**
 
 ```bash
-bash platforms/claude/install.sh
+claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote
 ```
 
-Codex:
+매번 입력하지 않으려면 shell alias를 추가합니다:
+
+```bash
+# ~/.zshrc 또는 ~/.bashrc
+alias claude='claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote'
+```
+
+**방법 4: CLI 비대화형 설치**
+
+```bash
+claude plugin install ai-symbiote@ai-symbiote --scope user
+```
+
+### Codex CLI
 
 ```bash
 bash platforms/codex/install.sh
 ```
+
+설치 스크립트가 다음을 자동 처리합니다:
+
+- 플러그인 번들 빌드 및 복사 (`~/plugins/ai-symbiote/`)
+- marketplace 등록 (`~/.agents/plugins/marketplace.json`)
+- config.toml에 플러그인 활성화 + hooks 기능 플래그 설정
+- Codex 캐시에 동기화
+
+### 플랫폼 차이
+
+| 항목 | Claude Code | Codex CLI |
+|------|-------------|-----------|
+| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` (자동) | `~/plugins/ai-symbiote` |
+| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse (전체 매처) | SessionStart, PreToolUse (Bash 매처만) |
+| Hooks 기능 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 (install.sh가 자동 설정) |
+| 스킬 호출 | `/ai-symbiote:setup` | `$ai-symbiote:setup` 또는 암시적 호출 |
 
 ## 상태 저장
 
