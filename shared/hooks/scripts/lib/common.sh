@@ -2,10 +2,45 @@
 # ai-symbiote shared utilities
 # Provides: slug generation, JSON helpers, shared state path resolution
 
-# Generate project slug from Codex/Claude project dir or cwd
+# Generate project slug from git root basename.
+# Algorithm:
+#   1. git rev-parse --show-toplevel → basename → lowercase → sanitize
+#   2. No git? Use basename of CODEX_PROJECT_DIR / CLAUDE_PROJECT_DIR / pwd
+#   3. Collision guard: if ~/ai-symbiote/{slug}/ already exists and belongs to
+#      a different project, prepend the parent directory name.
 get_project_slug() {
   local dir="${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}}"
-  printf '%s' "$dir" | tr '[:upper:]' '[:lower:]' | sed 's|^/||' | tr '/' '_' | tr -cd 'a-z0-9_-' | cut -c1-64
+  local git_root
+  git_root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || git_root=""
+
+  local base_dir="${git_root:-$dir}"
+  local name parent slug full_slug
+  name=$(basename "$base_dir")
+  parent=$(basename "$(dirname "$base_dir")")
+  slug=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-' | cut -c1-64)
+  full_slug=$(printf '%s_%s' "$parent" "$name" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-' | cut -c1-64)
+
+  # Empty basename guard
+  if [ -z "$slug" ] || [ "$slug" = "-" ]; then
+    slug="$full_slug"
+  fi
+
+  # Collision detection: if slug dir exists but was created for a different project
+  local state_root
+  state_root=$(get_state_root)
+  local slug_dir="$state_root/$slug"
+  if [ -d "$slug_dir" ] && [ -f "$slug_dir/manifest.json" ]; then
+    local recorded_path manifest_json
+    manifest_json=$(cat "$slug_dir/manifest.json")
+    recorded_path=$(json_field "$manifest_json" "projectPath")
+    # fallback: 기존 manifest는 "path" 필드를 사용할 수 있음
+    [ -z "$recorded_path" ] && recorded_path=$(json_field "$manifest_json" "path")
+    if [ -n "$recorded_path" ] && [ "$recorded_path" != "$base_dir" ]; then
+      slug="$full_slug"
+    fi
+  fi
+
+  printf '%s' "$slug"
 }
 
 # Get shared state root path: $SYMBIOTE_HOME or ~/ai-symbiote
