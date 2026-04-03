@@ -1,7 +1,6 @@
 # ai-symbiote
 
 > Author: JunyoungJung
-> Date: 2026-04-02
 
 Claude Code와 Codex CLI에서 **동일한 스킬, 훅, 태스크 매니저**를 공유하는 AI 에이전트 오케스트레이션 플러그인입니다. 하나의 소스(`shared/`)를 관리하면 양쪽 플랫폼에서 같은 방식으로 동작합니다.
 
@@ -54,9 +53,18 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 
 `install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true` 포함)을 한 번에 처리합니다.
 
+### 업데이트
+
+양쪽 플랫폼 모두에서 `update` 스킬로 최신 버전으로 업데이트할 수 있습니다:
+
+- Claude: `/ai-symbiote:update`
+- Codex: `$ai-symbiote:update` 또는 "ai-symbiote 업데이트해줘"
+
+저장소를 자동으로 pull하고 플랫폼에 맞게 재설치합니다.
+
 ## 스킬 목록
 
-설치 후 사용할 수 있는 스킬입니다. Claude에서는 `/ai-symbiote:<name>`, Codex에서는 `$ai-symbiote:<name>`으로 호출합니다.
+설치 후 사용할 수 있는 25개 스킬입니다. Claude에서는 `/ai-symbiote:<name>`, Codex에서는 `$ai-symbiote:<name>`으로 호출합니다.
 
 ### 핵심 워크플로우
 
@@ -65,7 +73,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 | `synapse` | 사용자 의도를 분석하여 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
 | `auto-loop` | Analyze → Plan → Execute → Verify를 반복하여 작업을 자율 완료 (최대 10회) |
 | `autopilot` | auto-loop의 병렬 극대화 모드. Builder를 최대한 동시 투입 (최대 3회) |
-| `setup` | 프로젝트를 분석하여 `~/ai-symbiote/{slug}/`에 상태 디렉터리를 초기화 |
+| `setup` | 프로젝트 스택 감지, 연동 플러그인 자동 설치, 상태 디렉터리 초기화 |
 
 ### 계획 및 분석
 
@@ -106,6 +114,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 |------|------|
 | `note` | Compaction 내성 메모장. 컨텍스트 윈도우 초과 시에도 정보 보존 |
 | `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
+| `update` | 저장소 pull + 플랫폼별 재설치를 자동 수행 |
 | `clean` | 완료된 작업의 상태 폴더 정리 |
 | `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
 | `stats` | 스킬/커맨드 사용 빈도 분석 |
@@ -122,7 +131,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   24개 스킬
+│   ├── skills/                #   25개 스킬
 │   ├── hooks/scripts/         #   훅 스크립트 (setup-check, guard-shell 등)
 │   ├── taskmaster/            #   PRD/task 스키마 및 템플릿
 │   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지
@@ -145,7 +154,7 @@ ai-symbiote/
 
 ```
 shared/  ──rsync──▶  plugins/ai-symbiote/   (Claude용, Git에 포함)
-   +                  
+   +
 claude/overlay/
 
 shared/  ──rsync──▶  dist/codex-symbiote/   (Codex용, Git 미포함)
@@ -170,16 +179,30 @@ bash scripts/build-codex.sh    # Codex만
 | PostToolUse 매처 | Read, Write\|Edit, Bash 등 전체 | Bash만 지원 |
 | Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
 | 스킬 호출 | `/ai-symbiote:setup` | `$ai-symbiote:setup` 또는 암시적 호출 |
+| 연동 플러그인 설치 | `claude plugin install` | `git clone` + 로컬 등록 |
 
 Codex에서 PostToolUse의 Read, Write|Edit 매처가 지원되지 않으므로, usage-tracker, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
 
 ## 상태 저장
 
-모든 플랫폼은 `~/ai-symbiote/{project-slug}/`를 공용 상태 루트로 사용합니다.
+모든 플랫폼은 `~/ai-symbiote/{slug}/`를 공용 상태 루트로 사용합니다.
+
+### Slug 규칙
+
+slug는 **git 루트 디렉터리의 basename**을 소문자로 변환하여 생성합니다:
+
+```
+/home/user/projects/MyApp  →  myapp
+/home/user/work/api-server →  api-server
+```
+
+같은 이름의 프로젝트가 다른 경로에 존재하면, `manifest.json`의 `path` 필드로 충돌을 감지하고 부모 디렉터리를 접두어로 추가합니다.
+
+### 상태 디렉터리 구조
 
 ```text
 ~/ai-symbiote/{slug}/
-├── manifest.json       # 프로젝트 스택, 설정
+├── manifest.json       # 프로젝트 스택, 설정, 경로, 연동 플러그인 상태
 ├── context.md          # 동적 컨텍스트 (스택, 컨벤션)
 ├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
 ├── taskmaster/         # PRD, task graph
@@ -187,7 +210,14 @@ Codex에서 PostToolUse의 Read, Write|Edit 매처가 지원되지 않으므로,
 └── messenger/          # 메신저 브릿지 설정, 커맨드, 승인 요청
 ```
 
-기존 `~/symbiote/{slug}`, `~/claude_symbiote/{slug}`, `~/codex_symbiote/{slug}`는 읽기 전용 fallback 경로로만 참조됩니다.
+### 연동 플러그인
+
+setup 시 자동으로 설치/확인되는 외부 플러그인:
+
+| 플러그인 | 용도 | 필수 여부 |
+|----------|------|-----------|
+| [snarktank/ralph](https://github.com/snarktank/ralph) | PRD 생성(`/prd`) 및 JSON 변환(`/ralph`) | 자동 설치 |
+| [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) | Codex(GPT-5.4) 서브에이전트 연동 | 선택적 |
 
 ## 유지보수 원칙
 
