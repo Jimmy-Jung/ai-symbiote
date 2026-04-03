@@ -89,7 +89,7 @@ export class SessionControlHandler {
         await this.reply(msg.channelId, `📝 지시 수신: "${parsed.args.slice(0, 100)}"\n다음 반복에 주입됩니다.`);
         break;
       case 'chat':
-        await this.claudeRelay.handle(msg);
+        await this.claudeRelay.handle({ ...msg, text: parsed.args });
         break;
       case 'claude':
       case 'codex':
