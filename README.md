@@ -3,152 +3,185 @@
 > Author: JunyoungJung
 > Date: 2026-04-02
 
-`ai-symbiote`는 Claude와 Codex가 함께 사용하는 단일 플러그인 소스입니다. 공용 자산은 `shared/`에 두고, 플랫폼 차이는 `platforms/`의 오버레이와 설치 스크립트로 분리합니다.
-
-## 개요
-
-- 플러그인 이름: `ai-symbiote`
-- 공용 상태 경로: `~/ai-symbiote/{project-slug}`
-- 공용 자산: `skills`, `hooks`, `taskmaster`, `messenger-bridge`
-- 플랫폼 지원: Claude marketplace, Codex local plugin
-
-## 디렉터리 구조
-
-```text
-ai-symbiote/
-├── .claude-plugin/
-│   └── marketplace.json
-├── docs/
-│   └── ARCHITECTURE.md
-├── plugins/
-│   └── ai-symbiote/          # Claude marketplace용 로컬 번들
-├── shared/
-│   ├── skills/
-│   ├── hooks/
-│   ├── taskmaster/
-│   └── messenger-bridge/
-├── platforms/
-│   ├── claude/
-│   │   ├── overlay/
-│   │   └── install.sh
-│   └── codex/
-│       ├── overlay/
-│       └── install.sh
-├── scripts/
-│   ├── build-claude.sh
-│   ├── build-codex.sh
-│   └── build-all.sh
-```
-
-## 빌드
-
-```bash
-bash scripts/build-claude.sh
-```
-
-```bash
-bash scripts/build-codex.sh
-```
-
-```bash
-bash scripts/build-all.sh
-```
-
-생성물:
-- `plugins/ai-symbiote/`: Claude marketplace가 직접 읽는 로컬 번들
-- `dist/claude-symbiote/`: Claude 검증/테스트용 생성물
-- `dist/codex-symbiote/`: Codex 설치용 생성물
-
-`dist/`는 생성물이며 저장소에서 유지하지 않습니다.
+Claude Code와 Codex CLI에서 **동일한 스킬, 훅, 태스크 매니저**를 공유하는 AI 에이전트 오케스트레이션 플러그인입니다. 하나의 소스(`shared/`)를 관리하면 양쪽 플랫폼에서 같은 방식으로 동작합니다.
 
 ## 설치
 
 ### Claude Code
-
-**방법 1: GitHub marketplace (권장)**
 
 ```text
 /plugin marketplace add Jimmy-Jung/ai-symbiote
 /plugin install ai-symbiote@ai-symbiote
 ```
 
-**방법 2: 로컬 marketplace**
+로컬 저장소를 사용하려면:
 
 ```text
 /plugin marketplace add /path/to/ai-symbiote
 /plugin install ai-symbiote@ai-symbiote
 ```
 
-**방법 3: 설치 없이 즉시 로드**
+설치 없이 세션 한 번만 테스트:
 
 ```bash
 claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote
 ```
 
-매번 입력하지 않으려면 shell alias를 추가합니다:
-
-```bash
-# ~/.zshrc 또는 ~/.bashrc
-alias claude='claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote'
-```
-
-**방법 4: CLI 비대화형 설치**
-
-```bash
-claude plugin install ai-symbiote@ai-symbiote --scope user
-```
-
 ### Codex CLI
 
-**방법 1: 프롬프트로 자동 설치**
-
-Codex 세션에서 아래 프롬프트를 입력하면 자동으로 설치됩니다:
+Codex 세션에서 아래 프롬프트를 입력하면 자동으로 클론 + 설치됩니다:
 
 ```text
 https://github.com/Jimmy-Jung/ai-symbiote 저장소를 ~/ai-symbiote-repo에 클론하고 bash platforms/codex/install.sh를 실행해서 ai-symbiote 플러그인을 설치해줘
 ```
 
-**방법 2: 직접 설치**
+직접 설치:
 
 ```bash
 git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
 cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ```
 
-설치 스크립트가 다음을 자동 처리합니다:
+`install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true` 포함)을 한 번에 처리합니다.
 
-- 플러그인 번들 빌드 및 복사 (`~/plugins/ai-symbiote/`)
-- marketplace 등록 (`~/.agents/plugins/marketplace.json`)
-- config.toml에 플러그인 활성화 + hooks 기능 플래그 설정
-- Codex 캐시에 동기화
+## 스킬 목록
 
-### 플랫폼 차이
+설치 후 사용할 수 있는 스킬입니다. Claude에서는 `/ai-symbiote:<name>`, Codex에서는 `$ai-symbiote:<name>`으로 호출합니다.
+
+### 핵심 워크플로우
+
+| 스킬 | 설명 |
+|------|------|
+| `synapse` | 사용자 의도를 분석하여 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
+| `auto-loop` | Analyze → Plan → Execute → Verify를 반복하여 작업을 자율 완료 (최대 10회) |
+| `autopilot` | auto-loop의 병렬 극대화 모드. Builder를 최대한 동시 투입 (최대 3회) |
+| `setup` | 프로젝트를 분석하여 `~/ai-symbiote/{slug}/`에 상태 디렉터리를 초기화 |
+
+### 계획 및 분석
+
+| 스킬 | 설명 |
+|------|------|
+| `plan` | Scout 2명 + Architect 1명으로 구현 계획을 수립 |
+| `planning` | 요구사항 인터뷰, 영향도 평가, 계획 템플릿 등 계획 방법론 정의 |
+| `analyze` | Scout 2~3명 + Architect 1명으로 대상을 심층 분석 |
+| `deep-search` | Grep, Glob, Agent(Explore)를 병렬 3-Track으로 코드베이스 탐색 |
+
+### 코드 품질
+
+| 스킬 | 설명 |
+|------|------|
+| `review` | 현재 변경사항에 대해 코드 리뷰 실행 |
+| `code-accuracy` | 심볼 존재 확인, import 검증, 환각 코드 방지 가드레일 |
+| `verify-loop` | 자율 루프의 4-Level 완료 기준과 재시도 전략 정의 |
+
+### Git 및 협업
+
+| 스킬 | 설명 |
+|------|------|
+| `git-commit` | git diff를 분석하여 Conventional Commits 형식으로 커밋 메시지 생성 |
+| `pr` | 현재 브랜치의 변경사항을 분석하고 Pull Request 생성 |
+| `messenger` | Slack, Discord, Telegram 연동으로 세션 모니터링 및 원격 제어 |
+
+### 태스크 관리
+
+| 스킬 | 설명 |
+|------|------|
+| `tm-init` | Task Master 전역 task graph 초기화 |
+| `tm-parse-prd` | `prd.json`을 읽어 작업별 `task.json` 초안 생성 |
+| `tm-board` | task graph를 상태별로 요약 표시 |
+
+### 유틸리티
+
+| 스킬 | 설명 |
+|------|------|
+| `note` | Compaction 내성 메모장. 컨텍스트 윈도우 초과 시에도 정보 보존 |
+| `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
+| `clean` | 완료된 작업의 상태 폴더 정리 |
+| `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
+| `stats` | 스킬/커맨드 사용 빈도 분석 |
+
+### 내부 스킬 (synapse가 자동 참조)
+
+| 스킬 | 설명 |
+|------|------|
+| `roles` | Scout, Architect, Builder, Inspector, Researcher, Codex 6개 역할의 계약 정의 |
+| `team-templates` | analysis, implementation, review, planning, research, dynamic 6개 팀 템플릿 |
+
+## 디렉터리 구조
+
+```text
+ai-symbiote/
+├── shared/                    # 공용 원본 (여기만 편집)
+│   ├── skills/                #   24개 스킬
+│   ├── hooks/scripts/         #   훅 스크립트 (setup-check, guard-shell 등)
+│   ├── taskmaster/            #   PRD/task 스키마 및 템플릿
+│   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지
+├── platforms/
+│   ├── claude/
+│   │   └── overlay/           #   .claude-plugin/plugin.json, hooks/hooks.json
+│   └── codex/
+│       └── overlay/           #   .codex-plugin/plugin.json, hooks/hooks.json
+├── plugins/
+│   └── ai-symbiote/           # Claude marketplace용 번들 (빌드 생성물, 직접 편집 금지)
+├── scripts/
+│   ├── build-claude.sh        #   shared + claude overlay → plugins/ai-symbiote/
+│   ├── build-codex.sh         #   shared + codex overlay → dist/codex-symbiote/
+│   └── build-all.sh
+└── .claude-plugin/
+    └── marketplace.json       # Claude marketplace 카탈로그
+```
+
+### 빌드 흐름
+
+```
+shared/  ──rsync──▶  plugins/ai-symbiote/   (Claude용, Git에 포함)
+   +                  
+claude/overlay/
+
+shared/  ──rsync──▶  dist/codex-symbiote/   (Codex용, Git 미포함)
+   +
+codex/overlay/
+```
+
+빌드 명령:
+
+```bash
+bash scripts/build-all.sh      # 양쪽 모두
+bash scripts/build-claude.sh   # Claude만
+bash scripts/build-codex.sh    # Codex만
+```
+
+## 플랫폼 차이
 
 | 항목 | Claude Code | Codex CLI |
 |------|-------------|-----------|
-| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` (자동) | `~/plugins/ai-symbiote` |
-| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse (전체 매처) | SessionStart, PreToolUse (Bash 매처만) |
-| Hooks 기능 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 (install.sh가 자동 설정) |
+| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` (자동 제공) | `~/plugins/ai-symbiote` |
+| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse |
+| PostToolUse 매처 | Read, Write\|Edit, Bash 등 전체 | Bash만 지원 |
+| Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
 | 스킬 호출 | `/ai-symbiote:setup` | `$ai-symbiote:setup` 또는 암시적 호출 |
+
+Codex에서 PostToolUse의 Read, Write|Edit 매처가 지원되지 않으므로, usage-tracker, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
 
 ## 상태 저장
 
-모든 플랫폼은 같은 상태 루트를 사용합니다: `~/ai-symbiote/{project-slug}/`
+모든 플랫폼은 `~/ai-symbiote/{project-slug}/`를 공용 상태 루트로 사용합니다.
 
-여기에 저장되는 항목:
+```text
+~/ai-symbiote/{slug}/
+├── manifest.json       # 프로젝트 스택, 설정
+├── context.md          # 동적 컨텍스트 (스택, 컨벤션)
+├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
+├── taskmaster/         # PRD, task graph
+├── usage-data/         # 스킬/커맨드 사용 통계
+└── messenger/          # 메신저 브릿지 설정, 커맨드, 승인 요청
+```
 
-- `manifest.json`
-- `context.md`
-- `state/`
-- `taskmaster/`
-- `usage-data/`
-- `messenger/`
-
-기존 `~/symbiote/{slug}`, `~/claude_symbiote/{slug}`, `~/codex_symbiote/{slug}`는 fallback 경로로만 읽습니다.
+기존 `~/symbiote/{slug}`, `~/claude_symbiote/{slug}`, `~/codex_symbiote/{slug}`는 읽기 전용 fallback 경로로만 참조됩니다.
 
 ## 유지보수 원칙
 
-- 공용 변경은 `shared/`만 수정
-- 플랫폼 차이는 `platforms/claude/overlay`, `platforms/codex/overlay`만 수정
-- 빌드 후 생성된 `plugins/ai-symbiote`와 `dist/`는 직접 편집하지 않음
-- 구조 설명이 더 필요하면 [ARCHITECTURE.md](/Users/jimmy/Documents/GitHub/ai-symbiote/docs/ARCHITECTURE.md)를 기준 문서로 사용
+- **공용 변경**: `shared/`만 수정 → `build-all.sh`로 양쪽 번들 갱신
+- **플랫폼 차이**: `platforms/<name>/overlay/`만 수정
+- **빌드 생성물**: `plugins/ai-symbiote/`와 `dist/`는 직접 편집 금지
+- **상세 구조**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조
