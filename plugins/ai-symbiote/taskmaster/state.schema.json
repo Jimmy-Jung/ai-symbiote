@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ai-symbiote.local/schemas/taskmaster/state.schema.json",
+  "title": "Symbiote Taskmaster State",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["currentTag", "currentTaskId", "lastSelectedTaskId", "lastSwitched", "migrationNoticeShown"],
+  "properties": {
+    "currentTag": { "type": "string", "minLength": 1 },
+    "currentTaskId": { "type": ["string", "null"] },
+    "lastSelectedTaskId": { "type": ["string", "null"] },
+    "lastSwitched": { "type": "string", "format": "date-time" },
+    "migrationNoticeShown": { "type": "boolean" }
+  }
+}
