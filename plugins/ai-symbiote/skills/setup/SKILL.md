@@ -34,6 +34,24 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
 
 **절대 전체 경로를 slug에 포함하지 마세요.** `users_jimmy_documents_github_carelog` 같은 형태는 잘못된 것입니다.
 
+## 플랫폼 감지
+
+setup 시작 시 현재 실행 플랫폼을 감지합니다:
+
+```bash
+# Claude 환경 감지
+if command -v claude >/dev/null 2>&1; then
+  PLATFORM="claude"
+# Codex 환경 감지
+elif command -v codex >/dev/null 2>&1 || [ -f "$HOME/.codex/config.toml" ]; then
+  PLATFORM="codex"
+else
+  PLATFORM="unknown"
+fi
+```
+
+이후 단계에서 플랫폼별 명령을 분기합니다.
+
 ## 워크플로우
 
 ### Step 0: 환경 준비
@@ -49,31 +67,46 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
   ```
 - `~/ai-symbiote/{slug}/usage-data/.tracked-since`에 현재 ISO8601 타임스탬프 기록
 
-### Step 0.5: 연동 플러그인 설치
+### Step 0.5: 연동 플러그인 설치 — snarktank/ralph
 
 snarktank/ralph 플러그인이 설치되어 있는지 확인하고, 없으면 자동 설치합니다.
 
-1. Bash로 설치 여부를 확인합니다:
+#### Claude 환경
+
+1. 설치 여부 확인:
    ```bash
    claude plugin list 2>/dev/null | grep -q "ralph" && echo "installed" || echo "not-installed"
    ```
 
-2. 설치되어 있지 않으면 마켓플레이스 등록 후 설치합니다:
+2. 미설치 시 마켓플레이스 등록 후 설치:
    ```bash
-   # 마켓플레이스 등록 (이미 등록되어 있으면 무시)
    claude plugin marketplace add snarktank/ralph 2>/dev/null
-   # 플러그인 설치
    claude plugin install ralph-skills@ralph-marketplace
    ```
 
-3. 설치 실패 시 수동 설치 방법을 안내합니다:
+#### Codex 환경
+
+1. 설치 여부 확인:
+   ```bash
+   [ -d "$HOME/plugins/ralph-skills" ] && echo "installed" || echo "not-installed"
    ```
-   snarktank/ralph 자동 설치에 실패했습니다.
-   수동으로 설치하려면:
-     claude plugin marketplace add snarktank/ralph
-     claude plugin install ralph-skills@ralph-marketplace
-   이 플러그인은 /prd (PRD 생성)와 /ralph (PRD->JSON 변환) 커맨드를 제공합니다.
+
+2. 미설치 시 clone 후 로컬 등록:
+   ```bash
+   git clone https://github.com/snarktank/ralph.git "$HOME/plugins/ralph-skills" 2>/dev/null
    ```
+   그 후 `~/.agents/plugins/marketplace.json`에 ralph-skills 항목을 추가하고,
+   `~/.codex/config.toml`에 플러그인 활성화 항목을 추가합니다.
+
+#### 공통 — 설치 실패 시 안내
+
+```
+snarktank/ralph 자동 설치에 실패했습니다.
+수동으로 설치하려면:
+  [Claude] claude plugin marketplace add snarktank/ralph && claude plugin install ralph-skills@ralph-marketplace
+  [Codex]  git clone https://github.com/snarktank/ralph.git ~/plugins/ralph-skills
+이 플러그인은 /prd (PRD 생성)와 /ralph (PRD->JSON 변환) 커맨드를 제공합니다.
+```
 
 snarktank/ralph가 제공하는 스킬:
 - `/prd` - PRD(요구사항 문서) 생성
@@ -84,34 +117,47 @@ snarktank/ralph가 제공하는 스킬:
 openai/codex-plugin-cc 플러그인이 설치되어 있는지 확인합니다.
 Codex는 선택적 강화이므로, 미설치 시에도 setup을 계속 진행합니다.
 
+#### Claude 환경
+
 1. 플러그인 설치 여부 확인:
    ```bash
    claude plugin list 2>/dev/null | grep -q "codex" && echo "installed" || echo "not-installed"
    ```
 
-2. 설치되어 있으면 Codex CLI 인증 상태 확인:
+2. 설치되어 있으면 CLI 인증 확인:
    ```bash
    codex --version 2>/dev/null && echo "cli-ready" || echo "cli-not-ready"
    ```
 
-3. 결과에 따른 안내:
-   - 플러그인 설치됨 + CLI 준비됨: "Codex 연동이 활성화됩니다. 서브에이전트 팀에서 세컨드 오피니언, 적대적 리뷰, root cause 분석에 활용됩니다."
-   - 플러그인 설치됨 + CLI 미준비: "Codex 플러그인은 설치되어 있지만 CLI 인증이 필요합니다. `codex` 명령으로 인증하세요."
-   - 플러그인 미설치:
-     ```
-     [선택] Codex 플러그인을 설치하시겠습니까?
-     Codex(GPT-5.4)를 서브에이전트로 활용하여 세컨드 오피니언, 적대적 리뷰, root cause 분석이 가능합니다.
-     OpenAI 계정(ChatGPT Plus/Pro 또는 API 키)이 필요합니다.
-     설치하려면 "yes", 건너뛰려면 "skip":
-     ```
-   - 사용자가 "yes" 선택 시:
+3. 미설치 시 사용자에게 선택 요청:
+   ```
+   [선택] Codex 플러그인을 설치하시겠습니까?
+   Codex(GPT-5.4)를 서브에이전트로 활용하여 세컨드 오피니언, 적대적 리뷰, root cause 분석이 가능합니다.
+   OpenAI 계정(ChatGPT Plus/Pro 또는 API 키)이 필요합니다.
+   설치하려면 "yes", 건너뛰려면 "skip":
+   ```
+   - "yes" 선택 시:
      ```bash
      claude plugin marketplace add openai/codex-plugin-cc 2>/dev/null
      claude plugin install codex@openai-codex
      ```
-   - 사용자가 "skip" 선택 시: Codex 없이 진행 (모든 워크플로우 정상 작동)
+   - "skip" 선택 시: Codex 없이 진행
 
-4. manifest.json에 codex 상태를 기록합니다 (manifest.json 생성 단계에서 사용).
+#### Codex 환경
+
+Codex 환경에서는 이미 Codex CLI가 런타임이므로, openai/codex-plugin-cc 설치는 불필요합니다.
+대신 Claude 연동 가능 여부를 확인합니다:
+
+1. Claude CLI 확인:
+   ```bash
+   command -v claude >/dev/null 2>&1 && echo "claude-available" || echo "claude-not-available"
+   ```
+
+2. 결과에 따른 안내:
+   - Claude 사용 가능: "Claude 연동이 활성화됩니다. 크로스 플랫폼 서브에이전트 팀을 구성합니다."
+   - Claude 미설치: "Codex 단독 모드로 진행합니다. Claude Code를 설치하면 크로스 플랫폼 팀을 구성할 수 있습니다."
+
+4. manifest.json에 플랫폼 상태를 기록합니다.
 
 ### Step 1: 프로젝트 감지 (Project Detection)
 
