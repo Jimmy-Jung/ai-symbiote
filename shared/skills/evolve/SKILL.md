@@ -25,7 +25,8 @@ setup이 초기 1회 스냅샷이라면, evolve는 주기적 동기화입니다.
 ```
 기준선 항목:
 - project.languages
-- project.platforms
+- project.platforms (프로젝트 타겟 플랫폼: iOS, web 등)
+- agentPlatforms (항상 ["claude", "codex"] 유지, 변경 대상 아님)
 - stack.packageManager
 - stack.buildTool
 - stack.frameworks

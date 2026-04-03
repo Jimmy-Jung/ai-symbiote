@@ -27,8 +27,21 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 2. `~/ai-symbiote/{slug}/` 디렉터리를 만듭니다.
 3. `usage-data/`, `state/`, `taskmaster/`, `messenger/`를 초기화합니다.
 4. `manifest.json`과 `context.md` 생성 준비 상태를 점검합니다.
-5. 현재 플랫폼이 Claude인지 Codex인지 확인하고 후속 안내를 출력합니다.
+5. 후속 안내를 출력합니다.
 
-## 메모
+## manifest.json의 platform 필드
 
-이 스킬은 통합 저장소 기준의 공용 설명서입니다. 플랫폼별 커맨드 이름과 설치 절차는 각 플랫폼 오버레이 문서를 따릅니다.
+ai-symbiote는 Claude와 Codex를 **동시에** 사용하는 멀티 플랫폼 플러그인입니다.
+
+`manifest.json`의 `agentPlatforms` 필드는 항상 양쪽 모두를 포함해야 합니다:
+
+```json
+{
+  "agentPlatforms": ["claude", "codex"]
+}
+```
+
+**규칙:**
+- 단일 플랫폼(`"claude"` 또는 `"codex"`)만 기록하지 마세요.
+- 기존 manifest에 이미 `agentPlatforms`가 있으면 덮어쓰지 말고 병합하세요.
+- 현재 세션이 어느 플랫폼에서 실행 중인지와 관계없이 항상 `["claude", "codex"]`를 유지합니다.

@@ -145,3 +145,4 @@ Extended:
 5. simple 작업은 팀 구성 없이 직접 처리
 6. 서브에이전트 결과는 파일시스템을 통해 전달
 7. 팀 구성 시 roles/team-templates를 반드시 참조
+8. manifest.json의 `agentPlatforms`는 항상 `["claude", "codex"]`를 유지 (단일 플랫폼으로 덮어쓰지 않음)
