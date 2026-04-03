@@ -83,7 +83,7 @@ allowed-tools: [Read, Write, Bash, Glob, Grep, Agent]
 #### Step 3: GitHub/웹 검색 (Step 2에서도 결과 없을 때)
 - GitHub에서 관련 스킬/플러그인을 검색:
   ```
-  WebSearch(query: "{query} agent skill site:github.com")
+  WebSearch(query: "{query} claude code skill site:github.com")
   WebSearch(query: "{query} (plugin OR agent skill) site:github.com")
   ```
 - 검색 결과에서 `.claude-plugin` 또는 `.codex-plugin` 디렉터리가 있는 레포를 우선 검토

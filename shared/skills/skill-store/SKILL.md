@@ -83,7 +83,7 @@ allowed-tools: [Read, Write, Bash, Glob, Grep, Agent]
 #### Step 3: GitHub/웹 검색 (Step 2에서도 결과 없을 때)
 - GitHub에서 관련 스킬/플러그인을 검색:
   ```
-  WebSearch(query: "{query} agent skill site:github.com")
+  WebSearch(query: "{query} claude code skill site:github.com")
   WebSearch(query: "{query} (plugin OR agent skill) site:github.com")
   ```
 - 검색 결과에서 `.claude-plugin` 또는 `.codex-plugin` 디렉터리가 있는 레포를 우선 검토
@@ -117,7 +117,22 @@ awesome-agent-skills README를 WebFetch로 가져와 catalog.json을 최신화�
 
 ## 설치 방법
 
-선택된 스킬을 설치할 때는 현재 플랫폼의 플러그인 구조를 따릅니다:
+선택된 스킬을 설치할 때는 현재 플랫폼을 감지하여 적절한 방법을 사용합니다:
+
+### Claude 환경
+
+```bash
+# 1. 마켓플레이스 등록 (이미 등록되어 있으면 무시)
+claude plugin marketplace add {owner}/{repo} 2>/dev/null
+
+# 2. 플러그인 설치 (plugin.json의 name 필드 참조)
+claude plugin install {plugin-name}@{marketplace-name}
+
+# 설치 실패 시 수동 안내
+echo "수동 설치: https://github.com/{owner}/{repo} 참고"
+```
+
+### Codex 환경
 
 ```bash
 # 1. 저장소 clone
@@ -126,7 +141,7 @@ git clone https://github.com/{owner}/{repo} ~/plugins/{repo}
 # 2. 플러그인 manifest 확인
 find ~/plugins/{repo} -maxdepth 2 \( -path "*/.claude-plugin/plugin.json" -o -path "*/.codex-plugin/plugin.json" \)
 
-# 3. 현재 플랫폼의 marketplace/local install 절차에 맞춰 등록
+# 3. marketplace.json에 항목 추가 후 config.toml에서 활성화
 ```
 
 참고:
