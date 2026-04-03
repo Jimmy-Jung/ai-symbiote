@@ -18,6 +18,8 @@ export interface PlatformConfig {
   signingSecret?: string;
   /** Slack: app-level token (Socket Mode) */
   appToken?: string;
+  /** 허용된 사용자 ID 목록 (비어있으면 모든 사용자 허용) */
+  allowedUserIds?: string[];
 }
 
 // ── 메시지 타입 ──

@@ -23,13 +23,37 @@ export class TelegramAdapter implements MessengerAdapter {
   private connected = false;
   private actionHandler: ActionHandler | null = null;
   private messageHandler: MessageHandler | null = null;
+  private allowedUserIds: Set<string> = new Set();
+
+  /** 사용자 인증 확인 */
+  private isAuthorized(userId: string): boolean {
+    // allowedUserIds가 비어있으면 모든 사용자 허용 (기존 호환)
+    if (this.allowedUserIds.size === 0) return true;
+    return this.allowedUserIds.has(userId);
+  }
 
   async connect(config: PlatformConfig): Promise<void> {
     this.bot = new Telegraf(config.token);
 
+    // 허용 사용자 목록 설정
+    if (config.allowedUserIds?.length) {
+      this.allowedUserIds = new Set(config.allowedUserIds);
+      console.log(`[Telegram] 🔒 인증 모드: ${this.allowedUserIds.size}명 허용`);
+    } else {
+      console.log(`[Telegram] ⚠️  인증 미설정: 모든 사용자 허용`);
+    }
+
     // 버튼 콜백 핸들링
     this.bot.on('callback_query', async (ctx) => {
       if (!this.actionHandler) return;
+
+      // 인증 검사
+      const userId = String(ctx.from.id);
+      if (!this.isAuthorized(userId)) {
+        await ctx.answerCbQuery('🔒 인증되지 않은 사용자입니다.');
+        return;
+      }
+
       const data = 'data' in ctx.callbackQuery ? ctx.callbackQuery.data : undefined;
       if (!data) return;
 
@@ -59,6 +83,14 @@ export class TelegramAdapter implements MessengerAdapter {
 
     // 텍스트 메시지 핸들링
     this.bot.on('text', async (ctx) => {
+      // 인증 검사
+      const userId = String(ctx.from.id);
+      if (!this.isAuthorized(userId)) {
+        console.log(`[Telegram] 🚫 미인증 사용자 차단: ${userId}`);
+        await ctx.reply('🔒 인증되지 않은 사용자입니다. 관리자에게 문의하세요.');
+        return;
+      }
+
       // pending modify가 있으면 그 응답으로 처리
       const pending = (this.bot as any).__pendingModify;
       if (pending && String(ctx.from.id) === pending.userId && this.actionHandler) {
@@ -97,6 +129,8 @@ export class TelegramAdapter implements MessengerAdapter {
       { command: 'connect', description: '기존 세션에 연결 (/connect id)' },
       { command: 'disconnect', description: '세션 연결 해제' },
       { command: 'session', description: '현재 세션 정보' },
+      { command: 'claude', description: 'Claude에 질문 (/claude 질문)' },
+      { command: 'codex', description: 'Codex에 질문 (/codex 질문)' },
       { command: 'help', description: '사용 가능한 명령어 목록' },
       { command: 'status', description: '루프 상태 확인' },
       { command: 'start', description: '작업 시작 (/start 작업내용)' },

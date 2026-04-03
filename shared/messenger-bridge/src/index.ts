@@ -62,6 +62,7 @@ function buildPlatformConfig(config: ReturnType<typeof import('./config.js')['lo
     platform: 'telegram',
     token: config.telegram!.token,
     channelId: config.telegram!.chatId,
+    allowedUserIds: config.telegram!.allowedUserIds,
   };
 }
 
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
   // 핸들러 생성
   const notificationHandler = new NotificationHandler(adapter, config);
   const approvalHandler = new ApprovalHandler(adapter, config, msgDir);
-  const sessionControlHandler = new SessionControlHandler(adapter, stateDir, msgDir, config.projectDir, config.defaultBackend);
+  const sessionControlHandler = new SessionControlHandler(adapter, stateDir, msgDir, config.projectDir, config.defaultBackend, config.security);
 
   // 어댑터 이벤트 등록
   adapter.onAction(async (action) => {

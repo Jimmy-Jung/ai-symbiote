@@ -20,6 +20,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { MessengerAdapter, UserMessage } from '../adapters/types.js';
+import type { SecurityConfig, PermissionLevel } from '../config.js';
 
 const execAsync = promisify(exec);
 
@@ -37,11 +38,44 @@ export class ClaudeRelayHandler {
   /** 세션 시작 시각 */
   private sessionStartedAt: Date | null = null;
 
+  /** 보안 설정 */
+  private security: SecurityConfig;
+  /** 현재 세션에서 사용 중인 백엔드 */
+  private activeBackend: AIBackend | null = null;
+
   constructor(
     private adapter: MessengerAdapter,
     private projectDir: string | undefined,
     private defaultBackend: AIBackend = 'claude',
-  ) {}
+    security?: SecurityConfig,
+  ) {
+    this.security = security ?? { permissionLevel: 'safe' };
+    console.log(`[Relay] 🔒 보안 모드: ${this.security.permissionLevel}`);
+  }
+
+  /** 보안 설정에 따른 Claude CLI 인자 생성 */
+  private getSecurityArgs(): string[] {
+    // 커스텀 도구 목록이 있으면 우선 적용
+    if (this.security.allowedTools?.length) {
+      return ['--allowedTools', this.security.allowedTools.join(',')];
+    }
+    if (this.security.disallowedTools?.length) {
+      return ['--disallowedTools', this.security.disallowedTools.join(',')];
+    }
+
+    // 프리셋 레벨
+    switch (this.security.permissionLevel) {
+      case 'readonly':
+        return [
+          '--permission-mode', 'plan',
+          '--allowedTools', 'Read,Glob,Grep,WebSearch,WebFetch',
+        ];
+      case 'safe':
+        return ['--disallowedTools', 'Bash'];
+      case 'full':
+        return [];
+    }
+  }
 
   /** 새 세션 시작 (세션 초기화) */
   async resetSession(channelId: string): Promise<void> {
@@ -49,6 +83,7 @@ export class ClaudeRelayHandler {
     this.sessionId = null;
     this.messageCount = 0;
     this.sessionStartedAt = null;
+    this.activeBackend = null;
     console.log(`[Relay] 🔄 세션 초기화`);
 
     if (hadSession) {
@@ -77,6 +112,7 @@ export class ClaudeRelayHandler {
     this.sessionId = null;
     this.messageCount = 0;
     this.sessionStartedAt = null;
+    this.activeBackend = null;
     console.log(`[Relay] 🔌 세션 연결 해제: ${oldId}`);
     await this.reply(channelId, `🔌 세션 연결이 해제되었습니다.\n다음 메시지는 새 세션으로 시작됩니다.`);
   }
@@ -100,7 +136,7 @@ export class ClaudeRelayHandler {
       `├ 상태: 활성`,
       `├ 메시지: ${this.messageCount}회`,
       `├ 경과: ${minutes}분 ${seconds}초`,
-      `└ 백엔드: ${this.defaultBackend}`,
+      `└ 백엔드: ${this.activeBackend ?? this.defaultBackend}`,
       '',
       '💡 /new — 새 대화 | /disconnect — 연결 해제',
     ].join('\n');
@@ -247,7 +283,11 @@ export class ClaudeRelayHandler {
       return;
     }
 
-    const cli = backend ?? this.defaultBackend;
+    // 명시적 백엔드 지정 시 activeBackend 갱신, 아니면 현재 세션 백엔드 유지
+    if (backend) {
+      this.activeBackend = backend;
+    }
+    const cli = this.activeBackend ?? this.defaultBackend;
     const preview = msg.text.length > 60 ? msg.text.slice(0, 60) + '…' : msg.text;
     this.busy = true;
 
@@ -306,7 +346,7 @@ export class ClaudeRelayHandler {
   private callClaude(prompt: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const isNewSession = !this.sessionId;
-      const args = ['-p', prompt];
+      const args = ['-p', prompt, ...this.getSecurityArgs()];
 
       if (this.sessionId) {
         // 기존 세션 이어감
@@ -416,8 +456,11 @@ export class ClaudeRelayHandler {
         timeout: 180_000,
         cwd: this.projectDir ?? process.cwd(),
         env: { ...process.env, LANG: 'ko_KR.UTF-8' },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+
+      // codex exec는 stdin도 읽으려 하므로 즉시 닫아준다
+      child.stdin!.end();
 
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];

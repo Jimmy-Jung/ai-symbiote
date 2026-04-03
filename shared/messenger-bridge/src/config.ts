@@ -23,6 +23,19 @@ export interface DiscordConfig {
 export interface TelegramConfig {
   token: string;
   chatId: string;
+  /** 허용된 Telegram 사용자 ID 목록 (비어있으면 모든 사용자 허용) */
+  allowedUserIds?: string[];
+}
+
+export type PermissionLevel = 'readonly' | 'safe' | 'full';
+
+export interface SecurityConfig {
+  /** 권한 레벨: readonly(읽기만), safe(Bash차단, 기본), full(제한없음) */
+  permissionLevel: PermissionLevel;
+  /** 허용 도구 커스텀 목록 (permissionLevel 대신 직접 지정) */
+  allowedTools?: string[];
+  /** 차단 도구 커스텀 목록 */
+  disallowedTools?: string[];
 }
 
 export interface MessengerPreferences {
@@ -44,6 +57,8 @@ export interface MessengerConfig {
   projectDir?: string;
   /** 기본 AI 백엔드: 'claude' | 'codex' (기본값: claude) */
   defaultBackend?: 'claude' | 'codex';
+  /** 보안 설정 (기본: safe 모드) */
+  security?: SecurityConfig;
 }
 
 const DEFAULT_PREFERENCES: MessengerPreferences = {

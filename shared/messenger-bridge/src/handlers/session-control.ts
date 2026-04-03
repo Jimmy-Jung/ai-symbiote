@@ -16,6 +16,7 @@ import { writeJsonAtomic, ensureDir, fileTimestamp } from '../utils/file-protoco
 import { findActiveTaskFolders, parseRalphState, readNotepad } from '../utils/state-reader.js';
 import { formatStatusMessage } from '../formatters/messages.ko.js';
 import { ClaudeRelayHandler, type AIBackend } from './claude-relay.js';
+import type { SecurityConfig } from '../config.js';
 
 type Command = 'start' | 'stop' | 'resume' | 'cancel' | 'status' | 'instruct' | 'chat' | 'claude' | 'codex' | 'new' | 'session' | 'sessions' | 'connect' | 'disconnect' | 'help';
 
@@ -40,8 +41,9 @@ export class SessionControlHandler {
     private messengerDir: string,
     projectDir?: string,
     defaultBackend?: AIBackend,
+    security?: SecurityConfig,
   ) {
-    this.claudeRelay = new ClaudeRelayHandler(adapter, projectDir, defaultBackend);
+    this.claudeRelay = new ClaudeRelayHandler(adapter, projectDir, defaultBackend, security);
   }
 
   /** 메신저 텍스트 메시지를 명령으로 처리 */

@@ -98,7 +98,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 |------|------|
 | `git-commit` | git diff를 분석하여 Conventional Commits 형식으로 커밋 메시지 생성 |
 | `pr` | 현재 브랜치의 변경사항을 분석하고 Pull Request 생성 |
-| `messenger` | Slack, Discord, Telegram 연동으로 세션 모니터링 및 원격 제어 |
+| `messenger` | Slack, Discord, Telegram 연동으로 AI 챗봇 + 세션 모니터링 + 원격 제어 ([상세](docs/MESSENGER.md)) |
 
 ### 태스크 관리
 
@@ -218,6 +218,18 @@ setup 시 자동으로 설치/확인되는 외부 플러그인:
 |----------|------|-----------|
 | [snarktank/ralph](https://github.com/snarktank/ralph) | PRD 생성(`/prd`) 및 JSON 변환(`/ralph`) | 자동 설치 |
 | [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) | Codex(GPT-5.4) 서브에이전트 연동 | 선택적 |
+
+## 메신저 브릿지
+
+Telegram, Slack, Discord를 통해 Claude/Codex CLI를 원격으로 사용할 수 있습니다. 자세한 설정 및 사용법은 [docs/MESSENGER.md](docs/MESSENGER.md)를 참조하세요.
+
+주요 기능:
+
+- **AI 챗봇**: Telegram에서 질문하면 Claude/Codex가 직접 답변 (세션 유지)
+- **세션 연동**: 맥 터미널의 Claude Code 세션을 Telegram에서 이어감
+- **실시간 모니터링**: macOS 알림 + 봇 로그로 CLI 실행 과정 확인
+- **보안**: 사용자 인증 (allowedUserIds) + CLI 권한 제한 (permissionLevel)
+- **루프 제어**: auto-loop/autopilot 세션의 원격 모니터링, 중지, 재개
 
 ## 유지보수 원칙
 
