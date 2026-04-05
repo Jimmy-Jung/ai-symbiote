@@ -67,6 +67,113 @@ fi
   ```
 - `~/ai-symbiote/{slug}/usage-data/.tracked-since`에 현재 ISO8601 타임스탬프 기록
 
+### Step 0.1: 플랫폼별 프로젝트 설정 디렉터리 생성 및 `.gitignore` 등록
+
+각 플랫폼이 사용하는 프로젝트 설정 디렉터리를 생성하고 Git 추적에서 제외합니다.
+**이 디렉터리가 없으면 hooks가 프로젝트 컨텍스트를 주입하지 못하고, 플러그인 스킬이 활용되지 않습니다.**
+
+ai-symbiote는 멀티 플랫폼이므로, 현재 실행 플랫폼과 무관하게 **양쪽 모두** 생성합니다.
+
+| 플랫폼 | 디렉터리 | 설정 파일 | 용도 |
+|--------|---------|-----------|------|
+| Claude | `.claude/` | `settings.json` | Claude Code 프로젝트별 권한/설정 |
+| Codex  | `.codex/` | `config.toml` | Codex CLI 프로젝트별 설정 |
+
+#### 1. 프로젝트 루트 확인 및 디렉터리 생성
+
+```bash
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+mkdir -p "$PROJECT_ROOT/.claude"
+mkdir -p "$PROJECT_ROOT/.codex"
+```
+
+#### 2. Claude — `.claude/settings.json` 생성 (없는 경우만)
+
+파일이 이미 존재하면 덮어쓰지 않습니다.
+
+```bash
+if [ ! -f "$PROJECT_ROOT/.claude/settings.json" ]; then
+  # 기본 권한 설정으로 생성
+fi
+```
+
+`settings.json` 기본 내용:
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Agent(*)",
+      "Skill(*)",
+      "NotebookEdit(*)"
+    ],
+    "deny": []
+  }
+}
+```
+
+#### 3. Codex — `.codex/config.toml` 생성 (없는 경우만)
+
+파일이 이미 존재하면 덮어쓰지 않습니다.
+
+```bash
+if [ ! -f "$PROJECT_ROOT/.codex/config.toml" ]; then
+  # 기본 설정으로 생성
+fi
+```
+
+`config.toml` 기본 내용:
+```toml
+# Codex 프로젝트 설정 (ai-symbiote setup 자동 생성)
+model = "o4-mini"
+approval_mode = "suggest"
+```
+
+#### 4. `.gitignore`에 설정 디렉터리 추가 (없는 경우만)
+
+```bash
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+
+# .gitignore가 없으면 생성
+if [ ! -f "$GITIGNORE" ]; then
+  touch "$GITIGNORE"
+fi
+
+# 파일 끝에 개행이 없으면 추가하는 헬퍼
+ensure_trailing_newline() {
+  [ -s "$1" ] && [ "$(tail -c1 "$1")" != "" ] && echo "" >> "$1"
+}
+
+# .claude/ 항목이 없을 때만 추가
+if ! grep -qxF '.claude/' "$GITIGNORE" && ! grep -qxF '.claude' "$GITIGNORE"; then
+  ensure_trailing_newline "$GITIGNORE"
+  echo '# AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)' >> "$GITIGNORE"
+  echo '.claude/' >> "$GITIGNORE"
+fi
+
+# .codex/ 항목이 없을 때만 추가
+if ! grep -qxF '.codex/' "$GITIGNORE" && ! grep -qxF '.codex' "$GITIGNORE"; then
+  # 위에서 이미 코멘트를 추가했을 수 있으므로 코멘트 중복 방지
+  if ! grep -qF '# AI agent 프로젝트 설정' "$GITIGNORE"; then
+    ensure_trailing_newline "$GITIGNORE"
+    echo '# AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)' >> "$GITIGNORE"
+  fi
+  echo '.codex/' >> "$GITIGNORE"
+fi
+```
+
+#### 주의사항
+- 설정 파일이 이미 존재하면 **절대 덮어쓰지 않음** (사용자 커스텀 보존)
+- `.gitignore`에 이미 해당 항목이 있으면 중복 추가하지 않음
+- 현재 플랫폼(Claude/Codex)과 무관하게 **양쪽 설정 디렉터리를 모두 생성** (크로스 플랫폼 호환)
+
 ### Step 0.5: 연동 플러그인 설치 — snarktank/ralph
 
 snarktank/ralph 플러그인이 설치되어 있는지 확인하고, 없으면 자동 설치합니다.
@@ -259,6 +366,7 @@ Skill Store의 `--auto` 모드를 실행합니다.
 사용자에게 setup 요약 출력:
 - 감지된 스택
 - 생성된 파일 경로
+- 프로젝트 설정 디렉터리: `.claude/` 생성됨/이미 존재, `.codex/` 생성됨/이미 존재, `.gitignore` 등록됨
 - 상태 디렉터리 위치
 - 설치된 연동 플러그인:
   - snarktank/ralph: 설치됨/미설치
