@@ -1,6 +1,7 @@
 #!/bin/bash
 # ai-symbiote PostToolUse hook: Track skill/command usage.
-# Monitors Read tool calls to detect skill/command file reads.
+# Monitors Read tool calls to detect skill/command file reads,
+# and Skill tool calls to directly capture skill invocations.
 #
 # Also supports CLI mode: bash usage-tracker.sh <category> <name>
 # Categories: skills | commands
@@ -66,9 +67,27 @@ if [ $# -ge 2 ]; then
   exit 0
 fi
 
-# Hook mode: PostToolUse(Read)
+# Hook mode: PostToolUse(Read|Skill)
 INPUT=$(cat)
 
+# --- Skill tool detection ---
+# Skill tool provides: tool_input.skill (e.g. "ai-symbiote:setup", "commit")
+SKILL_NAME=$(json_nested_field "$INPUT" "tool_input" "skill")
+if [ -z "$SKILL_NAME" ]; then
+  SKILL_NAME=$(json_field "$INPUT" "skill")
+fi
+
+if [ -n "$SKILL_NAME" ]; then
+  # Strip plugin prefix if present (e.g. "ai-symbiote:setup" -> "setup")
+  NAME="${SKILL_NAME##*:}"
+  NAME=$(printf '%s' "$NAME" | tr -cd 'a-zA-Z0-9_-')
+  if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
+    increment_counter "skills" "$NAME"
+  fi
+  exit 0
+fi
+
+# --- Read tool detection (legacy: SKILL.md file reads) ---
 FILE_PATH=$(json_nested_field "$INPUT" "tool_input" "file_path")
 if [ -z "$FILE_PATH" ]; then
   FILE_PATH=$(json_field "$INPUT" "file_path")
