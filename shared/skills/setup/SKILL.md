@@ -69,36 +69,22 @@ fi
 
 ### Step 0.1: 플랫폼별 프로젝트 설정 디렉터리 생성 및 `.gitignore` 등록
 
-각 플랫폼이 사용하는 프로젝트 설정 디렉터리를 생성하고 Git 추적에서 제외합니다.
-**이 디렉터리가 없으면 hooks가 프로젝트 컨텍스트를 주입하지 못하고, 플러그인 스킬이 활용되지 않습니다.**
-
+**⚠️ 필수 단계 — 반드시 실행하세요.**
+이 디렉터리가 없으면 hooks가 프로젝트 컨텍스트를 주입하지 못하고, 플러그인 스킬이 활용되지 않습니다.
 ai-symbiote는 멀티 플랫폼이므로, 현재 실행 플랫폼과 무관하게 **양쪽 모두** 생성합니다.
 
-| 플랫폼 | 디렉터리 | 설정 파일 | 용도 |
-|--------|---------|-----------|------|
-| Claude | `.claude/` | `settings.json` | Claude Code 프로젝트별 권한/설정 |
-| Codex  | `.codex/` | `config.toml` | Codex CLI 프로젝트별 설정 |
-
-#### 1. 프로젝트 루트 확인 및 디렉터리 생성
+#### 실행 (Bash 도구로 아래 스크립트를 실행하세요)
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+# 1. 디렉터리 생성
 mkdir -p "$PROJECT_ROOT/.claude"
 mkdir -p "$PROJECT_ROOT/.codex"
-```
 
-#### 2. Claude — `.claude/settings.json` 생성 (없는 경우만)
-
-파일이 이미 존재하면 덮어쓰지 않습니다.
-
-```bash
+# 2. .claude/settings.json (없을 때만)
 if [ ! -f "$PROJECT_ROOT/.claude/settings.json" ]; then
-  # 기본 권한 설정으로 생성
-fi
-```
-
-`settings.json` 기본 내용:
-```json
+  cat > "$PROJECT_ROOT/.claude/settings.json" << 'SETTINGS_EOF'
 {
   "permissions": {
     "allow": [
@@ -117,62 +103,47 @@ fi
     "deny": []
   }
 }
-```
-
-#### 3. Codex — `.codex/config.toml` 생성 (없는 경우만)
-
-파일이 이미 존재하면 덮어쓰지 않습니다.
-
-```bash
-if [ ! -f "$PROJECT_ROOT/.codex/config.toml" ]; then
-  # 기본 설정으로 생성
+SETTINGS_EOF
+  echo "[Step 0.1] .claude/settings.json 생성 완료"
+else
+  echo "[Step 0.1] .claude/settings.json 이미 존재 — 건너뜀"
 fi
-```
 
-`config.toml` 기본 내용:
-```toml
+# 3. .codex/config.toml (없을 때만)
+if [ ! -f "$PROJECT_ROOT/.codex/config.toml" ]; then
+  cat > "$PROJECT_ROOT/.codex/config.toml" << 'CODEX_EOF'
 # Codex 프로젝트 설정 (ai-symbiote setup 자동 생성)
 model = "o4-mini"
 approval_mode = "suggest"
-```
-
-#### 4. `.gitignore`에 설정 디렉터리 추가 (없는 경우만)
-
-```bash
-GITIGNORE="$PROJECT_ROOT/.gitignore"
-
-# .gitignore가 없으면 생성
-if [ ! -f "$GITIGNORE" ]; then
-  touch "$GITIGNORE"
+CODEX_EOF
+  echo "[Step 0.1] .codex/config.toml 생성 완료"
+else
+  echo "[Step 0.1] .codex/config.toml 이미 존재 — 건너뜀"
 fi
 
-# 파일 끝에 개행이 없으면 추가하는 헬퍼
-ensure_trailing_newline() {
-  [ -s "$1" ] && [ "$(tail -c1 "$1")" != "" ] && echo "" >> "$1"
+# 4. .gitignore에 등록 (중복 방지)
+GITIGNORE="$PROJECT_ROOT/.gitignore"
+[ ! -f "$GITIGNORE" ] && touch "$GITIGNORE"
+
+add_to_gitignore() {
+  local entry="$1"
+  if ! grep -qxF "$entry" "$GITIGNORE" && ! grep -qxF "${entry%/}" "$GITIGNORE"; then
+    [ -s "$GITIGNORE" ] && [ "$(tail -c1 "$GITIGNORE")" != "" ] && echo "" >> "$GITIGNORE"
+    if ! grep -qF '# AI agent 프로젝트 설정' "$GITIGNORE"; then
+      echo '# AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)' >> "$GITIGNORE"
+    fi
+    echo "$entry" >> "$GITIGNORE"
+    echo "[Step 0.1] .gitignore에 $entry 추가"
+  fi
 }
 
-# .claude/ 항목이 없을 때만 추가
-if ! grep -qxF '.claude/' "$GITIGNORE" && ! grep -qxF '.claude' "$GITIGNORE"; then
-  ensure_trailing_newline "$GITIGNORE"
-  echo '# AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)' >> "$GITIGNORE"
-  echo '.claude/' >> "$GITIGNORE"
-fi
+add_to_gitignore '.claude/'
+add_to_gitignore '.codex/'
 
-# .codex/ 항목이 없을 때만 추가
-if ! grep -qxF '.codex/' "$GITIGNORE" && ! grep -qxF '.codex' "$GITIGNORE"; then
-  # 위에서 이미 코멘트를 추가했을 수 있으므로 코멘트 중복 방지
-  if ! grep -qF '# AI agent 프로젝트 설정' "$GITIGNORE"; then
-    ensure_trailing_newline "$GITIGNORE"
-    echo '# AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)' >> "$GITIGNORE"
-  fi
-  echo '.codex/' >> "$GITIGNORE"
-fi
+echo "[Step 0.1] 완료"
 ```
 
-#### 주의사항
-- 설정 파일이 이미 존재하면 **절대 덮어쓰지 않음** (사용자 커스텀 보존)
-- `.gitignore`에 이미 해당 항목이 있으면 중복 추가하지 않음
-- 현재 플랫폼(Claude/Codex)과 무관하게 **양쪽 설정 디렉터리를 모두 생성** (크로스 플랫폼 호환)
+**이 전체 스크립트를 하나의 Bash 도구 호출로 실행하세요.** 설명용 코드가 아닙니다.
 
 ### Step 0.5: 연동 플러그인 설치 — snarktank/ralph
 
@@ -360,6 +331,54 @@ Skill Store의 `--auto` 모드를 실행합니다.
 - 코딩 컨벤션 (기존 코드에서 추출)
 - 파일 네이밍 패턴
 - 아키텍처 패턴
+
+### Step 4.1: 프로젝트 CLAUDE.md 생성
+
+**⚠️ 필수 단계 — 반드시 실행하세요.**
+프로젝트 루트에 `CLAUDE.md`가 없으면 Claude Code가 프로젝트 컨텍스트와 ai-symbiote 스킬을 인식하지 못합니다.
+
+#### 조건
+- `CLAUDE.md`가 이미 존재하면 **건너뜁니다** (사용자 커스텀 보존).
+- 존재하지 않을 때만 Write 도구로 새로 생성합니다.
+
+#### 내용 구성 (Write 도구로 `{PROJECT_ROOT}/CLAUDE.md`에 작성)
+
+Step 1~4에서 감지한 정보를 기반으로 아래 섹션을 포함합니다:
+
+```markdown
+# {프로젝트 이름} - Claude Code Instructions
+
+## 프로젝트 개요
+- Step 1에서 감지한 프로젝트 타입, 플랫폼, 빌드 도구 요약
+
+## ai-symbiote 플러그인 사용
+- 상태 디렉터리: `~/ai-symbiote/{slug}/`
+- 자율 실행: `/auto-loop <작업 설명>`
+- 병렬 실행: `/autopilot <작업 설명>`
+- PRD 기반: `/prd` → `/ralph`
+- 분석: `/analyze <대상>`
+- 계획: `/plan <작업>`
+- 코드 리뷰: `/review`
+- 커밋: `/git-commit`
+- 심층 탐색: `/deep-search <키워드>`
+- 메모: `/note <내용>`
+- Task Master: `/tm-init`, `/tm-board`
+
+## 코딩 컨벤션
+- Step 1에서 감지한 코딩 컨벤션 (파일 네이밍, 커밋 패턴 등)
+
+## 주요 의존성
+- Step 1에서 감지한 프레임워크/라이브러리 테이블
+
+## 모듈 구조
+- Step 1에서 감지한 디렉터리 구조 트리
+```
+
+**`CLAUDE.md`는 Step 0.1에서 생성한 `.claude/` 디렉터리와 다릅니다.**
+- `.claude/settings.json` = Claude Code 도구 권한 설정 (기계용)
+- `CLAUDE.md` = 프로젝트 컨텍스트 + 스킬 안내 (AI용)
+
+양쪽 모두 있어야 플러그인이 정상 동작합니다.
 
 ### Step 5: 리포트
 
