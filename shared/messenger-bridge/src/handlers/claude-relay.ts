@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { promisify } from 'node:util';
 import type { MessengerAdapter, UserMessage } from '../adapters/types.js';
-import type { SecurityConfig, PermissionLevel } from '../config.js';
+import type { SecurityConfig } from '../config.js';
 
 const execAsync = promisify(exec);
 
@@ -446,14 +446,39 @@ export class ClaudeRelayHandler {
     }
   }
 
-  /** spawn 기반 Codex CLI 호출 — stdout/stderr 실시간 로그 출력 */
-  private callCodex(prompt: string): Promise<string> {
+  /** PermissionLevel → Codex sandbox 모드 매핑 */
+  private getCodexSandboxMode(): string {
+    switch (this.security.permissionLevel) {
+      case 'readonly': return 'locked-down';
+      case 'safe':     return 'read-only';
+      case 'full':     return 'full-auto';
+    }
+  }
+
+  /** spawn 기반 Codex CLI 호출 — 보안 매핑 + 구조화 출력 + 에러 분류 */
+  private callCodex(prompt: string, opts?: { model?: string; sandbox?: string; timeout?: number }): Promise<string> {
     const tmpFile = join(tmpdir(), `codex-out-${randomBytes(4).toString('hex')}.txt`);
+    const timeout = opts?.timeout ?? 180_000;
 
     return new Promise((resolve, reject) => {
       const args = ['exec', prompt, '-o', tmpFile];
+
+      // 작업 디렉토리
+      if (this.projectDir) {
+        args.push('-C', this.projectDir);
+      }
+
+      // 샌드박스 모드 (명시 지정 > 보안 설정 매핑)
+      const sandbox = opts?.sandbox ?? this.getCodexSandboxMode();
+      args.push('-s', sandbox);
+
+      // 모델 오버라이드
+      if (opts?.model) {
+        args.push('-m', opts.model);
+      }
+
       const child = spawn('codex', args, {
-        timeout: 180_000,
+        timeout,
         cwd: this.projectDir ?? process.cwd(),
         env: { ...process.env, LANG: 'ko_KR.UTF-8' },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -469,8 +494,8 @@ export class ClaudeRelayHandler {
         stdoutChunks.push(chunk);
         const lines = chunk.toString().split('\n').filter(Boolean);
         for (const line of lines) {
-          const trimmed = line.length > 120 ? line.slice(0, 120) + '…' : line;
-          console.log(`[Relay] 📝 ${trimmed}`);
+          const trimmed = line.length > 120 ? line.slice(0, 120) + '...' : line;
+          console.log(`[Relay] codex: ${trimmed}`);
         }
       });
 
@@ -491,14 +516,24 @@ export class ClaudeRelayHandler {
         }
 
         if (!output && code !== 0) {
-          reject(new Error(stderr || `프로세스 종료 코드: ${code}`));
+          const errMsg = stderr || `codex exit code: ${code}`;
+          // 에러 분류
+          if (code === null) {
+            reject(new Error(`[timeout] codex ${timeout}ms 초과: ${errMsg}`));
+          } else if (stderr.includes('auth') || stderr.includes('API key')) {
+            reject(new Error(`[auth] codex 인증 실패: ${errMsg}`));
+          } else if (stderr.includes('Unknown') || stderr.includes('error: unexpected')) {
+            reject(new Error(`[flag] codex 잘못된 인자: ${errMsg}`));
+          } else {
+            reject(new Error(`[exec] codex 실행 실패 (code=${code}): ${errMsg}`));
+          }
           return;
         }
         resolve(output || '(빈 응답)');
       });
 
       child.on('error', (err) => {
-        reject(err);
+        reject(new Error(`[spawn] codex 프로세스 시작 실패: ${err.message}`));
       });
     });
   }
