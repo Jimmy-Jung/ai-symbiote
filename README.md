@@ -132,32 +132,47 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
 │   ├── skills/                #   25개 스킬
-│   ├── hooks/scripts/         #   훅 스크립트 (setup-check, guard-shell 등)
-│   ├── taskmaster/            #   PRD/task 스키마 및 템플릿
-│   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지
+│   ├── hooks/scripts/         #   훅 스크립트 5개
+│   │   ├── setup-check.sh     #     세션 시작 시 프로젝트 상태 확인
+│   │   ├── guard-shell.sh     #     위험 명령어 차단
+│   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
+│   │   ├── comment-checker.sh #     코드 주석 품질 검사
+│   │   ├── messenger-notify.sh#     메신저 알림 전송
+│   │   └── lib/common.sh      #     훅 공용 라이브러리
+│   ├── taskmaster/            #   PRD/task/state 스키마 및 템플릿
+│   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지 (TypeScript)
 ├── platforms/
 │   ├── claude/
 │   │   └── overlay/           #   .claude-plugin/plugin.json, hooks/hooks.json
 │   └── codex/
-│       └── overlay/           #   .codex-plugin/plugin.json, hooks/hooks.json
+│       ├── overlay/           #   .codex-plugin/plugin.json, hooks/hooks.json
+│       └── install.sh         #   Codex 원클릭 설치 스크립트
 ├── plugins/
 │   └── ai-symbiote/           # Claude marketplace용 번들 (빌드 생성물, 직접 편집 금지)
+├── dist/                      # 빌드 출력 (Git 미포함)
+│   ├── claude-symbiote/       #   Claude 배포용 번들
+│   └── codex-symbiote/        #   Codex 배포용 번들
 ├── scripts/
-│   ├── build-claude.sh        #   shared + claude overlay → plugins/ai-symbiote/
+│   ├── build-claude.sh        #   shared + claude overlay → plugins/ + dist/
 │   ├── build-codex.sh         #   shared + codex overlay → dist/codex-symbiote/
 │   └── build-all.sh
-└── .claude-plugin/
-    └── marketplace.json       # Claude marketplace 카탈로그
+├── docs/
+│   ├── ARCHITECTURE.md        #   아키텍처 상세 문서
+│   └── MESSENGER.md           #   메신저 브릿지 상세 문서
+├── .claude-plugin/
+│   └── marketplace.json       # Claude marketplace 카탈로그
+└── .codex/
+    └── config.toml            # Codex 프로젝트 설정 (기본 모델: gpt-5.4)
 ```
 
 ### 빌드 흐름
 
 ```
-shared/  ──rsync──▶  plugins/ai-symbiote/   (Claude용, Git에 포함)
-   +
+shared/  ──rsync──▶  plugins/ai-symbiote/   (Claude marketplace, Git에 포함)
+   +                 dist/claude-symbiote/   (Claude 배포용)
 claude/overlay/
 
-shared/  ──rsync──▶  dist/codex-symbiote/   (Codex용, Git 미포함)
+shared/  ──rsync──▶  dist/codex-symbiote/   (Codex 배포용, Git 미포함)
    +
 codex/overlay/
 ```
@@ -166,8 +181,8 @@ codex/overlay/
 
 ```bash
 bash scripts/build-all.sh      # 양쪽 모두
-bash scripts/build-claude.sh   # Claude만
-bash scripts/build-codex.sh    # Codex만
+bash scripts/build-claude.sh   # Claude만 (plugins/ + dist/)
+bash scripts/build-codex.sh    # Codex만 (dist/)
 ```
 
 ## 플랫폼 차이
@@ -176,12 +191,13 @@ bash scripts/build-codex.sh    # Codex만
 |------|-------------|-----------|
 | 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` (자동 제공) | `~/plugins/ai-symbiote` |
 | Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse |
-| PostToolUse 매처 | Read, Write\|Edit, Bash 등 전체 | Bash만 지원 |
+| PostToolUse 매처 | Read\|Skill, Write\|Edit | Bash만 지원 |
 | Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
+| 기본 모델 | — | gpt-5.4 (`.codex/config.toml`) |
 | 스킬 호출 | `/ai-symbiote:setup` | `$ai-symbiote:setup` 또는 암시적 호출 |
 | 연동 플러그인 설치 | `claude plugin install` | `git clone` + 로컬 등록 |
 
-Codex에서 PostToolUse의 Read, Write|Edit 매처가 지원되지 않으므로, usage-tracker, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
+Codex에서 PostToolUse의 Read\|Skill, Write\|Edit 매처가 지원되지 않으므로, usage-tracker, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
 
 ## 상태 저장
 
