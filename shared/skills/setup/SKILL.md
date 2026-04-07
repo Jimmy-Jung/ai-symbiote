@@ -113,7 +113,7 @@ fi
 if [ ! -f "$PROJECT_ROOT/.codex/config.toml" ]; then
   cat > "$PROJECT_ROOT/.codex/config.toml" << 'CODEX_EOF'
 # Codex 프로젝트 설정 (ai-symbiote setup 자동 생성)
-model = "o4-mini"
+model = "gpt-5.4"
 approval_mode = "suggest"
 CODEX_EOF
   echo "[Step 0.1] .codex/config.toml 생성 완료"
