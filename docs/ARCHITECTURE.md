@@ -6,8 +6,8 @@
 
 `shared/`는 플랫폼에 독립적인 자산을 담습니다.
 
-- `skills/` — 25개 스킬 정의
-- `hooks/scripts/` — 훅 스크립트 5개 (setup-check, guard-shell, usage-tracker, comment-checker, messenger-notify)
+- `skills/` — 26개 스킬 정의
+- `hooks/scripts/` — 훅 스크립트 6개 (setup-check, guard-shell, usage-tracker, harness-learn, comment-checker, messenger-notify)
 - `hooks/scripts/lib/common.sh` — 훅 공용 라이브러리
 - `taskmaster/` — PRD/task/state JSON 스키마 및 템플릿
 - `messenger-bridge/` — Telegram/Slack/Discord 브릿지 (TypeScript)
@@ -28,6 +28,7 @@
 | SessionStart | — | setup-check.sh | O | O |
 | PreToolUse | Bash | guard-shell.sh | O | O |
 | PostToolUse | Read\|Skill | usage-tracker.sh | O | X |
+| PostToolUse | Write\|Edit | harness-learn.sh | O | X |
 | PostToolUse | Write\|Edit | comment-checker.sh | O | X |
 | PostToolUse | Write\|Edit | messenger-notify.sh | O | X |
 

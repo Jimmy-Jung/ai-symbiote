@@ -2,31 +2,86 @@
 
 > Author: JunyoungJung
 
-Claude Code와 Codex CLI에서 **동일한 스킬, 훅, 태스크 매니저**를 공유하는 AI 에이전트 오케스트레이션 플러그인입니다. 하나의 소스(`shared/`)를 관리하면 양쪽 플랫폼에서 같은 방식으로 동작합니다.
+마블의 **베놈(Venom)**을 기억하시나요? 심비오트(Symbiote)는 숙주에 달라붙어 하나가 되는 외계 생명체입니다. 숙주의 능력을 증폭시키고, 숙주의 경험을 통해 스스로도 진화합니다.
+
+ai-symbiote는 이 관계를 코드 위에 구현합니다. AI 에이전트에 달라붙어 하나가 되고, 에이전트가 실수하면 하네스가 자동으로 강해지고, 개발자가 규칙을 다듬으면 에이전트가 더 정확해집니다. 베놈이 에디 브록과 함께 강해지듯, **ai-symbiote는 쓰면 쓸수록 개발자와 에이전트가 함께 강해지는 공생 시스템**입니다.
+
+Claude Code와 Codex CLI에서 동일한 스킬, 훅, 태스크 매니저를 공유하는 AI 에이전트 오케스트레이션 플러그인입니다.
+
+## Harness Engineering
+
+AI 모델이 아무리 똑똑해도 혼자 두면 같은 실수를 반복합니다. 하네스(harness)는 이 문제를 구조적으로 해결합니다. 프롬프트로 "이렇게 하지 마"라고 부탁하는 대신, **실수 자체가 불가능한 환경을 설계**합니다.
+
+ai-symbiote의 하네스는 세 가지 기둥으로 구성됩니다:
+
+### 1. Context File (context.md)
+
+에이전트가 매 세션 시작 시 가장 먼저 읽는 프로젝트 지침서입니다. `setup` 스킬이 프로젝트 스택, 코딩 컨벤션, 아키텍처를 자동 감지하여 생성하고, `evolve` 스킬이 프로젝트 변화에 맞춰 동기화합니다.
+
+```mermaid
+flowchart LR
+    A[SessionStart] --> B[setup-check.sh]
+    B --> C[context.md]
+    C -->|"systemMessage 주입"| D["에이전트가 프로젝트 규칙을<br/>인지한 상태로 작업 시작"]
+```
+
+### 2. Auto-Enforcement (Hooks)
+
+규칙을 "부탁"이 아닌 "강제"로 적용합니다:
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `guard-shell.sh` | PreToolUse(Bash) | `git push --force`, `rm -rf /` 등 위험 명령 차단 |
+| `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 → 자동 규칙 생성 |
+| `comment-checker.sh` | PostToolUse(Write\|Edit) | 자명한 주석, 주석 처리된 코드 경고 |
+
+```mermaid
+flowchart LR
+    subgraph PreToolUse
+        A["Bash 명령"] -->|guard-shell.sh| B{"위험한 명령?"}
+        B -->|"Yes"| C["차단"]
+        B -->|"No"| D["허용"]
+    end
+    subgraph PostToolUse
+        E["Write/Edit"] -->|harness-learn.sh| F{"반복 실수?"}
+        F -->|"Yes"| G["기록 + 규칙 자동 생성"]
+        F -->|"No"| H["조용히 통과"]
+    end
+```
+
+핵심 원칙: **"성공은 조용히, 실패만 시끄럽게."** 테스트가 통과하면 아무 출력 없이 진행하고, 실패했을 때만 에이전트에게 알립니다. 통과한 4,000줄의 결과를 모두 보여주면 에이전트가 그걸 읽느라 정작 할 일을 잊어버리기 때문입니다.
+
+### 3. Garbage Collection (gc skill)
+
+규칙은 추가만 하면 비대해집니다. `gc` 스킬이 30일 이상 트리거되지 않은 규칙을 식별하고 정리를 제안합니다. context.md는 300줄 이하로 유지되어야 에이전트가 효과적으로 활용할 수 있습니다.
+
+### Self-Evolving Harness
+
+```mermaid
+flowchart TD
+    A["에이전트 실수 발생"] --> B["harness-learn.sh"]
+    B -->|"기록"| C["harness-log.jsonl"]
+    B -->|"7일 내 동일 실수 2회+"| D["context.md에<br/>규칙 자동 추가"]
+    D --> E["다음 세션: 에이전트가 규칙을 읽고<br/>동일 실수 회피"]
+    F["gc 스킬"] -->|"30일+ 미사용<br/>규칙 정리"| D
+    C -->|"stats 스킬"| G["하네스 진화<br/>지표 대시보드"]
+```
+
+시간이 지날수록 하네스는 프로젝트에 특화된 규칙을 축적합니다. `stats` 스킬로 하네스 진화 지표(규칙 수, 실수 빈도 추이, 재발률)를 확인할 수 있습니다.
 
 ## 설치
 
 ### Claude Code
 
-1. marketplace 등록:
-
 ```text
 /plugin marketplace add Jimmy-Jung/ai-symbiote
-```
-
-2. 플러그인 설치:
-
-```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
-로컬 저장소를 사용하려면:
+로컬 저장소 사용:
 
 ```text
 /plugin marketplace add /path/to/ai-symbiote
-```
-
-```text
 /plugin install ai-symbiote@ai-symbiote
 ```
 
@@ -38,33 +93,23 @@ claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote
 
 ### Codex CLI
 
-Codex 세션에서 아래 프롬프트를 입력하면 자동으로 클론 + 설치됩니다:
-
-```text
-https://github.com/Jimmy-Jung/ai-symbiote 저장소를 ~/ai-symbiote-repo에 클론하고 bash platforms/codex/install.sh를 실행해서 ai-symbiote 플러그인을 설치해줘
-```
-
-직접 설치:
-
 ```bash
 git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
 cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ```
 
-`install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true` 포함)을 한 번에 처리합니다.
+`install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true`)을 한 번에 처리합니다.
 
 ### 업데이트
 
-양쪽 플랫폼 모두에서 `update` 스킬로 최신 버전으로 업데이트할 수 있습니다:
+```
+Claude: /ai-symbiote:update
+Codex:  $ai-symbiote:update
+```
 
-- Claude: `/ai-symbiote:update`
-- Codex: `$ai-symbiote:update` 또는 "ai-symbiote 업데이트해줘"
+## 스킬 목록 (26개)
 
-저장소를 자동으로 pull하고 플랫폼에 맞게 재설치합니다.
-
-## 스킬 목록
-
-설치 후 사용할 수 있는 25개 스킬입니다. Claude에서는 `/ai-symbiote:<name>`, Codex에서는 `$ai-symbiote:<name>`으로 호출합니다.
+`/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
 
 ### 핵심 워크플로우
 
@@ -72,17 +117,17 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 |------|------|
 | `synapse` | 사용자 의도를 분석하여 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
 | `auto-loop` | Analyze → Plan → Execute → Verify를 반복하여 작업을 자율 완료 (최대 10회) |
-| `autopilot` | auto-loop의 병렬 극대화 모드. Builder를 최대한 동시 투입 (최대 3회) |
+| `autopilot` | auto-loop의 병렬 극대화 모드. Builder를 최대한 동시 투입 |
 | `setup` | 프로젝트 스택 감지, 연동 플러그인 자동 설치, 상태 디렉터리 초기화 |
 
 ### 계획 및 분석
 
 | 스킬 | 설명 |
 |------|------|
-| `plan` | Scout 2명 + Architect 1명으로 구현 계획을 수립 |
-| `planning` | 요구사항 인터뷰, 영향도 평가, 계획 템플릿 등 계획 방법론 정의 |
-| `analyze` | Scout 2~3명 + Architect 1명으로 대상을 심층 분석 |
-| `deep-search` | Grep, Glob, Agent(Explore)를 병렬 3-Track으로 코드베이스 탐색 |
+| `plan` | Scout 2명 + Architect 1명으로 구현 계획 수립 |
+| `planning` | 요구사항 인터뷰, 영향도 평가, 계획 템플릿 방법론 |
+| `analyze` | Scout 2~3명 + Architect 1명으로 대상 심층 분석 |
+| `deep-search` | Grep, Glob, Agent(Explore) 병렬 3-Track 코드베이스 탐색 |
 
 ### 코드 품질
 
@@ -90,7 +135,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 |------|------|
 | `review` | 현재 변경사항에 대해 코드 리뷰 실행 |
 | `code-accuracy` | 심볼 존재 확인, import 검증, 환각 코드 방지 가드레일 |
-| `verify-loop` | 자율 루프의 4-Level 완료 기준과 재시도 전략 정의 |
+| `verify-loop` | 자율 루프의 4-Level 완료 기준과 재시도 전략 |
 
 ### Git 및 협업
 
@@ -98,7 +143,7 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 |------|------|
 | `git-commit` | git diff를 분석하여 Conventional Commits 형식으로 커밋 메시지 생성 |
 | `pr` | 현재 브랜치의 변경사항을 분석하고 Pull Request 생성 |
-| `messenger` | Slack, Discord, Telegram 연동으로 AI 챗봇 + 세션 모니터링 + 원격 제어 ([상세](docs/MESSENGER.md)) |
+| `messenger` | Slack, Discord, Telegram 연동으로 원격 모니터링 및 제어 ([상세](docs/MESSENGER.md)) |
 
 ### 태스크 관리
 
@@ -116,8 +161,9 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 | `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
 | `update` | 저장소 pull + 플랫폼별 재설치를 자동 수행 |
 | `clean` | 완료된 작업의 상태 폴더 정리 |
+| `gc` | 하네스 자동 생성 규칙의 가비지 컬렉션. 미사용 규칙 정리, 로그 정리 |
 | `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
-| `stats` | 스킬/커맨드 사용 빈도 분석 |
+| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 |
 
 ### 내부 스킬 (synapse가 자동 참조)
 
@@ -126,84 +172,62 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 | `roles` | Scout, Architect, Builder, Inspector, Researcher, Codex 6개 역할의 계약 정의 |
 | `team-templates` | analysis, implementation, review, planning, research, dynamic 6개 팀 템플릿 |
 
-## 디렉터리 구조
+## 아키텍처
 
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   25개 스킬
-│   ├── hooks/scripts/         #   훅 스크립트 5개
+│   ├── skills/                #   26개 스킬
+│   ├── hooks/scripts/         #   6개 훅 스크립트
 │   │   ├── setup-check.sh     #     세션 시작 시 프로젝트 상태 확인
 │   │   ├── guard-shell.sh     #     위험 명령어 차단
 │   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
+│   │   ├── harness-learn.sh   #     에이전트 실수 감지 및 규칙 자동 생성
 │   │   ├── comment-checker.sh #     코드 주석 품질 검사
 │   │   ├── messenger-notify.sh#     메신저 알림 전송
 │   │   └── lib/common.sh      #     훅 공용 라이브러리
 │   ├── taskmaster/            #   PRD/task/state 스키마 및 템플릿
 │   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지 (TypeScript)
 ├── platforms/
-│   ├── claude/
-│   │   └── overlay/           #   .claude-plugin/plugin.json, hooks/hooks.json
-│   └── codex/
-│       ├── overlay/           #   .codex-plugin/plugin.json, hooks/hooks.json
-│       └── install.sh         #   Codex 원클릭 설치 스크립트
-├── plugins/
-│   └── ai-symbiote/           # Claude marketplace용 번들 (빌드 생성물, 직접 편집 금지)
-├── dist/                      # 빌드 출력 (Git 미포함)
-│   ├── claude-symbiote/       #   Claude 배포용 번들
-│   └── codex-symbiote/        #   Codex 배포용 번들
-├── scripts/
-│   ├── build-claude.sh        #   shared + claude overlay → plugins/ + dist/
-│   ├── build-codex.sh         #   shared + codex overlay → dist/codex-symbiote/
-│   └── build-all.sh
-├── docs/
-│   ├── ARCHITECTURE.md        #   아키텍처 상세 문서
-│   └── MESSENGER.md           #   메신저 브릿지 상세 문서
-├── .claude-plugin/
-│   └── marketplace.json       # Claude marketplace 카탈로그
-└── .codex/
-    └── config.toml            # Codex 프로젝트 설정 (기본 모델: gpt-5.4)
+│   ├── claude/overlay/        #   .claude-plugin/plugin.json, hooks/hooks.json
+│   └── codex/overlay/         #   .codex-plugin/plugin.json, hooks/hooks.json
+├── plugins/ai-symbiote/       # Claude marketplace용 번들 (빌드 생성물)
+├── dist/                      # 빌드 출력
+├── scripts/                   # build-claude.sh, build-codex.sh, build-all.sh
+└── docs/                      # ARCHITECTURE.md, MESSENGER.md
 ```
 
 ### 빌드 흐름
 
+```mermaid
+flowchart LR
+    S["shared/"] --> C["claude/overlay/"]
+    S --> X["codex/overlay/"]
+    C -->|rsync| P["plugins/ai-symbiote/<br/>dist/claude-symbiote/"]
+    X -->|rsync| D["dist/codex-symbiote/"]
 ```
-shared/  ──rsync──▶  plugins/ai-symbiote/   (Claude marketplace, Git에 포함)
-   +                 dist/claude-symbiote/   (Claude 배포용)
-claude/overlay/
-
-shared/  ──rsync──▶  dist/codex-symbiote/   (Codex 배포용, Git 미포함)
-   +
-codex/overlay/
-```
-
-빌드 명령:
 
 ```bash
 bash scripts/build-all.sh      # 양쪽 모두
-bash scripts/build-claude.sh   # Claude만 (plugins/ + dist/)
-bash scripts/build-codex.sh    # Codex만 (dist/)
+bash scripts/build-claude.sh   # Claude만
+bash scripts/build-codex.sh    # Codex만
 ```
 
 ## 플랫폼 차이
 
 | 항목 | Claude Code | Codex CLI |
 |------|-------------|-----------|
-| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` (자동 제공) | `~/plugins/ai-symbiote` |
+| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `~/plugins/ai-symbiote` |
 | Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse |
 | PostToolUse 매처 | Read\|Skill, Write\|Edit | Bash만 지원 |
 | Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
-| 기본 모델 | — | gpt-5.4 (`.codex/config.toml`) |
-| 스킬 호출 | `/ai-symbiote:setup` | `$ai-symbiote:setup` 또는 암시적 호출 |
-| 연동 플러그인 설치 | `claude plugin install` | `git clone` + 로컬 등록 |
+| 기본 모델 | — | gpt-5.4 |
 
-Codex에서 PostToolUse의 Read\|Skill, Write\|Edit 매처가 지원되지 않으므로, usage-tracker, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
+Codex에서 PostToolUse의 Read\|Skill, Write\|Edit 매처가 지원되지 않으므로, usage-tracker, harness-learn, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
 
-## 상태 저장
+## 상태 관리
 
 모든 플랫폼은 `~/ai-symbiote/{slug}/`를 공용 상태 루트로 사용합니다.
-
-### Slug 규칙
 
 slug는 **git 루트 디렉터리의 basename**을 소문자로 변환하여 생성합니다:
 
@@ -212,14 +236,11 @@ slug는 **git 루트 디렉터리의 basename**을 소문자로 변환하여 생
 /home/user/work/api-server →  api-server
 ```
 
-같은 이름의 프로젝트가 다른 경로에 존재하면, `manifest.json`의 `path` 필드로 충돌을 감지하고 부모 디렉터리를 접두어로 추가합니다.
-
-### 상태 디렉터리 구조
-
 ```text
 ~/ai-symbiote/{slug}/
 ├── manifest.json       # 프로젝트 스택, 설정, 경로, 연동 플러그인 상태
-├── context.md          # 동적 컨텍스트 (스택, 컨벤션)
+├── context.md          # 동적 컨텍스트 (스택, 컨벤션, 하네스 규칙)
+├── harness-log.jsonl   # 에이전트 실수 로그 (자동 관리)
 ├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
 ├── taskmaster/         # PRD, task graph
 ├── usage-data/         # 스킬/커맨드 사용 통계
@@ -238,8 +259,6 @@ setup 시 자동으로 설치/확인되는 외부 플러그인:
 ## 메신저 브릿지
 
 Telegram, Slack, Discord를 통해 Claude/Codex CLI를 원격으로 사용할 수 있습니다. 자세한 설정 및 사용법은 [docs/MESSENGER.md](docs/MESSENGER.md)를 참조하세요.
-
-주요 기능:
 
 - **AI 챗봇**: Telegram에서 질문하면 Claude/Codex가 직접 답변 (세션 유지)
 - **세션 연동**: 맥 터미널의 Claude Code 세션을 Telegram에서 이어감
