@@ -68,7 +68,7 @@ Telegram/Slack/Discord
 `telegram.allowedUserIds`에 허용할 Telegram 사용자 ID를 등록합니다. 목록에 없는 사용자는 즉시 차단됩니다.
 
 ```json
-"allowedUserIds": ["8531186223"]
+"allowedUserIds": ["YOUR_TELEGRAM_USER_ID"]
 ```
 
 - 비어있거나 생략하면 모든 사용자 허용 (개발용)
