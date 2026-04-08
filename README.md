@@ -16,13 +16,14 @@ ai-symbiote의 하네스는 세 가지 기둥으로 구성됩니다:
 
 ### 1. Context File (context.md)
 
-에이전트가 매 세션 시작 시 가장 먼저 읽는 프로젝트 지침서입니다. `setup` 스킬이 프로젝트 스택, 코딩 컨벤션, 아키텍처를 자동 감지하여 생성하고, `evolve` 스킬이 프로젝트 변화에 맞춰 동기화합니다.
+에이전트가 매 세션 시작 시 가장 먼저 읽는 프로젝트 지침서입니다. `setup` 스킬이 프로젝트 스택, 코딩 컨벤션, 아키텍처를 자동 감지하여 생성하고, `evolve` 스킬이 프로젝트 변화에 맞춰 동기화합니다. 기술 스택별 **시드 규칙**(harness-seeds)이 초기 부트스트랩 시 로딩되어 알려진 에이전트 실수를 첫 세션부터 방지합니다.
 
 ```mermaid
 flowchart LR
     A[SessionStart] --> B[setup-check.sh]
-    B --> C[context.md]
-    C -->|"systemMessage 주입"| D["에이전트가 프로젝트 규칙을<br/>인지한 상태로 작업 시작"]
+    B --> C["context.md 전체 주입"]
+    C -->|"systemMessage"| D["에이전트가 프로젝트 규칙을<br/>인지한 상태로 작업 시작"]
+    B -->|"이전 세션 분석"| E["rule_prevented 기록"]
 ```
 
 ### 2. Auto-Enforcement (Hooks)
@@ -31,8 +32,8 @@ flowchart LR
 
 | Hook | Event | Action |
 |------|-------|--------|
-| `guard-shell.sh` | PreToolUse(Bash) | `git push --force`, `rm -rf /` 등 위험 명령 차단 |
-| `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 → 자동 규칙 생성 |
+| `guard-shell.sh` | PreToolUse(Bash) | 위험 명령 차단 + 안전한 우회 경로 제시 + harness-log 기록 |
+| `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 + auto-loop FAIL 연동 + 확장자 패턴 학습 → 자동 규칙 생성 |
 | `comment-checker.sh` | PostToolUse(Write\|Edit) | 자명한 주석, 주석 처리된 코드 경고 |
 
 ```mermaid
@@ -53,21 +54,27 @@ flowchart LR
 
 ### 3. Garbage Collection (gc skill)
 
-규칙은 추가만 하면 비대해집니다. `gc` 스킬이 30일 이상 트리거되지 않은 규칙을 식별하고 정리를 제안합니다. context.md는 300줄 이하로 유지되어야 에이전트가 효과적으로 활용할 수 있습니다.
+규칙은 추가만 하면 비대해집니다. `gc` 스킬이 30일 이상 트리거되지 않은 규칙을 식별하고 정리를 제안합니다. 규칙별 **방지 횟수(rule_prevented)** 카운터로 데이터 기반 삭제 판단이 가능합니다. 코드 레벨 위생 검사는 별도 `lint` 스킬이 담당합니다 (gc = 규칙 정리, lint = 코드 정리).
 
 ### Self-Evolving Harness
 
 ```mermaid
 flowchart TD
     A["에이전트 실수 발생"] --> B["harness-learn.sh"]
-    B -->|"기록"| C["harness-log.jsonl"]
+    B -->|"기록"| C["harness-log.jsonl (v2)"]
     B -->|"7일 내 동일 실수 2회+"| D["context.md에<br/>규칙 자동 추가"]
+    B -->|"동일 확장자 3개+ 파일"| D2["패턴 규칙 생성<br/>(파일별 → 확장자별)"]
     D --> E["다음 세션: 에이전트가 규칙을 읽고<br/>동일 실수 회피"]
+    D2 --> E
     F["gc 스킬"] -->|"30일+ 미사용<br/>규칙 정리"| D
-    C -->|"stats 스킬"| G["하네스 진화<br/>지표 대시보드"]
+    C -->|"stats 스킬"| G["하네스 진화 지표<br/>+ 규칙 효과 대시보드"]
+    H["auto-loop Inspector FAIL"] -->|"파일 패턴 감지"| B
+    I["guard-shell 차단"] -->|"guard_blocked 이벤트"| C
+    J["setup-check.sh"] -->|"이전 세션 분석"| K["rule_prevented 기록"]
+    K --> G
 ```
 
-시간이 지날수록 하네스는 프로젝트에 특화된 규칙을 축적합니다. `stats` 스킬로 하네스 진화 지표(규칙 수, 실수 빈도 추이, 재발률)를 확인할 수 있습니다.
+시간이 지날수록 하네스는 프로젝트에 특화된 규칙을 축적합니다. auto-loop의 실패도 자동으로 학습하고, 파일 단위 규칙은 확장자 패턴으로 일반화됩니다. `stats --baseline`으로 반복률 기준선을 측정하고, `stats`로 하네스 진화 지표(규칙 수, 실수 빈도 추이, 재발률, 규칙 효과)를 확인할 수 있습니다.
 
 ## 설치
 
@@ -107,7 +114,7 @@ Claude: /ai-symbiote:update
 Codex:  $ai-symbiote:update
 ```
 
-## 스킬 목록 (27개)
+## 스킬 목록 (28개)
 
 `/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
 
@@ -161,9 +168,10 @@ Codex:  $ai-symbiote:update
 | `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
 | `update` | 저장소 pull + 플랫폼별 재설치를 자동 수행 |
 | `clean` | 완료된 작업의 상태 폴더 정리 |
-| `gc` | 하네스 자동 생성 규칙의 가비지 컬렉션. 미사용 규칙 정리, 로그 정리 |
+| `gc` | 하네스 자동 생성 규칙의 가비지 컬렉션. 미사용 규칙 정리, 규칙 효과 측정 |
+| `lint` | 코드 위생 검사. 프로젝트 린터 자동 감지/실행 또는 기본 패턴 검사 |
 | `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
-| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 |
+| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 + 규칙 효과 대시보드 |
 | `contribute` | 플러그인의 버그/개선점 발견 시 GitHub 이슈 등록. 환경 정보 자동 수집 |
 
 ### 내부 스킬 (synapse가 자동 참조)
@@ -178,15 +186,16 @@ Codex:  $ai-symbiote:update
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   27개 스킬
+│   ├── skills/                #   28개 스킬
 │   ├── hooks/scripts/         #   6개 훅 스크립트
-│   │   ├── setup-check.sh     #     세션 시작 시 프로젝트 상태 확인
-│   │   ├── guard-shell.sh     #     위험 명령어 차단
+│   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
+│   │   ├── guard-shell.sh     #     위험 명령 차단 + 우회 경로 + 로깅
 │   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
-│   │   ├── harness-learn.sh   #     에이전트 실수 감지 및 규칙 자동 생성
+│   │   ├── harness-learn.sh   #     실수 감지 + auto-loop 연동 + 패턴 학습
 │   │   ├── comment-checker.sh #     코드 주석 품질 검사
 │   │   ├── messenger-notify.sh#     메신저 알림 전송
 │   │   └── lib/common.sh      #     훅 공용 라이브러리
+│   ├── harness-seeds/         #   스택별 초기 하네스 규칙 시드
 │   ├── taskmaster/            #   PRD/task/state 스키마 및 템플릿
 │   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지 (TypeScript)
 ├── platforms/
