@@ -107,7 +107,7 @@ Claude: /ai-symbiote:update
 Codex:  $ai-symbiote:update
 ```
 
-## 스킬 목록 (26개)
+## 스킬 목록 (27개)
 
 `/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
 
@@ -164,6 +164,7 @@ Codex:  $ai-symbiote:update
 | `gc` | 하네스 자동 생성 규칙의 가비지 컬렉션. 미사용 규칙 정리, 로그 정리 |
 | `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
 | `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 |
+| `contribute` | 플러그인의 버그/개선점 발견 시 GitHub 이슈 등록. 환경 정보 자동 수집 |
 
 ### 내부 스킬 (synapse가 자동 참조)
 
@@ -177,7 +178,7 @@ Codex:  $ai-symbiote:update
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   26개 스킬
+│   ├── skills/                #   27개 스킬
 │   ├── hooks/scripts/         #   6개 훅 스크립트
 │   │   ├── setup-check.sh     #     세션 시작 시 프로젝트 상태 확인
 │   │   ├── guard-shell.sh     #     위험 명령어 차단
