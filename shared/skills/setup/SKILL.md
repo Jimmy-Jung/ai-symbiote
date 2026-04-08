@@ -332,6 +332,51 @@ Write to `~/ai-symbiote/{slug}/context.md`:
 - File naming patterns
 - Architecture patterns
 
+### Step 4.5: Load Harness Seed Rules
+
+Loads stack-appropriate harness seed rules into context.md to prevent known agent mistakes from the first session.
+
+**Skip if `--no-seed` option is provided.**
+
+#### Seed Selection
+
+Match the detected stack (from Step 1) to seed files in the plugin's `harness-seeds/` directory:
+
+| Detected Stack | Seed Files |
+|---------------|------------|
+| Swift/iOS (SwiftUI, UIKit) | `swift.md` + `generic.md` |
+| Next.js / React | `nextjs.md` + `generic.md` |
+| Python (Django, Flask, FastAPI) | `python.md` + `generic.md` |
+| Other | `generic.md` only |
+
+#### Execution
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+SEEDS_DIR="$PLUGIN_ROOT/harness-seeds"
+STATE_DIR=~/ai-symbiote/{slug}
+CONTEXT_FILE="$STATE_DIR/context.md"
+HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+
+# Append seed rules to context.md
+SEED_COUNT=0
+for seed_file in generic.md {stack-specific}.md; do
+  if [ -f "$SEEDS_DIR/$seed_file" ]; then
+    echo "" >> "$CONTEXT_FILE"
+    cat "$SEEDS_DIR/$seed_file" >> "$CONTEXT_FILE"
+    COUNT=$(grep -c '^\[Seed #' "$SEEDS_DIR/$seed_file")
+    SEED_COUNT=$((SEED_COUNT + COUNT))
+  fi
+done
+
+# Record seed_loaded event
+NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+printf '{"v":2,"ts":"%s","type":"seed_loaded","seed":"{stack}","count":%d}\n' \
+  "$NOW" "$SEED_COUNT" >> "$HARNESS_LOG"
+```
+
+Output: `[Setup] Loaded {N} harness seed rules for {stack} stack.`
+
 ### Step 4.1: Generate Project CLAUDE.md
 
 **Warning: Required step -- must be executed.**

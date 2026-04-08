@@ -133,6 +133,12 @@ Write to `{task-folder}/results/architect-{id}.result.md`:
 - Indirect impact: {module list}
 - Breaking change: {specify if any}
 
+## Affected Files
+List every file that will be created or modified by this plan.
+Inspector uses this list for scope verification (auto-freeze).
+- {path}: create | modify | delete
+- {path}: create | modify | delete
+
 ## Implementation Steps
 1. [Step name]
    - File: {target file}
@@ -174,6 +180,8 @@ Read the following files to understand the exploration results:
 - Specify target file, change description, and verification method for each step.
 - Identify steps that can be executed in parallel.
 - Specify work units to assign to Builders.
+- REQUIRED: Include an `## Affected Files` section listing every file to be created/modified/deleted.
+  Inspector will use this list for scope verification.
 ```
 
 ---

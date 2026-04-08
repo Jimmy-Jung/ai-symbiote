@@ -118,9 +118,33 @@ Cleanup actions:
 - `--dry-run`: Display deletion candidates only, no actual deletion
 - `--force`: Execute cleanup immediately without confirmation
 
+## Seed Rule Management
+
+In addition to auto-generated `[Harness #N]` rules, gc also manages `[Seed #SN]` rules (loaded by setup).
+
+- Parse seed rules: `grep -n '^\[Seed #' "$STATE_DIR/context.md"`
+- Same 30-day untriggered deletion criteria as harness rules
+- Display separately in Step 3 output:
+  ```
+  Seed rules ({N}):
+    [Seed #S1] {description} — last triggered: {relative time}
+  ```
+- Include `rule_prevented` counts if available (see US-007)
+
+## Rule Effectiveness Display
+
+When `rule_prevented` events exist in harness-log.jsonl, display prevention counts:
+```
+[Harness #1] {description} — prevented: 5 times, last triggered: 3 days ago
+[Harness #2] {description} — prevented: 0 times, never triggered <- deletion candidate
+```
+
+Tip: Run `lint` skill for code-level cleanup.
+
 ## Principles
 
-- Manages harness rules only (dead code, documentation mismatches are out of scope)
+- Manages harness rules and seed rules (dead code, documentation mismatches are out of scope)
 - Never deletes without user confirmation (except with --force)
 - Never deletes active rules (triggered within 30 days)
-- Does not touch manually added content in context.md (only targets "[Harness #" prefixed lines)
+- Targets `[Harness #` and `[Seed #` prefixed lines only; does not touch manually added content
+- Gracefully skips unknown event types in harness-log.jsonl (v2 schema compatibility)

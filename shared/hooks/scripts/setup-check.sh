@@ -2,6 +2,9 @@
 # ai-symbiote SessionStart hook: Check project bootstrap status.
 # Checks ~/ai-symbiote/{slug}/ for manifest and interrupted Ralph loops.
 #
+# Principle: Silence on success — only output context/synapse injection and
+#            warnings. No extra messages when everything is normal.
+#
 # Codex hook protocol:
 #   stdout: {"continue":true,"systemMessage":"..."} for context injection
 
@@ -17,12 +20,37 @@ if [ ! -f "$STATE_DIR/manifest.json" ]; then
   CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup to initialize the project.")
 fi
 
-# Harness: clean up stale session directories
-if [ -d "$STATE_DIR" ]; then
+# Harness: analyze previous sessions for rule_prevented before cleanup
+if [ -d "$STATE_DIR" ] && [ -f "$STATE_DIR/context.md" ]; then
+  HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+  NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   for sess_dir in "$STATE_DIR"/session-*/; do
     [ -d "$sess_dir" ] || continue
     SESS_PID=$(basename "$sess_dir" | sed 's/session-//')
+    # Only analyze dead sessions (not the current one)
     if [ -n "$SESS_PID" ] && ! kill -0 "$SESS_PID" 2>/dev/null; then
+      EVENTS_FILE="$sess_dir/events.jsonl"
+      if [ -f "$EVENTS_FILE" ]; then
+        # For each harness/seed rule, check if covered files were edited without errors
+        while IFS= read -r rule_line; do
+          RULE_ID=$(printf '%s' "$rule_line" | grep -o '#[0-9]*' | head -1 | tr -d '#')
+          [ -z "$RULE_ID" ] && continue
+          # Extract file hint from rule (basename mentioned in rule text)
+          RULE_FILE=$(printf '%s' "$rule_line" | grep -o '[A-Za-z0-9_-]*\.[a-z]*' | head -1)
+          [ -z "$RULE_FILE" ] && continue
+          # Check if this file was edited in the session
+          EDITED=$(grep -c "\"file\":\"[^\"]*$RULE_FILE\"" "$EVENTS_FILE" 2>/dev/null) || EDITED=0
+          if [ "$EDITED" -gt 0 ]; then
+            # Check if there were errors on this file
+            ERRORS=$(grep "\"file\":\"[^\"]*$RULE_FILE\"" "$EVENTS_FILE" 2>/dev/null | grep -c '"status":"error"' 2>/dev/null) || ERRORS=0
+            if [ "$ERRORS" -eq 0 ]; then
+              printf '{"v":2,"ts":"%s","type":"rule_prevented","rule_id":%s,"file":"%s","session_pid":"%s"}\n' \
+                "$NOW" "$RULE_ID" "$(printf '%s' "$RULE_FILE" | tr -d '"')" "$SESS_PID" >> "$HARNESS_LOG" 2>/dev/null
+            fi
+          fi
+        done < <(grep '^\[Harness #\|^\[Seed #' "$STATE_DIR/context.md" 2>/dev/null)
+      fi
+      # Clean up stale session
       rm -rf "$sess_dir" 2>/dev/null
     fi
   done
@@ -57,9 +85,14 @@ if [ -d "$STATE_DIR/state" ]; then
 fi
 
 if [ -f "$STATE_DIR/context.md" ]; then
-  CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null | head -50)
+  CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null)
   if [ -n "$CONTEXT_CONTENT" ]; then
     CONTEXT_PARTS+=("[Symbiote Context] $CONTEXT_CONTENT")
+    # Warn when context.md grows too large (do NOT block injection)
+    CTX_LINES=$(echo "$CONTEXT_CONTENT" | wc -l | tr -d ' ')
+    if [ "$CTX_LINES" -gt 300 ]; then
+      CONTEXT_PARTS+=("[Harness] context.md exceeded ${CTX_LINES} lines (recommended max 300). Run gc skill to prune unused rules.")
+    fi
   fi
 fi
 
