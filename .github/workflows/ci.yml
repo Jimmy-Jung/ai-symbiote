@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check version sync
+        run: python3 scripts/version_sync.py --check
+
+      - name: Build bundles
+        run: bash scripts/build-all.sh
+
+      - name: Verify generated artifacts are committed
+        run: git diff --exit-code

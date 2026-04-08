@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+      - CHANGELOG.md
+      - .claude-plugin/marketplace.json
+      - platforms/claude/overlay/.claude-plugin/plugin.json
+      - platforms/codex/overlay/.codex-plugin/plugin.json
+      - plugins/ai-symbiote/.claude-plugin/plugin.json
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Check version sync
+        run: python3 scripts/version_sync.py --check
+
+      - name: Build bundles
+        run: bash scripts/build-all.sh
+
+      - name: Verify generated artifacts are committed
+        run: git diff --exit-code
+
+      - name: Load release version
+        id: version
+        run: echo "value=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release notes
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["RELEASE_VERSION"]
+          changelog = Path("CHANGELOG.md").read_text(encoding="utf-8")
+          pattern = re.compile(
+              rf"^## \[{re.escape(version)}\] - .+?(?=^## \[|\Z)",
+              re.MULTILINE | re.DOTALL,
+          )
+          match = pattern.search(changelog)
+          if not match:
+              raise SystemExit(f"Release notes for {version} not found in CHANGELOG.md")
+
+          Path("RELEASE_NOTES.md").write_text(match.group(0).strip() + "\n", encoding="utf-8")
+          PY
+
+      - name: Ensure git tag exists
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          TAG="v${RELEASE_VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "tag already exists: $TAG"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Create or update GitHub release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          TAG="v${RELEASE_VERSION}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md
+          else
+            gh release create "$TAG" --title "$TAG" --notes-file RELEASE_NOTES.md
+          fi
