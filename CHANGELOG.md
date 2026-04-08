@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2] - 2026-04-08
+
+### Fixed
+- **messenger watcher 신규 파일 감지 안정화** — `usePolling` 기반 감시, 초기 스캔 후 재스캔, 주기적 pending scan, 처리 타임아웃을 추가해 Telegram 브릿지에서 `notifications/` 신규 JSON 파일이 누락되거나 처리 중 고착되는 문제를 수정
+
 ## [0.6.1] - 2026-04-08
 
 ### Fixed
