@@ -1,6 +1,6 @@
 ---
 name: tm-init
-description: Task Master 전역 task graph 상태를 초기화합니다.
+description: Initializes the Task Master global task graph state.
 argument-hint: [--tag <tag>]
 user-invocable: true
 allowed-tools: [Read, Write, Bash]
@@ -8,32 +8,32 @@ allowed-tools: [Read, Write, Bash]
 
 # TM Init
 
-Task Master형 전역 task graph 상태를 초기화합니다.
+Initializes the Task Master global task graph state.
 
-## 상태 디렉터리
+## State Directory
 
 `~/ai-symbiote/{slug}/taskmaster/`
 
-## 동작
+## Behavior
 
-1. `~/ai-symbiote/{slug}/taskmaster/` 디렉터리 존재 여부를 확인합니다.
-2. 없으면 디렉터리를 생성합니다.
-3. `${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/taskmaster/state.template.json`과 config 기반으로 `state.json`을 생성합니다.
-4. 이미 있으면 현재 상태를 보여주고 재초기화 여부를 확인합니다.
+1. Checks whether the `~/ai-symbiote/{slug}/taskmaster/` directory exists.
+2. Creates the directory if it does not exist.
+3. Generates `state.json` based on `${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/taskmaster/state.template.json` and config.
+4. If the directory already exists, displays the current state and asks whether to reinitialize.
 
-## 초기화 스크립트
+## Initialization Script
 
 ```bash
-SLUG=$(프로젝트 경로 기반 slug)
+SLUG=$(project path based slug)
 STATE_DIR="$HOME/ai-symbiote/$SLUG/taskmaster"
 mkdir -p "$STATE_DIR"
 ```
 
-state.template.json을 복사하여 state.json 생성.
+Copies state.template.json to create state.json.
 
-## 원칙
+## Principles
 
-- 스키마 파일을 진실 기준으로 사용합니다.
-- 템플릿 파일을 초기 상태 복제 원본으로 사용합니다.
-- 세션 상태 폴더(`~/ai-symbiote/{slug}/state/*`)는 건드리지 않습니다.
-- 기존 파일이 있으면 파괴적 덮어쓰기를 피합니다.
+- Uses schema files as the source of truth.
+- Uses template files as the initial state clone source.
+- Does not touch the session state folder (`~/ai-symbiote/{slug}/state/*`).
+- Avoids destructive overwrites when existing files are present.

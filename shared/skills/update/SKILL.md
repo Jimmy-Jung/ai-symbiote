@@ -1,39 +1,39 @@
 ---
 name: update
-description: "ai-symbiote 플러그인을 최신 버전으로 업데이트합니다."
+description: "Updates the ai-symbiote plugin to the latest version."
 user-invocable: true
 ---
 
-# Update -- 플러그인 자동 업데이트
+# Update -- Plugin Auto-Update
 
-ai-symbiote 저장소를 pull하고 현재 플랫폼에 맞게 재설치합니다.
+Pulls the ai-symbiote repository and reinstalls for the current platform.
 
-## 워크플로우
+## Workflow
 
-### Step 1: 저장소 찾기
+### Step 1: Locate Repository
 
-다음 순서로 ai-symbiote 저장소 경로를 탐색합니다:
+Searches for the ai-symbiote repository path in the following order:
 
 ```bash
-# 1. 환경 변수
+# 1. Environment variable
 echo "${AI_SYMBIOTE_REPO:-}"
 
-# 2. 기본 경로
+# 2. Default paths
 for candidate in ~/ai-symbiote-repo ~/Documents/GitHub/ai-symbiote; do
   [ -d "$candidate/.git" ] && echo "$candidate" && break
 done
 ```
 
-저장소를 찾지 못하면:
+If the repository is not found:
 
 ```text
-ai-symbiote 저장소를 찾을 수 없습니다.
-클론 후 설치하려면:
+Cannot find the ai-symbiote repository.
+To clone and install:
   git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
   cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 ```
 
-### Step 2: 최신 소스 가져오기
+### Step 2: Fetch Latest Source
 
 ```bash
 cd <repo-path>
@@ -41,14 +41,14 @@ git fetch origin
 git pull origin main
 ```
 
-충돌 발생 시 사용자에게 보고하고 중단합니다.
+If conflicts occur, report to the user and abort.
 
-### Step 3: 플랫폼 감지 및 재설치
+### Step 3: Detect Platform and Reinstall
 
-현재 세션이 어느 플랫폼인지 감지합니다:
+Detects which platform the current session is running on:
 
-- `CLAUDE_PLUGIN_ROOT` 환경 변수가 있으면 → Claude
-- 그 외 → Codex
+- If `CLAUDE_PLUGIN_ROOT` environment variable exists -> Claude
+- Otherwise -> Codex
 
 **Claude:**
 
@@ -56,10 +56,10 @@ git pull origin main
 bash <repo-path>/scripts/build-claude.sh
 ```
 
-빌드 후 사용자에게 안내:
+After build, inform the user:
 
 ```text
-빌드 완료. 플러그인을 업데이트하려면:
+Build complete. To update the plugin:
 /plugin update ai-symbiote@ai-symbiote
 ```
 
@@ -69,20 +69,20 @@ bash <repo-path>/scripts/build-claude.sh
 bash <repo-path>/platforms/codex/install.sh
 ```
 
-### Step 4: 버전 확인
+### Step 4: Verify Version
 
 ```bash
-# 설치된 버전 확인
+# Check installed version
 cat <repo-path>/platforms/codex/overlay/.codex-plugin/plugin.json | grep version
-# 또는
+# or
 cat <repo-path>/platforms/claude/overlay/.claude-plugin/plugin.json | grep version
 ```
 
-완료 보고:
+Completion report:
 
 ```text
-[Update] ai-symbiote 업데이트 완료
-- 버전: {version}
-- 플랫폼: {claude/codex}
-- 저장소: {repo-path}
+[Update] ai-symbiote update complete
+- Version: {version}
+- Platform: {claude/codex}
+- Repository: {repo-path}
 ```

@@ -1,6 +1,6 @@
 ---
 name: pr
-description: 현재 브랜치의 변경사항을 분석하고 Pull Request를 생성합니다.
+description: Analyzes changes on the current branch and creates a Pull Request.
 argument-hint: [base-branch]
 user-invocable: true
 allowed-tools: [Read, Glob, Grep, Bash]
@@ -8,28 +8,28 @@ allowed-tools: [Read, Glob, Grep, Bash]
 
 # PR
 
-현재 브랜치의 변경사항을 분석하고 Pull Request를 생성합니다.
+Analyzes changes on the current branch and creates a Pull Request.
 
-## 워크플로우
+## Workflow
 
-### 1. 컨텍스트 로드
-- `~/ai-symbiote/{slug}/context.md`를 읽어 프로젝트 컨벤션 파악
+### 1. Load Context
+- Read `~/ai-symbiote/{slug}/context.md` to understand project conventions
 
-### 2. 변경사항 분석
-- `git status`, `git diff`, `git log`으로 변경사항 분석
-- 인자로 base-branch가 지정되면 해당 브랜치와 비교
+### 2. Analyze Changes
+- Analyze changes with `git status`, `git diff`, `git log`
+- If a base-branch is specified as argument, compare against that branch
 
-### 3. PR 생성
-- PR 제목: 70자 이내, 변경 내용 요약
-- PR 본문:
+### 3. Create PR
+- PR title: under 70 chars, summarize changes
+- PR body:
   ```
   ## Summary
-  - 변경 사항 요약 (1-3 bullet points)
+  - Change summary (1-3 bullet points)
 
   ## Test Plan
-  - 테스트 계획 체크리스트
+  - Test plan checklist
   ```
-- 브랜치를 push하고 `gh pr create`로 PR 생성
+- Push the branch and create PR with `gh pr create`
 
-### 4. 결과
-- PR URL을 사용자에게 반환
+### 4. Result
+- Return the PR URL to the user

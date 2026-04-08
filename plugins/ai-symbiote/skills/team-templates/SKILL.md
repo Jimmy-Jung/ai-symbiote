@@ -1,223 +1,223 @@
 ---
 name: team-templates
-description: 팀 구성 템플릿. synapse 오케스트레이터가 작업 유형에 따라 서브에이전트 팀을 구성할 때 참조합니다. analysis, implementation, review, planning, research, dynamic 6개 템플릿을 정의합니다.
+description: Team composition templates. Referenced by the synapse orchestrator when composing subagent teams based on task types. Defines 6 templates: analysis, implementation, review, planning, research, dynamic.
 user-invocable: false
 ---
 
-# Team Templates -- 팀 구성 템플릿
+# Team Templates
 
-synapse 오케스트레이터가 작업 유형별로 최적의 팀을 구성할 때 참조하는 템플릿.
-각 템플릿은 역할 배치, 단계 순서, 병렬화 규칙, 결과 합성 전략을 정의합니다.
+Templates referenced by the synapse orchestrator for composing optimal teams by task type.
+Each template defines role placement, phase ordering, parallelization rules, and result synthesis strategy.
 
-## 템플릿 선택 기준
+## Template Selection Criteria
 
-| 작업 유형 | 템플릿 | 트리거 |
-|----------|--------|--------|
-| 심층 분석, 리서치, 아키텍처 분석 | analysis | analyze 워크플로우, "심층 분석", "구조 분석" |
-| 기능 구현, 버그 수정, 자율 실행 | implementation | auto-loop, autopilot, "끝까지", "구현" |
-| 코드 리뷰, PR 리뷰 | review | review 워크플로우, "코드 리뷰" |
-| 구현 계획 수립 | planning | planning 워크플로우, "계획 수립" |
-| 외부 조사, 마이그레이션 계획 | research | "조사", "리서치", "마이그레이션" |
-| 위 어디에도 해당 안 됨 | dynamic | synapse가 작업 분석 후 판단 |
+| Task Type | Template | Trigger |
+|-----------|----------|---------|
+| Deep analysis, research, architecture analysis | analysis | analyze workflow, "deep analysis", "structure analysis" |
+| Feature implementation, bug fix, autonomous execution | implementation | auto-loop, autopilot, "to completion", "implement" |
+| Code review, PR review | review | review workflow, "code review" |
+| Implementation planning | planning | planning workflow, "create plan" |
+| External research, migration planning | research | "investigate", "research", "migration" |
+| None of the above | dynamic | synapse analyzes the task and decides |
 
 ---
 
 ## Template: analysis
 
-심층 분석 팀. 코드베이스를 다각도로 탐색하고 구조화된 분석 결과를 생성합니다.
+Deep analysis team. Explores the codebase from multiple angles and produces structured analysis results.
 
-### 팀 구성
+### Team Composition
 
-| 순서 | 역할 | 수량 | 실행 | 목적 |
-|------|------|------|------|------|
-| Wave 1 | Scout | 2~3 | 병렬 | 서로 다른 탐색 전략으로 정보 수집 |
-| Wave 2 | Architect | 1 | 순차 | Scout 결과를 합성하여 구조화된 분석 |
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 1 | Scout | 2-3 | Parallel | Gather information with different exploration strategies |
+| Wave 2 | Architect | 1 | Sequential | Synthesize Scout results into structured analysis |
 
-### 병렬화 규칙
-- Wave 1: Scout들은 서로 다른 검색 전략을 할당받아 병렬 실행
-  - Scout-001: Grep 기반 정확 매칭 (심볼, import)
-  - Scout-002: Glob 기반 파일 패턴 탐색 (구조, 네이밍)
-  - Scout-003: subagent(explorer) 기반 심층 탐색 (선택적, 복잡한 분석 시)
-- Wave 2: 모든 Scout 완료 후 Architect 실행
+### Parallelization Rules
+- Wave 1: Scouts are assigned different search strategies and run in parallel
+  - Scout-001: Grep-based exact matching (symbols, imports)
+  - Scout-002: Glob-based file pattern exploration (structure, naming)
+  - Scout-003: subagent(explorer)-based deep exploration (optional, for complex analysis)
+- Wave 2: Architect runs after all Scouts complete
 
-### 결과 합성
-오케스트레이터가 Architect의 결과 파일을 읽어 사용자에게 보고합니다.
+### Result Synthesis
+The orchestrator reads the Architect's result file and reports to the user.
 
-### 적용 스킬
-- analyze 워크플로우
-- "심층 분석", "깊이 파악" 자연어 트리거
+### Applicable Skills
+- analyze workflow
+- "deep analysis", "deep dive" natural language triggers
 
 ---
 
 ## Template: implementation
 
-구현 팀. 분석부터 구현, 검증까지 전 과정을 처리합니다.
-auto-loop과 autopilot의 4-Phase 파이프라인을 팀 기반으로 실행합니다.
+Implementation team. Handles the full process from analysis through implementation to verification.
+Executes the auto-loop and autopilot 4-Phase pipeline on a team basis.
 
-### 팀 구성
+### Team Composition
 
-| 순서 | 역할 | 수량 | 실행 | 목적 |
-|------|------|------|------|------|
-| Phase 0: Analyze | Scout | 1~2 | 병렬 | 요구사항 분석, 코드베이스 탐색 |
-| Phase 1: Plan | Architect | 1 | 순차 | Scout 결과 기반 구현 계획 |
-| Phase 2: Execute | Builder | 1~3 | 병렬(독립 단계) | Architect 계획에 따른 코드 구현 |
-| Phase 3: Verify | Inspector | 1 | 순차 | 구현 결과 검증 |
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Phase 0: Analyze | Scout | 1-2 | Parallel | Requirements analysis, codebase exploration |
+| Phase 1: Plan | Architect | 1 | Sequential | Implementation plan based on Scout results |
+| Phase 2: Execute | Builder | 1-3 | Parallel (independent steps) | Code implementation per Architect plan |
+| Phase 3: Verify | Inspector | 1 | Sequential | Verify implementation results |
 
-### 병렬화 규칙
-- Phase 0: Scout들은 병렬 실행 (요구사항 분석 + 코드베이스 탐색)
-- Phase 1: Scout 결과 수집 후 Architect 실행
-- Phase 2: Architect가 병렬 가능으로 표시한 단계들을 별도 Builder에 배분
-- Phase 3: 모든 Builder 완료 후 Inspector 실행
+### Parallelization Rules
+- Phase 0: Scouts run in parallel (requirements analysis + codebase exploration)
+- Phase 1: Architect runs after collecting Scout results
+- Phase 2: Steps marked as parallelizable by the Architect are assigned to separate Builders
+- Phase 3: Inspector runs after all Builders complete
 
-### Codex 연동 (선택적)
+### Codex Integration (Optional)
 
-Codex가 사용 가능하면 implementation 팀에서 다음과 같이 활용합니다:
+When Codex is available, the implementation team utilizes it as follows:
 
-| 상황 | Codex 투입 방식 |
-|------|----------------|
-| Builder 동일 오류 2회 반복 | Codex를 Builder 대체로 투입 (다른 모델의 세컨드 오피니언) |
-| Inspector FAIL + 원인 불명 | Codex rescue로 root cause 진단 |
-| Phase 3 Verify | Inspector와 Codex review를 병렬 실행 (이중 검증) |
-| 보안 검토 필요 (Level 4) | Codex adversarial-review 추가 투입 |
+| Situation | Codex Deployment |
+|-----------|-----------------|
+| Builder repeats same error twice | Deploy Codex as Builder replacement (second opinion from different model) |
+| Inspector FAIL + unknown cause | Codex rescue for root cause diagnosis |
+| Phase 3 Verify | Run Inspector and Codex review in parallel (dual verification) |
+| Security review needed (Level 4) | Add Codex adversarial-review |
 
-Codex가 unavailable이면 이 섹션을 건너뛰고 Claude 에이전트만으로 진행합니다.
+If Codex is unavailable, skip this section and proceed with Claude agents only.
 
-### 모드 변형
+### Mode Variants
 
-#### autonomous 모드 (auto-loop)
-- Loop 활성화: Inspector FAIL 시 Phase 2로 회귀
-- maxIterations: 10 (기본값, manifest.json에서 오버라이드 가능)
-- completionLevel: 2 (기본값)
-- 에스컬레이션: maxIterations 도달, 동일 오류 3회, 파괴적 변경
-- Codex 투입: 동일 오류 2회 반복 시 자동 (available한 경우)
+#### autonomous mode (auto-loop)
+- Loop enabled: return to Phase 2 on Inspector FAIL
+- maxIterations: 10 (default, overridable in manifest.json)
+- completionLevel: 2 (default)
+- Escalation: maxIterations reached, same error 3 times, destructive changes
+- Codex deployment: automatic on 2 repeated errors (if available)
 
-#### parallel-max 모드 (autopilot)
-- Builder 수를 최대화 (독립 단계 수만큼)
+#### parallel-max mode (autopilot)
+- Maximize Builder count (as many as independent steps)
 - maxIterations: 3
-- Loop 실패 시 접근 방식 변경 후 재시도
-- Codex 투입: 1회차 실패 시 즉시 Codex rescue 시도 (available한 경우)
+- On loop failure, change approach and retry
+- Codex deployment: immediate Codex rescue on first failure (if available)
 
-### 결과 합성
-오케스트레이터가 각 Phase의 결과를 읽고 다음 Phase로 진행 여부를 결정합니다.
-Inspector FAIL 시: 이슈 분석 -> 수정 계획 -> Builder 재디스패치.
+### Result Synthesis
+The orchestrator reads each Phase's results and decides whether to proceed to the next Phase.
+On Inspector FAIL: issue analysis -> fix plan -> Builder redispatch.
 
-### 적용 스킬
-- auto-loop (autonomous 모드)
-- autopilot (parallel-max 모드)
-- "끝까지", "최대 성능" 자연어 트리거
+### Applicable Skills
+- auto-loop (autonomous mode)
+- autopilot (parallel-max mode)
+- "to completion", "max performance" natural language triggers
 
 ---
 
 ## Template: review
 
-리뷰 팀. 코드 변경사항을 다각도로 검증합니다.
+Review team. Verifies code changes from multiple perspectives.
 
-### 팀 구성
+### Team Composition
 
-| 순서 | 역할 | 수량 | 실행 | 목적 |
-|------|------|------|------|------|
-| Wave 1 | Scout | 1 | 순차 | 변경 사항 주변 컨텍스트 수집 |
-| Wave 2 | Inspector | 2~3 | 병렬 | 서로 다른 관점으로 리뷰 |
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 1 | Scout | 1 | Sequential | Gather context around changes |
+| Wave 2 | Inspector | 2-3 | Parallel | Review from different perspectives |
 
-### 병렬화 규칙
-- Wave 1: Scout가 변경 파일의 관련 코드, 의존성, 테스트를 수집
-- Wave 2: Inspector들은 서로 다른 리뷰 관점을 할당받아 병렬 실행
-  - Inspector-001: 코드 품질 (가독성, 복잡도, 중복)
-  - Inspector-002: 패턴 준수 (아키텍처, 네이밍, 컨벤션)
-  - Inspector-003: 잠재 버그 + 성능 (널 참조, 경계 조건, N+1)
-  - (manifest.json enableSecurityReview = true 시) Inspector-004: 보안 리뷰
+### Parallelization Rules
+- Wave 1: Scout collects related code, dependencies, and tests for changed files
+- Wave 2: Inspectors are assigned different review perspectives and run in parallel
+  - Inspector-001: Code quality (readability, complexity, duplication)
+  - Inspector-002: Pattern compliance (architecture, naming, conventions)
+  - Inspector-003: Potential bugs + performance (null references, boundary conditions, N+1)
+  - (if manifest.json enableSecurityReview = true) Inspector-004: Security review
 
-### Codex 연동 (선택적)
+### Codex Integration (Optional)
 
-Codex가 사용 가능하면 review 팀에서 다음과 같이 활용합니다:
+When Codex is available, the review team utilizes it as follows:
 
-- Inspector들과 병렬로 `Skill(skill: "codex:review")` 실행 → Claude + Codex 이중 리뷰
-- 보안 리뷰 요청 시 `Skill(skill: "codex:adversarial-review")` 추가 → 적대적 관점 리뷰
-- Codex 리뷰 결과(JSON verdict)를 Inspector 결과와 합산
+- Run `Skill(skill: "codex:review")` in parallel with Inspectors -> Claude + Codex dual review
+- On security review request, add `Skill(skill: "codex:adversarial-review")` -> adversarial perspective review
+- Combine Codex review results (JSON verdict) with Inspector results
 
-Codex가 unavailable이면 Inspector만으로 리뷰합니다.
+If Codex is unavailable, review with Inspectors only.
 
-### 결과 합성
-오케스트레이터가 모든 Inspector + Codex 결과를 합산하여 통합 리뷰 보고서를 작성합니다.
-severity 기준 정렬: critical > warning > suggestion.
-Codex findings는 출처를 "[Codex]"로 표시하여 구분합니다.
+### Result Synthesis
+The orchestrator aggregates all Inspector + Codex results into a unified review report.
+Sort by severity: critical > warning > suggestion.
+Mark Codex findings with "[Codex]" source tag for distinction.
 
-### 적용 스킬
-- review 워크플로우
+### Applicable Skills
+- review workflow
 
 ---
 
 ## Template: planning
 
-계획 팀. 구현 전 실행 가능한 계획을 수립합니다.
+Planning team. Creates actionable plans before implementation.
 
-### 팀 구성
+### Team Composition
 
-| 순서 | 역할 | 수량 | 실행 | 목적 |
-|------|------|------|------|------|
-| Wave 1 | Scout | 2 | 병렬 | 코드베이스 구조 + 유사 구현 탐색 |
-| Wave 2 | Architect | 1 | 순차 | Scout 결과 기반 상세 계획 수립 |
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 1 | Scout | 2 | Parallel | Codebase structure + similar implementation exploration |
+| Wave 2 | Architect | 1 | Sequential | Detailed plan based on Scout results |
 
-### 병렬화 규칙
-- Wave 1: Scout 병렬 (구조 탐색 + 유사 패턴 탐색)
-- Wave 2: Scout 결과 수집 후 Architect 실행
+### Parallelization Rules
+- Wave 1: Scouts run in parallel (structure exploration + similar pattern search)
+- Wave 2: Architect runs after collecting Scout results
 
-### 결과 합성
-오케스트레이터가 Architect 결과를 EnterPlanMode로 사용자에게 제시합니다.
-사용자 승인 후 implementation 팀으로 전환 가능.
+### Result Synthesis
+The orchestrator presents the Architect's result to the user via EnterPlanMode.
+Can transition to the implementation team after user approval.
 
-### 적용 스킬
-- planning 워크플로우
+### Applicable Skills
+- planning workflow
 
 ---
 
 ## Template: research
 
-리서치 팀. 외부 정보와 코드베이스 내부 정보를 결합합니다.
+Research team. Combines external information with internal codebase information.
 
-### 팀 구성
+### Team Composition
 
-| 순서 | 역할 | 수량 | 실행 | 목적 |
-|------|------|------|------|------|
-| Wave 1 | Scout + Researcher | 2~4 | 병렬 | 내부 탐색 + 외부 조사 동시 진행 |
-| Wave 2 | Architect | 1 | 순차 | 내/외부 결과 합성하여 보고서 작성 |
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 1 | Scout + Researcher | 2-4 | Parallel | Internal exploration + external research simultaneously |
+| Wave 2 | Architect | 1 | Sequential | Synthesize internal/external results into report |
 
-### 병렬화 규칙
-- Wave 1: Scout (코드베이스)와 Researcher (외부 문서/API)를 병렬 실행
-- Wave 2: 모든 결과 수집 후 Architect가 합성
+### Parallelization Rules
+- Wave 1: Scout (codebase) and Researcher (external docs/APIs) run in parallel
+- Wave 2: Architect synthesizes after all results are collected
 
-### 적용 스킬
-- "조사", "리서치", "마이그레이션" 자연어 트리거
+### Applicable Skills
+- "investigate", "research", "migration" natural language triggers
 
 ---
 
 ## Template: dynamic
 
-동적 팀. 위 템플릿에 해당하지 않는 작업에 대해 synapse가 직접 구성합니다.
+Dynamic team. For tasks that do not match any template above, synapse composes the team directly.
 
-### 구성 규칙
-1. 항상 Scout 1명으로 시작 (코드베이스 파악)
-2. Scout 결과를 읽고 필요한 역할을 추가 투입
-3. 최대 5명 제한 유지
-4. 각 역할 투입 시 roles/SKILL.md의 프롬프트 템플릿 사용
+### Composition Rules
+1. Always start with 1 Scout (understand the codebase)
+2. Read Scout results and add additional roles as needed
+3. Maintain max 5 agents limit
+4. Use prompt templates from roles/SKILL.md when deploying each role
 
-### 의사결정 트리
+### Decision Tree
 ```
-Scout 결과 분석
-├─ 코드 변경 필요 → Builder 투입
-├─ 계획 수립 필요 → Architect 투입
-├─ 검증 필요 → Inspector 투입
-├─ 외부 정보 필요 → Researcher 투입
-└─ 추가 탐색 필요 → Scout 추가 투입
+Scout result analysis
+├─ Code change needed → Deploy Builder
+├─ Planning needed → Deploy Architect
+├─ Verification needed → Deploy Inspector
+├─ External information needed → Deploy Researcher
+└─ Further exploration needed → Deploy additional Scout
 ```
 
 ---
 
-## 공통 프로토콜
+## Common Protocols
 
 ### team-manifest.json
 
-모든 팀은 task-folder에 `team-manifest.json`을 생성하여 팀 상태를 추적합니다.
+All teams create `team-manifest.json` in the task-folder to track team state.
 
 ```json
 {
@@ -236,17 +236,17 @@ Scout 결과 분석
   "decisions": [
     {
       "timestamp": "ISO8601",
-      "decision": "Scout 결과 기반으로 Builder 3명 병렬 투입 결정"
+      "decision": "Decided to deploy 3 Builders in parallel based on Scout results"
     }
   ]
 }
 ```
 
-### 에스컬레이션
-팀 내에서 해결 불가한 상황 발생 시, 오케스트레이터가 사용자에게 에스컬레이션합니다.
-메신저 브릿지가 활성화되어 있으면 메신저를 통해 에스컬레이션합니다.
-(상세: auto-loop/SKILL.md의 메신저 브릿지 연동 섹션)
+### Escalation
+When an unresolvable situation arises within the team, the orchestrator escalates to the user.
+If the messenger bridge is active, escalation occurs via messenger.
+(Details: messenger bridge integration section of auto-loop/SKILL.md)
 
-### 결과 파일 정리
-팀 완료 후 결과 파일은 task-folder에 보존됩니다.
-clean 워크플로우로 정리 가능.
+### Result File Cleanup
+After team completion, result files are preserved in the task-folder.
+Can be cleaned up via the clean workflow.

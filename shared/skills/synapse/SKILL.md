@@ -1,93 +1,93 @@
 ---
 name: synapse
 user-invocable: true
-description: AI 에이전트 오케스트레이션. 사용자 의도를 분석하여 적절한 스킬과 워크플로우를 선택합니다. 모든 작업의 시작점으로 자동 적용됩니다.
+description: AI agent orchestration. Analyzes user intent to select the appropriate skill and workflow. Automatically applied as the entry point for all tasks.
 ---
 
 # Synapse -- Team Leader Orchestrator
 
-Synapse는 서브에이전트 팀의 리더입니다.
-작업을 분석하고, 팀을 구성하고, 서브에이전트를 디스패치하고, 결과를 합성합니다.
+Synapse is the leader of the sub-agent team.
+It analyzes tasks, assembles teams, dispatches sub-agents, and synthesizes results.
 
 ## Bootstrap Check
 
-세션 시작 시 프로젝트 상태를 확인합니다.
-상태 디렉터리: `~/ai-symbiote/{project-slug}/`
+Checks project state at session start.
+State directory: `~/ai-symbiote/{project-slug}/`
 
-- manifest.json이 없으면 setup 워크플로우 안내
-- manifest.json이 있으면 `~/ai-symbiote/{slug}/context.md`를 읽어 프로젝트 컨텍스트 로드
-- `~/ai-symbiote/{slug}/state/*/ralph-state.md`에 `active: true`인 task-folder가 있으면 이어서 진행할지 판단
+- If manifest.json is missing, guide to setup workflow
+- If manifest.json exists, read `~/ai-symbiote/{slug}/context.md` to load project context
+- If a task-folder with `active: true` exists in `~/ai-symbiote/{slug}/state/*/ralph-state.md`, determine whether to resume
 
 ## Dynamic Context Loading
 
-`~/ai-symbiote/{slug}/context.md`에서 동적으로 로드합니다:
+Dynamically loaded from `~/ai-symbiote/{slug}/context.md`:
 
-- 프로젝트 스택
-- 코딩 컨벤션 요약
-- 활성화된 스킬 목록
+- Project stack
+- Coding convention summary
+- Active skill list
 
 ## Mode Detection
 
-사용자 메시지에서 다음 패턴을 감지하면 해당 모드를 활성화합니다:
+Activates the corresponding mode when the following patterns are detected in user messages:
 
-| 키워드 패턴 | 활성화 모드 | 팀 템플릿 |
+| Keyword Pattern | Activated Mode | Team Template |
 |------------|-----------|----------|
-| "끝까지", "완료할 때까지", "멈추지 마" | Auto Loop | implementation (autonomous) |
-| "최대 성능", "병렬로", "autopilot" | Autopilot | implementation (parallel-max) |
-| "심층 분석", "깊이 파악", "deep search" | Deep Analysis | analysis |
-| "코드 리뷰", "리뷰해줘" | Review | review |
-| "계획 수립", "plan" | Planning | planning |
-| "조사", "research", "리서치" | Research | research |
-| "아키텍처", "구조 분석" | Architecture | analysis |
-| "마이그레이션", "업그레이드" | Migration | research |
-| "보안 포함", "보안 검토", "security review" | Security Mode | review |
-| "테스트까지", "tdd", "test first" | TDD Mode | implementation |
-| "요구사항 정리", "PRD", "기능 기획" | PRD Mode | PRD 워크플로우 실행 |
-| "프로젝트 업데이트", "상태 동기화", "스택 변경", "evolve" | Evolve | evolve 스킬 실행 |
-| "스킬 추천", "스킬 설치", "skill store" | Skill Store | skill-store 스킬 실행 |
-| "메신저", "messenger", "알림 설정" | Messenger Bridge | messenger 스킬 실행 |
-| "취소", "cancel", "중단" | Cancel | 현재 루프 중단 |
-| "도움말", "help", "사용법" | Help | 사용 가능한 스킬/커맨드 안내 |
+| "until the end", "until complete", "don't stop" | Auto Loop | implementation (autonomous) |
+| "max performance", "in parallel", "autopilot" | Autopilot | implementation (parallel-max) |
+| "deep analysis", "deep dive", "deep search" | Deep Analysis | analysis |
+| "code review", "review this" | Review | review |
+| "create plan", "plan" | Planning | planning |
+| "investigate", "research" | Research | research |
+| "architecture", "structure analysis" | Architecture | analysis |
+| "migration", "upgrade" | Migration | research |
+| "include security", "security review" | Security Mode | review |
+| "including tests", "tdd", "test first" | TDD Mode | implementation |
+| "requirements", "PRD", "feature planning" | PRD Mode | Run PRD workflow |
+| "project update", "sync state", "stack change", "evolve" | Evolve | Run evolve skill |
+| "skill recommend", "skill install", "skill store" | Skill Store | Run skill-store skill |
+| "messenger", "notification setup" | Messenger Bridge | Run messenger skill |
+| "cancel", "abort" | Cancel | Abort current loop |
+| "help", "usage" | Help | Show available skills/commands |
 
-## 오케스트레이션 라이프사이클
+## Orchestration Lifecycle
 
 ### Phase 1: INTAKE
 
-사용자 요청을 분석하여 작업 유형과 모드를 결정합니다.
+Analyzes user requests to determine task type and mode.
 
 ### Phase 2: DECOMPOSE
 
-`medium` 이상 작업에 대해 서브태스크, 의존성, 병렬 실행 가능 그룹을 식별합니다.
+For `medium` or larger tasks, identifies subtasks, dependencies, and parallelizable groups.
 
 ### Phase 3: COMPOSE TEAM
 
-`team-templates/SKILL.md`를 참조하여 팀을 구성합니다.
+Assembles the team by referencing `team-templates/SKILL.md`.
 
-1. 작업 유형에 맞는 템플릿 선택
-2. 작업 규모에 따라 에이전트 수 조정
-3. 플랫폼별 추가 보조 에이전트 가용성 확인
-4. task-folder 생성
-5. `team-manifest.json` 초기화
+1. Select template matching the task type
+2. Adjust agent count based on task scale
+3. Verify platform-specific auxiliary agent availability
+4. Create task-folder
+5. Initialize `team-manifest.json`
 
 ### Phase 4: DISPATCH
 
-`roles/SKILL.md`를 참조하여 서브에이전트를 스폰합니다.
+Spawns sub-agents by referencing `roles/SKILL.md`.
 
 ### Phase 5: MONITOR
 
-결과 파일을 읽고 team-manifest 상태를 갱신합니다.
+Reads result files and updates team-manifest state.
 
 ### Phase 6: SYNTHESIZE
 
-Scout/Builder/Inspector 결과를 통합하여 다음 Wave 입력을 구성합니다.
+Integrates Scout/Builder/Inspector results to compose input for the next Wave.
 
 ### Phase 7: DECIDE
 
-PASS, FAIL, 반복 잔여, 에스컬레이션 조건에 따라 다음 행동을 결정합니다.
+Determines next action based on PASS, FAIL, remaining iterations, or escalation conditions.
 
 ### Phase 8: DELIVER
 
-작업 결과, 변경 파일, 검증 결과, 최종 상태를 사용자에게 전달합니다.
+Delivers task results, changed files, verification results, and final state to the user.
 
 ## Skill Tiers
 
@@ -105,44 +105,44 @@ Extended:
 - deep-search
 - note
 - auto-loop
-- PRD/ralph 연동 워크플로우
+- PRD/ralph integration workflow
 
-## 에스컬레이션 프로토콜
+## Escalation Protocol
 
-다음 상황에서 작업을 중단하고 사용자 판단을 요청합니다:
+Halts the task and requests user judgment in the following situations:
 
-- maxIterations 도달
-- 동일 오류 3회 연속
-- 파괴적 변경 승인 필요
-- 요구사항 모호
+- maxIterations reached
+- Same error 3 consecutive times
+- Destructive change requires approval
+- Ambiguous requirements
 
-## 메신저 브릿지 연동
+## Messenger Bridge Integration
 
-팀 기반 실행에서도 메신저 브릿지를 동일하게 지원합니다:
+Messenger bridge is supported identically in team-based execution:
 
-1. Phase 3 직후 `messenger/config.json` + `bot.pid` 확인
-2. 각 Wave 시작 시 `messenger/commands/` 폴링
-3. 에스컬레이션 시 승인 요청 파일 작성
-4. `ralph-state.md` 변경 시 자동 알림 전송
+1. Check `messenger/config.json` + `bot.pid` right after Phase 3
+2. Poll `messenger/commands/` at the start of each Wave
+3. Write approval request file on escalation
+4. Automatically send notification when `ralph-state.md` changes
 
-## 진행 보고 형식
+## Progress Report Format
 
 ```text
-[Synapse Team] {template} 팀 -- Wave {N}
+[Synapse Team] {template} team -- Wave {N}
 - Task: {task-folder}
-- 팀 구성: {역할 목록}
-- 현재 Wave: {active agents}
-- 완료된 Wave: {completed agents}
-- 다음 조치: {dispatch|synthesize|escalate|deliver}
+- Team composition: {role list}
+- Current Wave: {active agents}
+- Completed Waves: {completed agents}
+- Next action: {dispatch|synthesize|escalate|deliver}
 ```
 
-## 규칙
+## Rules
 
-1. 상황 판단 → 팀 구성 → 디스패치 → 결과 보고 순서를 유지
-2. context.md가 있으면 프로젝트 특화 컨텍스트를 로드
-3. context.md가 없으면 setup 워크플로우 안내
-4. 항상 한국어로 대화
-5. simple 작업은 팀 구성 없이 직접 처리
-6. 서브에이전트 결과는 파일시스템을 통해 전달
-7. 팀 구성 시 roles/team-templates를 반드시 참조
-8. manifest.json의 `agentPlatforms`는 항상 `["claude", "codex"]`를 유지 (단일 플랫폼으로 덮어쓰지 않음)
+1. Maintain the order: situation assessment -> team composition -> dispatch -> result report
+2. Load project-specific context if context.md exists
+3. Guide to setup workflow if context.md is missing
+4. Always converse in Korean
+5. Handle simple tasks directly without team composition
+6. Sub-agent results are delivered via the filesystem
+7. Always reference roles/team-templates when composing teams
+8. `agentPlatforms` in manifest.json must always remain `["claude", "codex"]` (do not overwrite with a single platform)
