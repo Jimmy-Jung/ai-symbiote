@@ -38,7 +38,7 @@ fi
 
 # --- 2. State directory setup ---
 STATE_DIR=$(get_state_dir)
-SESSION_DIR="$STATE_DIR/session-$PPID"
+SESSION_DIR="$STATE_DIR/state/session-$PPID"
 mkdir -p "$SESSION_DIR" 2>/dev/null || exit 0
 
 EVENTS_FILE="$SESSION_DIR/events.jsonl"

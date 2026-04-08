@@ -1,6 +1,8 @@
 #!/bin/bash
 # ai-symbiote PostToolUse(Write|Edit) hook: Detect unnecessary AI-generated comments.
 # Warns when edited files contain patterns of low-value comments.
+#
+# Principle: Silence on success — output ONLY when suspicious comments exceed threshold.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
