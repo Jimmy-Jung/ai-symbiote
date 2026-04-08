@@ -1,6 +1,8 @@
 #!/bin/bash
 # ai-symbiote PostToolUse(Write|Edit) hook: Detect unnecessary AI-generated comments.
 # Warns when edited files contain patterns of low-value comments.
+#
+# Principle: Silence on success — output ONLY when suspicious comments exceed threshold.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
@@ -32,7 +34,7 @@ COMMENT_COUNT=$((P1 + P2 + P3))
 
 if [ "$COMMENT_COUNT" -gt 3 ]; then
   ESCAPED_PATH=$(json_escape "$FILE_PATH")
-  printf '{"continue":true,"systemMessage":"[Comment Checker] %d개의 의심 주석이 %s에서 감지됨. 자명한 주석(%d), 주석 처리된 코드(%d), 빈 TODO(%d)."}\n' "$COMMENT_COUNT" "$ESCAPED_PATH" "$P1" "$P2" "$P3"
+  printf '{"continue":true,"systemMessage":"[Comment Checker] %d suspicious comments in %s: trivial(%d), commented-out code(%d), empty TODO(%d)."}\n' "$COMMENT_COUNT" "$ESCAPED_PATH" "$P1" "$P2" "$P3"
 fi
 
 exit 0

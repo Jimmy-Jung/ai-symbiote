@@ -1,125 +1,146 @@
 ---
 name: verify-loop
 user-invocable: true
-description: 자율 작업 루프에서 자기 수정 동작의 가이드라인. 4-Level Completion Criteria, 재시도 전략, 루프 탈출 조건을 정의. This skill should be used when running autonomous execution loops that need structured verify-fix cycles.
+description: Guidelines for self-correcting behavior in autonomous execution loops. Defines 4-Level Completion Criteria, retry strategies, and loop exit conditions. This skill should be used when running autonomous execution loops that need structured verify-fix cycles.
 ---
 
-# 검증 루프 (Verify Loop)
+# Verify Loop
 
-자율 작업 루프의 자기 수정 동작 가이드라인.
+Guidelines for self-correcting behavior in autonomous execution loops.
 
-## 자기 수정 루프 흐름
+## Self-Correction Loop Flow
 
 ```
-Execute (구현)
+Execute (implement)
     |
-Verify (검증)
+Verify (validate)
     |
-[이슈 있음?] --Yes--> Analyze (원인 분석) --> Fix (수정) --> Execute (재시도)
+[Issue found?] --Yes--> Analyze (root cause) --> Fix (patch) --> Execute (retry)
     |
     No
     |
-Complete (완료)
+Complete (done)
 ```
 
-각 반복에서 이전 실패 원인을 반영하고, 동일 접근을 두 번 사용하지 않는다.
+Each iteration reflects previous failure causes; never use the same approach twice.
 
-## 4단계 완료 기준
+## 4-Level Completion Criteria
 
 ### Level 1 (Minimal)
-- 코드 변경 완료
-- Lint 통과 (bash로 린트 명령 실행)
-- 기본 문법/타입 검사 통과
-- 런타임 에러 없음
-- 적용: 단순 수정, 짧은 작업
+- Code changes complete
+- Lint passes (run lint command via bash)
+- Basic syntax/type checks pass
+- No runtime errors
+- Applies to: simple fixes, short tasks
 
 ### Level 2 (Standard)
-- Level 1 충족
-- 기능 검증 완료 (동작 확인)
-- 코드 리뷰 기준 충족
-- 논리적 정확성 확인
-- 적용: 일반 작업, 버그 수정
+- Level 1 satisfied
+- Functional verification complete (behavior confirmed)
+- Code review standards met
+- Logical correctness confirmed
+- Applies to: general tasks, bug fixes
 
 ### Level 3 (Thorough)
-- Level 2 충족
-- 모든 테스트 통과
-- 엣지 케이스 처리
-- 문서화 갱신
-- QA 검증 기준 충족
-- 적용: 기능 구현, 리팩토링
+- Level 2 satisfied
+- All tests pass
+- Edge cases handled
+- Documentation updated
+- QA verification standards met
+- Applies to: feature implementation, refactoring
 
 ### Level 4 (Production)
-- Level 3 충족
-- 보안 검토
-- 성능 검증
-- 통합 테스트
-- 적용: 릴리즈, 배포 전
+- Level 3 satisfied
+- Security review
+- Performance verification
+- Integration tests
+- Applies to: releases, pre-deployment
 
-## 재시도 전략
+## Retry Strategy
 
-### 원인 분석 필수
-검증 실패 시 즉시 수정하지 않고, 반드시 원인을 먼저 분석한다:
-- 무엇이 실패했는가 (증상)
-- 왜 실패했는가 (근본 원인)
-- 이전 시도에서 무엇이 잘못되었는가
-- 다음 시도에서 무엇을 다르게 할 것인가
+### Root Cause Analysis Required
+Do not fix immediately on verification failure; always analyze the cause first:
+- What failed (symptom)
+- Why it failed (root cause)
+- What went wrong in the previous attempt
+- What to do differently in the next attempt
 
-### 동일 접근 금지
-- 같은 방식으로 재시도하지 않는다
-- 같은 에러가 2회 반복되면 근본적으로 다른 접근법 시도
-- 접근 변경 예: 직접 구현 실패 -> 기존 유사 코드 참조
+### No Repeated Approaches
+- Do not retry using the same method
+- If the same error occurs twice, try a fundamentally different approach
+- Example of approach change: direct implementation failed -> reference existing similar code
 
-### 오류 유형별 최대 재시도
-- 컴파일 에러: 유사 패턴 2회까지
-- 동일 에러 3회 연속: 접근 전환
-- 총 5회 재시도: 사용자 에스컬레이션
+### Max Retries by Error Type
+- Compile errors: up to 2 attempts with similar pattern
+- Same error 3 times in a row: switch approach
+- Total 5 retries: escalate to user
 
-## 루프 탈출 조건
+## Loop Exit Conditions
 
-### 정상 종료
-- 선택한 Level의 모든 기준 충족
+### Normal Termination
+- All criteria for the selected Level are met
 
-### 강제 종료 (에스컬레이션)
-- 동일 오류 3회 연속 -> 접근 전환
-- 총 5회 재시도 -> 사용자 에스컬레이션
-- 파괴적 변경 필요 시 사용자 확인
-- 요구사항 모호 시 사용자 확인
+### Forced Termination (Escalation)
+- Same error 3 times in a row -> switch approach
+- Total 5 retries -> escalate to user
+- Destructive changes needed: request user confirmation
+- Ambiguous requirements: request user confirmation
 
-### 강제 종료 보고 형식
+### Forced Termination Report Format
 
 ```
-[Verify Loop 강제 종료]
+[Verify Loop Forced Termination]
 
-- 반복 횟수: N/M
-- 탈출 사유: [사유]
-- 최종 상태: [달성한 것 / 미달성한 것]
-- 발견된 이슈: [목록]
-- 권장 조치: [사용자에게 제안]
+- Iteration count: N/M
+- Exit reason: [reason]
+- Final status: [achieved / not achieved]
+- Issues found: [list]
+- Recommended action: [suggestion to user]
 ```
 
-## 실패 패턴 분류 및 대응
+## Failure Pattern Classification and Response
 
-| 패턴 | 가능 원인 | 대응 |
-|------|----------|------|
-| 컴파일 에러 | import 누락, 문법 | import/문법 수정 |
-| 타입 에러 | 타입 불일치 | 실제 타입 정의 확인 후 수정 |
-| 로직 에러 | 요구사항 오해 | 요구사항 재분석 |
-| 테스트 실패 | 기대값 불일치 | 테스트 기대값 확인 |
-| 심볼 미존재 | 환각 코드 | Grep으로 실제 심볼 검색 후 교체 |
+| Pattern | Possible Cause | Response |
+|---------|---------------|----------|
+| Compile error | Missing import, syntax | Fix import/syntax |
+| Type error | Type mismatch | Check actual type definition, then fix |
+| Logic error | Misunderstood requirements | Re-analyze requirements |
+| Test failure | Expected value mismatch | Verify test expectations |
+| Symbol not found | Hallucinated code | Search for actual symbol via Grep, then replace |
 
-## 성능 원칙
+## Performance Principles
 
-- 최소 수정: 수정 사이클에서는 최소한의 변경만 수행
-- 과도한 설계 금지: 수정 중에는 오버엔지니어링 지양
-- Fail Fast: 조기 실패 시 불필요한 후속 단계 건너뜀
-- 검증 범위: Level 1 통과 후 상위 Level로 확대
+- Minimal changes: only make the smallest necessary changes during fix cycles
+- No over-engineering: avoid over-design during fixes
+- Fail Fast: skip unnecessary subsequent steps on early failure
+- Verification scope: expand to higher Levels after Level 1 passes
+
+## Scope Verification (Auto-Freeze)
+
+When `manifest.json` has `autoFreeze: true` (default), Inspector must verify that Builder changes stay within the Architect's planned scope.
+
+### Verification Steps
+
+1. Read the Architect's `## Affected Files` section from `results/architect-*.result.md`
+2. Read the Builder's `## Changed Files` section from `results/builder-*.result.md`
+3. Compare: any file in Builder's changes that is NOT in Architect's Affected Files is a **scope violation**
+
+### Scope Violation Handling
+
+- Report scope violations as a FAIL reason: `"Scope violation: {file} was modified but not listed in Affected Files"`
+- **Escape hatch**: If Builder's result includes a `## Out-of-scope justification` section explaining why the out-of-scope change was necessary, Inspector may accept it and PASS
+- Scope violations are recorded in harness-log.jsonl via the auto-loop learning mechanism
+
+### Skip Conditions
+
+- `manifest.json` has `autoFreeze: false` → skip scope verification entirely
+- No Architect result file found → skip (direct execution without planning)
 
 ## Role Injection: Inspector
 
-이 섹션은 synapse 오케스트레이터가 Inspector 서브에이전트를 스폰할 때 프롬프트에 주입됩니다.
+This section is injected into the prompt when the synapse orchestrator spawns an Inspector subagent.
 
-Inspector는 위의 4단계 완료 기준, 자기 수정 루프 흐름, 실패 패턴 분류를 따릅니다.
-오케스트레이터가 지정한 완료 기준 Level에 맞춰 검증하세요.
-종합 판정은 반드시 PASS 또는 FAIL로 명시하세요.
-FAIL 시 수정 제안을 구체적으로 (파일, 줄번호, 수정 방법) 제공하세요.
-결과는 반드시 지정된 result 파일에 markdown으로 작성하세요.
+The Inspector follows the 4-Level Completion Criteria, Self-Correction Loop Flow, Failure Pattern Classification, and Scope Verification above.
+Verify against the completion criteria Level specified by the orchestrator.
+The overall verdict must be explicitly stated as PASS or FAIL.
+On FAIL, provide specific fix suggestions (file, line number, fix method).
+Write results in markdown to the designated result file.

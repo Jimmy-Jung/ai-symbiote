@@ -1,64 +1,130 @@
 ---
 name: stats
-description: 스킬, 커맨드의 사용 빈도를 분석합니다.
+description: Analyzes usage frequency of skills and commands.
 argument-hint: [--reset]
 user-invocable: true
 allowed-tools: [Read, Glob, Grep, Bash]
 ---
 
-# Stats -- 사용 통계 조회
+# Stats -- Usage Statistics
 
-## 워크플로우
+## Workflow
 
-### Step 1: 사용 데이터 수집
+### Step 1: Collect Usage Data
 
-`~/ai-symbiote/{slug}/usage-data/` 디렉터리에서 추적 데이터를 읽습니다.
+Reads tracking data from the `~/ai-symbiote/{slug}/usage-data/` directory.
 
-데이터 형식: 각 파일은 `{count}|{ISO8601 timestamp}` 형태입니다.
+Data format: each file contains `{count}|{ISO8601 timestamp}`.
 
 ```
 ~/ai-symbiote/{slug}/usage-data/
-  .tracked-since          # 추적 시작일
-  skills/{name}           # 스킬별 카운터
-  commands/{name}         # 커맨드별 카운터
+  .tracked-since          # tracking start date
+  skills/{name}           # per-skill counter
+  commands/{name}         # per-command counter
 ```
 
-추적 데이터가 없으면 안내 메시지를 출력합니다.
+If no tracking data exists, display a guidance message.
 
-### Step 2: 전체 항목 스캔
+### Step 2: Scan All Items
 
-실제 존재하는 모든 항목을 디렉터리에서 수집합니다:
+Collects all existing items from directories:
 
-- 스킬: 현재 플러그인 루트의 `skills/*/SKILL.md` -- Glob으로 검색
-- 커맨드: 슬래시 커맨드 목록 (argument-hint가 있는 스킬)
+- Skills: `skills/*/SKILL.md` in the current plugin root -- search via Glob
+- Commands: slash command list (skills with argument-hint)
 
-### Step 3: 데이터 병합 및 정렬
+### Step 3: Merge and Sort Data
 
-각 항목에 대해:
-1. usage-data에 카운터 파일이 있으면 count와 lastUsed 읽기
-2. 없으면 count=0으로 처리
-3. 카테고리별로 count 내림차순 정렬
+For each item:
+1. If a counter file exists in usage-data, read count and lastUsed
+2. If not, treat as count=0
+3. Sort by count in descending order within each category
 
-### Step 4: 통계 출력
+### Step 4: Output Statistics
 
 ```
-[사용 통계] 추적 기간: {시작일} ~ 현재 ({N}일)
+[Usage Stats] Tracking period: {start date} ~ now ({N} days)
 
-스킬 ({전체}개, 활성 {1회 이상}개):
-  #1  {name}          {count}회  (최근: {상대시간})
+Skills ({total}, {1+ uses} active):
+  #1  {name}          {count} uses  (last: {relative time})
   ...
-  --- 미사용 (0회) ---
-  {name}              0회
+  --- Unused (0 uses) ---
+  {name}              0 uses
 
-커맨드 ({전체}개, 활성 {1회 이상}개):
-  #1  {name}          {count}회  (최근: {상대시간})
+Commands ({total}, {1+ uses} active):
+  #1  {name}          {count} uses  (last: {relative time})
   ...
 ```
 
-### Step 5: 추적 초기화 (--reset)
+### Step 5: Harness Evolution Metrics
 
-사용자가 "추적 초기화", "stats --reset" 등을 요청하면:
-1. 초기화 범위를 확인
-2. 현재 통계를 요약 표시
-3. 확인 후 해당 카운터 파일 삭제
-4. 결과 보고
+Analyzes harness state from `~/ai-symbiote/{slug}/harness-log.jsonl` and `context.md`.
+
+If harness-log.jsonl does not exist, skip this section.
+
+```
+[Harness Evolution Metrics]
+
+Auto-generated rules:
+  Active: {N}  |  Total created: {M}  |  GC removed: {M-N}
+
+Mistake frequency (last 30 days):
+  This week: {N}  |  Last week: {M}  |  Trend: {up/down/flat}
+
+TOP 5 mistake types:
+  #1  {error_type} @ {file}    {count} times
+  #2  {error_type} @ {file}    {count} times
+  ...
+
+Harness effectiveness:
+  Same mistake recurrence after rule creation: {N}/{M} ({percent}%)
+  (Lower recurrence rate = more effective harness)
+
+Rule prevention stats (v2):
+  Total preventions: {N}
+  Top 5 most effective rules:
+    #1  [Harness #{id}] {description}    prevented: {count} times
+    #2  [Seed #{id}] {description}       prevented: {count} times
+    ...
+  Rules with 0 preventions: {N} (gc candidates)
+
+Guard blocked commands (v2):
+  Total blocks: {N}
+  Top patterns: {command pattern} x{count}
+
+context.md: {line count} lines ({harness rules} + {seed rules})
+harness-log.jsonl: {line count} lines
+```
+
+Analysis method:
+1. Count `[Harness #` prefixed lines in context.md -> active harness rule count
+2. Count `[Seed #` prefixed lines in context.md -> active seed rule count
+3. Count `rule_created` events in harness-log.jsonl -> total created rule count
+4. Count mistake events in harness-log.jsonl for last 7/14 days -> weekly trend
+5. Aggregate frequency by error_type + file combination -> TOP 5
+6. Check recurrence of same {error_type, file} after rule_created -> recurrence rate
+7. Count `rule_prevented` events per rule_id -> prevention stats (v2 events)
+8. Count `guard_blocked` events -> guard stats (v2 events)
+9. Gracefully skip unknown event types (forward-compatible with future schema versions)
+
+### Step 5.5: Baseline Measurement (--baseline)
+
+When `--baseline` is provided, calculate and display the current repeat rate for tracking improvement:
+
+```
+[Harness Baseline] Measured on {date}
+
+Repeat rate (same {error_type, file} within 7 days):
+  Total unique error patterns: {N}
+  Patterns that recurred: {M}
+  Repeat rate: {M/N * 100}%
+
+Save this baseline to track improvement after harness evolution changes.
+```
+
+### Step 6: Reset Tracking (--reset)
+
+When the user requests "reset tracking", "stats --reset", etc.:
+1. Confirm the scope of reset
+2. Display current statistics summary
+3. Delete corresponding counter files after confirmation
+4. Report results

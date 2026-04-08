@@ -2,6 +2,9 @@
 # ai-symbiote SessionStart hook: Check project bootstrap status.
 # Checks ~/ai-symbiote/{slug}/ for manifest and interrupted Ralph loops.
 #
+# Principle: Silence on success — only output context/synapse injection and
+#            warnings. No extra messages when everything is normal.
+#
 # Codex hook protocol:
 #   stdout: {"continue":true,"systemMessage":"..."} for context injection
 
@@ -14,7 +17,58 @@ STATE_DIR=$(get_state_dir)
 CONTEXT_PARTS=()
 
 if [ ! -f "$STATE_DIR/manifest.json" ]; then
-  CONTEXT_PARTS+=("[Symbiote] manifest.json이 없습니다. setup 명령으로 프로젝트를 초기화하세요.")
+  CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup to initialize the project.")
+fi
+
+# Harness: analyze previous sessions for rule_prevented before cleanup
+if [ -d "$STATE_DIR" ] && [ -f "$STATE_DIR/context.md" ]; then
+  HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+  NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  for sess_dir in "$STATE_DIR"/session-*/; do
+    [ -d "$sess_dir" ] || continue
+    SESS_PID=$(basename "$sess_dir" | sed 's/session-//')
+    # Only analyze dead sessions (not the current one)
+    if [ -n "$SESS_PID" ] && ! kill -0 "$SESS_PID" 2>/dev/null; then
+      EVENTS_FILE="$sess_dir/events.jsonl"
+      if [ -f "$EVENTS_FILE" ]; then
+        # For each harness/seed rule, check if covered files were edited without errors
+        while IFS= read -r rule_line; do
+          RULE_ID=$(printf '%s' "$rule_line" | grep -o '#[0-9]*' | head -1 | tr -d '#')
+          [ -z "$RULE_ID" ] && continue
+          # Extract file hint from rule (basename mentioned in rule text)
+          RULE_FILE=$(printf '%s' "$rule_line" | grep -o '[A-Za-z0-9_-]*\.[a-z]*' | head -1)
+          [ -z "$RULE_FILE" ] && continue
+          # Check if this file was edited in the session
+          EDITED=$(grep -c "\"file\":\"[^\"]*$RULE_FILE\"" "$EVENTS_FILE" 2>/dev/null) || EDITED=0
+          if [ "$EDITED" -gt 0 ]; then
+            # Check if there were errors on this file
+            ERRORS=$(grep "\"file\":\"[^\"]*$RULE_FILE\"" "$EVENTS_FILE" 2>/dev/null | grep -c '"status":"error"' 2>/dev/null) || ERRORS=0
+            if [ "$ERRORS" -eq 0 ]; then
+              printf '{"v":2,"ts":"%s","type":"rule_prevented","rule_id":%s,"file":"%s","session_pid":"%s"}\n' \
+                "$NOW" "$RULE_ID" "$(printf '%s' "$RULE_FILE" | tr -d '"')" "$SESS_PID" >> "$HARNESS_LOG" 2>/dev/null
+            fi
+          fi
+        done < <(grep '^\[Harness #\|^\[Seed #' "$STATE_DIR/context.md" 2>/dev/null)
+      fi
+      # Clean up stale session
+      rm -rf "$sess_dir" 2>/dev/null
+    fi
+  done
+fi
+
+# Harness: notify about auto-generated rules from previous sessions
+if [ -f "$STATE_DIR/harness-log.jsonl" ]; then
+  RECENT_RULES=$(grep '"type":"rule_created"' "$STATE_DIR/harness-log.jsonl" 2>/dev/null | tail -3)
+  if [ -n "$RECENT_RULES" ]; then
+    RULE_COUNT=$(grep -c '"type":"rule_created"' "$STATE_DIR/harness-log.jsonl" 2>/dev/null) || RULE_COUNT=0
+    CONTEXT_PARTS+=("[Harness] ${RULE_COUNT} auto-generated harness rules exist. Run stats to view harness evolution metrics.")
+  fi
+
+  # Harness: recommend gc when log exceeds 100 lines
+  LOG_LINES=$(wc -l < "$STATE_DIR/harness-log.jsonl" 2>/dev/null | tr -d ' ') || LOG_LINES=0
+  if [ "$LOG_LINES" -ge 100 ]; then
+    CONTEXT_PARTS+=("[Harness] harness-log.jsonl has ${LOG_LINES} lines. Run gc skill to prune unused rules and old logs.")
+  fi
 fi
 
 if [ -d "$STATE_DIR/state" ]; then
@@ -24,60 +78,65 @@ if [ -d "$STATE_DIR/state" ]; then
       ACTIVE=$(grep -o 'active: true' "${state_dir}ralph-state.md" 2>/dev/null)
       if [ -n "$ACTIVE" ]; then
         TASK_NAME=$(basename "$state_dir")
-        CONTEXT_PARTS+=("[Symbiote] Ralph Loop '${TASK_NAME}'이 중단되었습니다. ralph 연동으로 재개하거나 clean 워크플로우로 정리하세요.")
+        CONTEXT_PARTS+=("[Symbiote] Ralph Loop '${TASK_NAME}' was interrupted. Resume via ralph or clean up with the clean workflow.")
       fi
     fi
   done
 fi
 
 if [ -f "$STATE_DIR/context.md" ]; then
-  CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null | head -50)
+  CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null)
   if [ -n "$CONTEXT_CONTENT" ]; then
     CONTEXT_PARTS+=("[Symbiote Context] $CONTEXT_CONTENT")
+    # Warn when context.md grows too large (do NOT block injection)
+    CTX_LINES=$(echo "$CONTEXT_CONTENT" | wc -l | tr -d ' ')
+    if [ "$CTX_LINES" -gt 300 ]; then
+      CONTEXT_PARTS+=("[Harness] context.md exceeded ${CTX_LINES} lines (recommended max 300). Run gc skill to prune unused rules.")
+    fi
   fi
 fi
 
-# Synapse 오케스트레이터 라우팅 규칙 주입
+# Synapse orchestrator routing rules injection
 if [ -f "$STATE_DIR/manifest.json" ]; then
-  SYNAPSE_ROUTING='[Synapse Orchestrator] 당신은 ai-symbiote의 Synapse 팀 리더입니다. 사용자의 자연어 요청을 분석하여 아래 규칙에 따라 행동하세요.
+  SYNAPSE_ROUTING='[Synapse Orchestrator] You are the Synapse team leader of ai-symbiote. Analyze user requests and act according to the rules below.
 
-## 모드 감지 (사용자 메시지에서 키워드 매칭)
-- "끝까지","완료할 때까지","멈추지 마" → Skill(skill:"ai-symbiote:auto-loop", args:"<작업설명>")
-- "최대 성능","병렬로","autopilot" → Skill(skill:"ai-symbiote:autopilot", args:"<작업설명>")
-- "심층 분석","깊이 파악","deep search" → Skill(skill:"ai-symbiote:analyze", args:"<대상>")
-- "코드 리뷰","리뷰해줘" → Skill(skill:"ai-symbiote:review")
-- "계획 수립","plan" → Skill(skill:"ai-symbiote:plan", args:"<작업설명>")
-- "조사","research","리서치" → analysis 팀 + Researcher 투입
-- "요구사항 정리","PRD","기능 기획" → Skill(skill:"ralph-skills:prd")
-- "프로젝트 업데이트","evolve" → Skill(skill:"ai-symbiote:evolve")
-- "커밋","commit" → Skill(skill:"ai-symbiote:git-commit")
+## Mode Detection (keyword matching from user message)
+- "until done","do not stop","keep going" → Skill(skill:"ai-symbiote:auto-loop", args:"<task>")
+- "max performance","parallel","autopilot" → Skill(skill:"ai-symbiote:autopilot", args:"<task>")
+- "deep analysis","deep search","analyze deeply" → Skill(skill:"ai-symbiote:analyze", args:"<target>")
+- "code review","review this" → Skill(skill:"ai-symbiote:review")
+- "make a plan","plan" → Skill(skill:"ai-symbiote:plan", args:"<task>")
+- "research","investigate" → analysis team + Researcher
+- "requirements","PRD","feature spec" → Skill(skill:"ralph-skills:prd")
+- "update project","evolve" → Skill(skill:"ai-symbiote:evolve")
+- "commit" → Skill(skill:"ai-symbiote:git-commit")
 
-## 팀 기반 실행 (medium 이상 작업)
-명시적 키워드가 없어도, 작업 규모가 medium 이상이면 팀을 구성합니다:
-1. Scout(Explore, sonnet) 1~2명으로 코드베이스 탐색
-2. Architect(Plan, opus) 1명으로 구현 계획 수립
-3. Builder(general-purpose, sonnet) 1~3명으로 구현
-4. Inspector(general-purpose, sonnet) 1명으로 검증
-파일시스템 계약: ~/ai-symbiote/{slug}/state/{task-folder}/에 ralph-state.md, team-manifest.json, results/*.result.md 저장
+## Team-based Execution (medium+ tasks)
+Even without explicit keywords, form a team for medium+ scope:
+1. Scout(Explore, sonnet) x1-2 for codebase exploration
+2. Architect(Plan, opus) x1 for implementation planning
+3. Builder(general-purpose, sonnet) x1-3 for implementation
+4. Inspector(general-purpose, sonnet) x1 for verification
+Filesystem contract: ~/ai-symbiote/{slug}/state/{task-folder}/ stores ralph-state.md, team-manifest.json, results/*.result.md
 
-## 작업 규모 판단
-- simple: 파일 1~2개 수정, 단일 함수 변경 → 직접 처리 (팀 불필요)
-- medium: 파일 3~5개, 모듈 간 연동 → Scout + Builder + Inspector
-- large: 파일 5개+, 아키텍처 변경 → 전체 팀 구성 (Scout → Architect → Builder → Inspector)
+## Task Scope Assessment
+- simple: 1-2 files, single function change → handle directly (no team needed)
+- medium: 3-5 files, cross-module work → Scout + Builder + Inspector
+- large: 5+ files, architecture change → full team (Scout → Architect → Builder → Inspector)
 
-## 참조 스킬
-팀 구성 시 roles/SKILL.md와 team-templates/SKILL.md를 Read하여 프롬프트 템플릿과 출력 계약을 따르세요.
-code-accuracy, verify-loop, planning 스킬을 각 역할에 주입하세요.
+## Reference Skills
+When forming teams, Read roles/SKILL.md and team-templates/SKILL.md for prompt templates and output contracts.
+Inject code-accuracy, verify-loop, planning skills into each role.
 
-## 원칙
-- 한국어로 대화
-- simple 작업은 팀 구성 없이 직접 처리
-- 서브에이전트 결과는 파일시스템을 통해 전달
-- 에스컬레이션: maxIterations 도달, 동일 오류 3회, 파괴적 변경 시 사용자 확인'
+## Principles
+- Respond in the language the user uses
+- Handle simple tasks directly without team formation
+- Pass subagent results via filesystem
+- Escalate on: maxIterations reached, same error 3 times, destructive changes require user confirmation'
   CONTEXT_PARTS+=("$SYNAPSE_ROUTING")
 fi
 
-# 메신저 브릿지: pending 명령 확인
+# Messenger bridge: check pending commands
 MESSENGER_CMD_DIR="$STATE_DIR/messenger/commands"
 if [ -d "$MESSENGER_CMD_DIR" ]; then
   for cmd_file in "$MESSENGER_CMD_DIR"/*.json; do
@@ -92,13 +151,13 @@ if [ -d "$MESSENGER_CMD_DIR" ]; then
         CMD_ARGS=$(grep -o '"instruction"[[:space:]]*:[[:space:]]*"[^"]*"' "$cmd_file" | head -1 | sed 's/.*"instruction"[[:space:]]*:[[:space:]]*"//' | sed 's/"$//')
         [ -z "$CMD_ARGS" ] && CMD_ARGS=$(grep -o '"task"[[:space:]]*:[[:space:]]*"[^"]*"' "$cmd_file" | head -1 | sed 's/.*"task"[[:space:]]*:[[:space:]]*"//' | sed 's/"$//')
       fi
-      ESCAPED_CMD=$(json_escape "[Messenger] 메신저 커맨드 수신: ${CMD_TYPE} - ${CMD_ARGS}")
+      ESCAPED_CMD=$(json_escape "[Messenger] Command received: ${CMD_TYPE} - ${CMD_ARGS}")
       CONTEXT_PARTS+=("$ESCAPED_CMD")
     fi
   done
 fi
 
-# 메신저 브릿지: 미처리 승인 응답 확인
+# Messenger bridge: check pending approval responses
 MESSENGER_APR_DIR="$STATE_DIR/messenger/approvals"
 if [ -d "$MESSENGER_APR_DIR" ]; then
   for resp_file in "$MESSENGER_APR_DIR"/*_response.json; do
@@ -106,7 +165,7 @@ if [ -d "$MESSENGER_APR_DIR" ]; then
     RESP_ID=$(json_field "$(cat "$resp_file")" "id")
     RESP_DECISION=$(json_field "$(cat "$resp_file")" "decision")
     RESP_COMMENT=$(json_field "$(cat "$resp_file")" "comment")
-    CONTEXT_PARTS+=("[Messenger] 승인 응답 수신: ${RESP_ID} - 결정: ${RESP_DECISION}, 코멘트: ${RESP_COMMENT}")
+    CONTEXT_PARTS+=("[Messenger] Approval response received: ${RESP_ID} - decision: ${RESP_DECISION}, comment: ${RESP_COMMENT}")
   done
 fi
 

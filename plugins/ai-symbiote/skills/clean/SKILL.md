@@ -1,6 +1,6 @@
 ---
 name: clean
-description: 완료된 작업의 상태 폴더를 정리합니다.
+description: Cleans up state folders for completed tasks.
 argument-hint: [task-folder-name | --all | --force]
 user-invocable: true
 allowed-tools: [Read, Bash, Glob]
@@ -8,24 +8,24 @@ allowed-tools: [Read, Bash, Glob]
 
 # Clean
 
-완료된 작업의 상태 폴더를 정리합니다.
+Cleans up state folders for completed tasks.
 
-## 상태 디렉터리
+## State Directory
 
 `~/ai-symbiote/{slug}/state/`
 
-## 워크플로우
+## Workflow
 
-1. `~/ai-symbiote/{slug}/state/` 하위 모든 task-folder를 스캔합니다.
-2. 각 폴더의 `ralph-state.md`를 확인합니다:
-   - `active: false` 또는 `ralph-state.md` 없음 -> 완료된 작업
-   - `active: true` -> 진행 중 (건너뜀)
-3. 완료된 작업 목록을 표시하고 사용자에게 삭제 확인을 요청합니다.
-4. 확인 후 해당 task-folder를 삭제합니다.
-5. 진행 중인 작업이 있으면 건드리지 않습니다.
+1. Scans all task-folders under `~/ai-symbiote/{slug}/state/`.
+2. Checks `ralph-state.md` in each folder:
+   - `active: false` or no `ralph-state.md` -> completed task
+   - `active: true` -> in progress (skipped)
+3. Displays the list of completed tasks and asks the user for deletion confirmation.
+4. Deletes the corresponding task-folders after confirmation.
+5. Does not touch in-progress tasks.
 
-## 옵션
+## Options
 
-- `--all`: 확인 없이 완료된 모든 작업 폴더 삭제
-- `--force`: 진행 중인 작업 포함 전체 삭제 (주의)
-- 작업명 지정: 특정 작업만 삭제 (예: `clean 2026-02-13T1430_login-feature`)
+- `--all`: Delete all completed task folders without confirmation
+- `--force`: Delete everything including in-progress tasks (use with caution)
+- Specify task name: Delete a specific task only (e.g., `clean 2026-02-13T1430_login-feature`)

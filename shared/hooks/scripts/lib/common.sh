@@ -33,7 +33,7 @@ get_project_slug() {
     local recorded_path manifest_json
     manifest_json=$(cat "$slug_dir/manifest.json")
     recorded_path=$(json_field "$manifest_json" "projectPath")
-    # fallback: 기존 manifest는 "path" 필드를 사용할 수 있음
+    # fallback: legacy manifests may use "path" field
     [ -z "$recorded_path" ] && recorded_path=$(json_field "$manifest_json" "path")
     if [ -n "$recorded_path" ] && [ "$recorded_path" != "$base_dir" ]; then
       slug="$full_slug"

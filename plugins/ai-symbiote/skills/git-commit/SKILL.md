@@ -1,65 +1,65 @@
 ---
 name: git-commit
 user-invocable: true
-description: 프로젝트 커밋 컨벤션에 맞는 커밋 메시지 자동 생성. git diff 분석 후 Conventional Commits 형식으로 생성합니다. This skill should be used when committing changes or when the user asks to commit.
+description: Auto-generate commit messages matching project commit conventions. Analyzes git diff and generates in Conventional Commits format. This skill should be used when committing changes or when the user asks to commit.
 ---
 
 # Git Commit
 
-프로젝트 커밋 컨벤션에 맞는 커밋 메시지를 자동 생성합니다.
+Auto-generates commit messages matching project commit conventions.
 
-## 커밋 타입 표
+## Commit Type Table
 
-| 타입 | 설명 | 예시 |
-|-----|------|------|
-| feat | 새로운 기능 | feat(auth): OAuth2 로그인 플로우 추가 |
-| fix | 버그 수정 | fix(parser): null 입력 처리 개선 |
-| refactor | 동작 변경 없는 코드 변경 | refactor(api): 에러 핸들러 분리 |
-| docs | 문서 변경 | docs: API 레퍼런스 업데이트 |
-| test | 테스트 추가/수정 | test(auth): 로그인 단위 테스트 추가 |
-| chore | 빌드, 툴링 변경 | chore: 의존성 업그레이드 |
-| style | 포맷팅, 공백 (로직 변경 없음) | style: 들여쓰기 수정 |
-| perf | 성능 개선 | perf(query): user_id 인덱스 추가 |
-| ci | CI 설정 변경 | ci: lint 워크플로우 추가 |
-| build | 빌드 시스템 변경 | build: 새 번들러로 마이그레이션 |
-| revert | 이전 커밋 되돌리기 | revert: feat(auth) 되돌리기 |
+| Type | Description | Example |
+|------|-------------|---------|
+| feat | New feature | feat(auth): add OAuth2 login flow |
+| fix | Bug fix | fix(parser): improve null input handling |
+| refactor | Code change with no behavior change | refactor(api): extract error handler |
+| docs | Documentation change | docs: update API reference |
+| test | Add/modify tests | test(auth): add login unit tests |
+| chore | Build, tooling changes | chore: upgrade dependencies |
+| style | Formatting, whitespace (no logic change) | style: fix indentation |
+| perf | Performance improvement | perf(query): add user_id index |
+| ci | CI config change | ci: add lint workflow |
+| build | Build system change | build: migrate to new bundler |
+| revert | Revert previous commit | revert: revert feat(auth) |
 
-## Subject 규칙
+## Subject Rules
 
-- type(scope)는 영어로, subject는 한글로 작성
-- 명령형/선언형 어조 (한글: "추가", "수정", "개선" / 영어: add, fix, improve)
-- 마침표 없음
-- 50자 이내 권장, 72자 절대 한도
-- 간결하되 충분히 설명적
+- type(scope) in English, subject in Korean
+- Imperative/declarative tone (Korean: "추가", "수정", "개선" / English: add, fix, improve)
+- No period
+- 50 chars recommended, 72 chars absolute limit
+- Concise but sufficiently descriptive
 
-## Body 규칙
+## Body Rules
 
-- Subject와 본문 사이 빈 줄 필수
-- 한글로 작성
-- WHY를 설명 (WHAT은 코드가 보여줌)
-- 72자마다 줄바꿈
+- Blank line required between subject and body
+- Written in Korean
+- Explain WHY (WHAT is shown by the code)
+- Line wrap at 72 chars
 
-## Footer 규칙
+## Footer Rules
 
-- BREAKING CHANGE: 호환성 깨짐 설명
+- BREAKING CHANGE: describe compatibility breakage
 - Closes #issue-number
 - Co-authored-by: Name <email>
 
-## 6단계 커밋 워크플로우
+## 6-Step Commit Workflow
 
-1. 스테이징된 변경 검토 (git diff --cached)
-2. 변경 내용에서 타입 결정
-3. scope 식별 (해당 시)
-4. Subject 작성 (명령형, 간결)
-5. 필요 시 Body 작성 (복잡한 변경)
-6. 커밋 실행
+1. Review staged changes (git diff --cached)
+2. Determine type from change content
+3. Identify scope (if applicable)
+4. Write subject (imperative, concise)
+5. Write body if needed (complex changes)
+6. Execute commit
 
-## 원자적 커밋 원칙
+## Atomic Commit Principle
 
-- 하나의 논리적 변경당 하나의 커밋
-- 커밋 단위로 독립적으로 이해 가능해야 함
+- One commit per logical change
+- Each commit should be independently understandable
 
-## 안전 사항
+## Safety Considerations
 
-- `.env`, `.env.*`, `credentials`, `secrets`, `*.key` 등 민감 정보는 커밋하지 않음
-- 경고 패턴 감지 시 사용자에게 확인 요청
+- Never commit sensitive information: `.env`, `.env.*`, `credentials`, `secrets`, `*.key`, etc.
+- Request user confirmation when warning patterns are detected

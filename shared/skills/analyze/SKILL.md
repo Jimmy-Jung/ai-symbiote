@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: 대상에 대해 심층 분석을 수행합니다.
+description: Performs deep analysis on a target.
 argument-hint: <analysis target>
 user-invocable: true
 allowed-tools: [Read, Glob, Grep, Bash, Agent]
@@ -8,33 +8,33 @@ allowed-tools: [Read, Glob, Grep, Bash, Agent]
 
 # Analyze
 
-synapse 오케스트레이터의 analysis 팀을 구성하여 대상을 심층 분석합니다.
+Assembles the synapse orchestrator's analysis team to perform deep analysis on a target.
 
-## 팀 구성
+## Team Composition
 
-- 팀 템플릿: `analysis`
+- Team template: `analysis`
 
-### 단계별 팀 투입
+### Phase-by-Phase Team Deployment
 
-| 순서 | 역할 | 수량 | 목적 |
-|------|------|------|------|
-| Wave 1 | Scout | 2~3 (병렬) | 서로 다른 전략으로 정보 수집 |
-| Wave 2 | Architect | 1 | Scout 결과를 합성하여 구조화된 분석 |
+| Order | Role | Count | Purpose |
+|-------|------|-------|---------|
+| Wave 1 | Scout | 2~3 (parallel) | Information gathering with different strategies |
+| Wave 2 | Architect | 1 | Synthesize Scout results into structured analysis |
 
-### Scout 배분 전략
-- Scout-001: Grep 기반 정확 매칭 (심볼, import, 타입 참조)
-- Scout-002: Glob 기반 파일 패턴 탐색 (구조, 네이밍 컨벤션)
-- Scout-003: subagent(explorer) 심층 탐색 (복잡한 분석 시 선택적 투입)
+### Scout Allocation Strategy
+- Scout-001: Grep-based exact matching (symbols, imports, type references)
+- Scout-002: Glob-based file pattern exploration (structure, naming conventions)
+- Scout-003: subagent(explorer) deep exploration (selectively deployed for complex analysis)
 
-## 분석 결과 구조
+## Analysis Result Structure
 
-Architect가 다음 구조로 분석 결과를 정리합니다:
-- 누락된 정보 (Missing Questions)
-- 범위 리스크 (Scope Risks)
-- 미검증 가정 (Unvalidated Assumptions)
-- 엣지 케이스 (Edge Cases)
-- 권장 사항 (Recommendations)
+The Architect organizes analysis results in the following structure:
+- Missing Questions
+- Scope Risks
+- Unvalidated Assumptions
+- Edge Cases
+- Recommendations
 
-## 핸드오프
+## Handoff
 
-분석 완료 후 필요 시 planning 워크플로우로 계획 수립을 제안합니다.
+After analysis is complete, suggests planning workflow for plan creation if needed.

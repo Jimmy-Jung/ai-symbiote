@@ -1,78 +1,78 @@
 ---
 name: note
 user-invocable: true
-description: Compaction 내성 메모장. 중요한 컨텍스트, 결정 사항, 진행 상태를 프로젝트별 state 폴더에 저장하여 컨텍스트 윈도우 초과나 세션 전환 시에도 정보가 보존됩니다. This skill should be used when persisting important context across compaction boundaries or session transitions.
+description: Compaction-resistant notepad. Persists important context, decisions, and progress status to a per-project state folder so information is preserved across context window overflow or session transitions. This skill should be used when persisting important context across compaction boundaries or session transitions.
 ---
 
-# Note -- Compaction 내성 메모장
+# Note -- Compaction-Resistant Notepad
 
-중요한 컨텍스트를 프로젝트별 state 폴더에 저장하여, 컨텍스트 윈도우 초과(compaction) 시에도 정보가 보존됩니다.
+Persists important context to a per-project state folder so information is preserved across context window overflow (compaction).
 
-## 저장 경로
+## Storage Path
 
 `~/ai-symbiote/{slug}/state/{task-folder}/notepad.md`
 
-task-folder 네이밍: `{ISO8601-basic}_{task-name}`
-예시: `2026-02-13T1430_login-feature`
+task-folder naming: `{ISO8601-basic}_{task-name}`
+Example: `2026-02-13T1430_login-feature`
 
-경로 결정 방법:
-1. 현재 작업의 task-folder가 이미 존재하면 그 폴더 사용
-2. 없으면 현재 시각과 작업명으로 task-folder 생성
+Path resolution:
+1. If a task-folder already exists for the current task, use that folder
+2. Otherwise, create a task-folder with the current time and task name
 
-slug 생성: git remote origin의 `owner-repo` 또는 디렉터리명. 64자 제한.
+slug generation: `owner-repo` from git remote origin or directory name. 64-char limit.
 
-## 언제 사용하는가
+## When to Use
 
-- 복잡한 작업 중 핵심 결정 사항을 기록할 때
-- Ralph Loop / Autopilot 반복 간 상태를 전달할 때
-- 디버깅 중 발견한 단서를 누적할 때
-- 사용자의 중요한 요구사항을 기록할 때
+- Recording key decisions during complex work
+- Passing state between Ralph Loop / Autopilot iterations
+- Accumulating clues discovered during debugging
+- Recording important user requirements
 
-## 저장 형식
+## Storage Format
 
 ```markdown
 # Notepad
 
-## 작업 컨텍스트
-- 현재 작업: [설명]
-- 목표: [설명]
+## Task Context
+- Current task: [description]
+- Goal: [description]
 
-## 핵심 결정
-- [타임스탬프] [결정 내용]
+## Key Decisions
+- [timestamp] [decision]
 
-## 발견 사항
-- [타임스탬프] [발견 내용]
+## Findings
+- [timestamp] [finding]
 
-## 진행 상태
-- [x] 완료된 항목
-- [ ] 남은 항목
+## Progress Status
+- [x] Completed items
+- [ ] Remaining items
 ```
 
-## 워크플로우
+## Workflow
 
-### 저장 (Write)
-1. task-folder가 없으면 Bash로 생성: `mkdir -p ~/ai-symbiote/{slug}/state/{task-folder}`
-2. `notepad.md`에 새 항목을 추가 (기존 내용 보존)
-3. 타임스탬프를 포함하여 시간순 추적 가능
+### Save (Write)
+1. If task-folder does not exist, create it via Bash: `mkdir -p ~/ai-symbiote/{slug}/state/{task-folder}`
+2. Append new entries to `notepad.md` (preserve existing content)
+3. Include timestamps for chronological tracking
 
-### 읽기 (Read)
-1. 작업 시작 시 notepad.md 존재 여부 확인
-2. 존재하면 Read tool로 이전 컨텍스트 복원
-3. 파일이 없으면 새로 시작
+### Read
+1. Check for notepad.md existence at task start
+2. If it exists, restore previous context via Read tool
+3. If file does not exist, start fresh
 
-### 정리 (Clean)
-1. 작업 완료 시 clean 워크플로우로 task-folder 전체를 삭제
+### Clean
+1. On task completion, delete entire task-folder via clean workflow
 
-## 자율 루프 연동
+## Autonomous Loop Integration
 
-Ralph Loop / Autopilot의 각 iteration에서:
-- iteration 시작: notepad.md 읽어 이전 상태 복원
-- iteration 중: 발견 사항, 수정 내역 기록
-- iteration 종료: 다음 iteration을 위한 상태 기록
+During each Ralph Loop / Autopilot iteration:
+- Iteration start: read notepad.md to restore previous state
+- During iteration: record findings and fix history
+- Iteration end: record state for the next iteration
 
-## 원칙
+## Principles
 
-- 간결하게 기록 (핵심만)
-- 항상 추가 모드 (기존 내용 덮어쓰지 않음)
-- 타임스탬프 포함
-- 작업 완료 후 clean 워크플로우로 정리
+- Record concisely (key points only)
+- Always append mode (never overwrite existing content)
+- Include timestamps
+- Clean up via clean workflow after task completion

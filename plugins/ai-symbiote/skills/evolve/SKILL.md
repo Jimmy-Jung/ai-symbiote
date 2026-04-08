@@ -1,32 +1,32 @@
 ---
 name: evolve
-description: "프로젝트 변경사항을 감지하여 manifest.json과 context.md를 동기화합니다."
+description: "Detects project changes and synchronizes manifest.json and context.md."
 argument-hint:
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
 ---
 
-# Evolve -- 프로젝트 상태 동기화
+# Evolve -- Project State Synchronization
 
-프로젝트 코드베이스의 현재 상태를 감지하여 manifest.json과 context.md를 최신으로 갱신합니다.
-setup이 초기 1회 스냅샷이라면, evolve는 주기적 동기화입니다.
+Detects the current state of the project codebase and updates manifest.json and context.md to the latest.
+If setup is a one-time initial snapshot, evolve is periodic synchronization.
 
-## 진입 조건
+## Entry Condition
 
-`~/ai-symbiote/{slug}/manifest.json`이 존재해야 합니다.
-존재하지 않으면: "먼저 setup 워크플로우로 프로젝트를 초기화해주세요." 안내.
+`~/ai-symbiote/{slug}/manifest.json` must exist.
+If it does not exist: guide with "Please initialize the project with the setup workflow first."
 
-## 워크플로우
+## Workflow
 
-### Step 1: 기준선 로드
+### Step 1: Load Baseline
 
-현재 manifest.json을 읽어 기존 상태를 기준선으로 확보합니다.
+Read the current manifest.json to establish the existing state as a baseline.
 
 ```
-기준선 항목:
+Baseline items:
 - project.languages
-- project.platforms (프로젝트 타겟 플랫폼: iOS, web 등)
-- agentPlatforms (항상 ["claude", "codex"] 유지, 변경 대상 아님)
+- project.platforms (project target platforms: iOS, web, etc.)
+- agentPlatforms (always keep ["claude", "codex"], not a change target)
 - stack.packageManager
 - stack.buildTool
 - stack.frameworks
@@ -38,16 +38,16 @@ setup이 초기 1회 스냅샷이라면, evolve는 주기적 동기화입니다.
 - plugins.codex.cliReady
 ```
 
-### Step 2: 6-Track 병렬 재감지
+### Step 2: 6-Track Parallel Re-detection
 
-setup의 Step 1과 동일한 감지를 재실행합니다.
-Glob, Grep, Read를 병렬로 실행합니다.
+Re-run the same detection as setup's Step 1.
+Run Glob, Grep, Read in parallel.
 
-#### Track A -- 언어 감지
-- Glob으로 파일 확장자 검색: `*.swift`, `*.kt`, `*.ts`, `*.tsx`, `*.js`, `*.py`, `*.go`, `*.rs`, `*.java`, `*.rb`, `*.cs`, `*.cpp`
-- primary/secondary 언어 결정
+#### Track A -- Language Detection
+- Glob for file extensions: `*.swift`, `*.kt`, `*.ts`, `*.tsx`, `*.js`, `*.py`, `*.go`, `*.rs`, `*.java`, `*.rb`, `*.cs`, `*.cpp`
+- Determine primary/secondary languages
 
-#### Track B -- 패키지 매니저 감지
+#### Track B -- Package Manager Detection
 - SPM: `Package.swift`
 - Node: `package.json`
 - Python: `requirements.txt`, `pyproject.toml`
@@ -55,19 +55,19 @@ Glob, Grep, Read를 병렬로 실행합니다.
 - Rust: `Cargo.toml`
 - Go: `go.mod`
 
-#### Track C -- 프레임워크 감지
-- Grep import 패턴: `import UIKit`, `import SwiftUI`, `import React`, `from 'react'`, `import django` 등
+#### Track C -- Framework Detection
+- Grep import patterns: `import UIKit`, `import SwiftUI`, `import React`, `from 'react'`, `import django`, etc.
 
-#### Track D -- 아키텍처 감지
-- 폴더 구조 힌트: `/features/`, `/domain/`, `/data/`, `/presentation/`, `/components/`
+#### Track D -- Architecture Detection
+- Folder structure hints: `/features/`, `/domain/`, `/data/`, `/presentation/`, `/components/`
 
-#### Track E -- CI/CD 감지
-- `.github/workflows/*.yml`, `.gitlab-ci.yml`, `Jenkinsfile` 등
+#### Track E -- CI/CD Detection
+- `.github/workflows/*.yml`, `.gitlab-ci.yml`, `Jenkinsfile`, etc.
 
-#### Track F -- 빌드 도구 감지
+#### Track F -- Build Tool Detection
 - Xcode: `*.xcodeproj`, Tuist: `Project.swift`, Web: `webpack`, `vite`, `next.config`
 
-### Step 3: 플러그인 상태 확인
+### Step 3: Plugin Status Check
 
 ```bash
 # ralph
@@ -83,78 +83,83 @@ Glob, Grep, Read를 병렬로 실행합니다.
 codex --version 2>/dev/null && echo "codex-cli:ready" || echo "codex-cli:not-ready"
 ```
 
-### Step 4: Diff 생성
+### Step 4: Generate Diff
 
-기준선(Step 1)과 재감지 결과(Step 2~3)를 비교합니다.
+Compare the baseline (Step 1) with re-detection results (Steps 2-3).
 
-변경 유형:
-- `[추가]` 새로 감지된 항목 (기준선에 없음)
-- `[제거]` 더 이상 감지되지 않는 항목 (기준선에 있었음)
-- `[변경]` 값이 달라진 항목
+Change types:
+- `[added]` Newly detected item (not in baseline)
+- `[removed]` No longer detected item (was in baseline)
+- `[changed]` Item with a different value
 
-변경이 없으면: "프로젝트 상태가 최신입니다. 변경사항이 없습니다." 출력 후 종료.
+If no changes: output "Project state is up to date. No changes detected." and exit.
 
-### Step 5: 변경 리포트
+### Step 5: Change Report
 
-변경된 항목만 사용자에게 보고합니다:
+Report only changed items to the user:
 
 ```
-[Evolve] 프로젝트 변경사항 감지:
+[Evolve] Project changes detected:
 
-언어:
-  [추가] Rust (Cargo.toml 감지)
+Languages:
+  [added] Rust (Cargo.toml detected)
 
-프레임워크:
-  [추가] Tailwind CSS (tailwind.config 감지)
-  [제거] Bootstrap (import 패턴 미감지)
+Frameworks:
+  [added] Tailwind CSS (tailwind.config detected)
+  [removed] Bootstrap (import pattern not detected)
 
-아키텍처:
-  [변경] Layered -> Clean Architecture (/domain/, /data/ 디렉터리 감지)
+Architecture:
+  [changed] Layered -> Clean Architecture (/domain/, /data/ directories detected)
 
 CI/CD:
-  [추가] GitHub Actions (.github/workflows/ci.yml 감지)
+  [added] GitHub Actions (.github/workflows/ci.yml detected)
 
-플러그인:
-  [변경] codex CLI 준비 완료 (cliReady: false -> true)
+Plugins:
+  [changed] codex CLI ready (cliReady: false -> true)
 
-이 변경사항을 manifest.json과 context.md에 반영하시겠습니까? (yes/no):
+Apply these changes to manifest.json and context.md? (yes/no):
 ```
 
-### Step 6: 갱신 (사용자 승인 시)
+### Step 6: Update (On User Approval)
 
-1. manifest.json 갱신:
-   - 변경된 필드만 업데이트
-   - `lastEvolved` 타임스탬프를 현재 시간으로 갱신
+1. Update manifest.json:
+   - Update only changed fields
+   - Set `lastEvolved` timestamp to current time
 
-2. context.md 재생성:
-   - 갱신된 manifest 기반으로 context.md를 재작성
-   - 기존 context.md의 수동 추가 섹션은 보존 (있으면)
-   - 프로젝트 스택 요약, 코딩 컨벤션, 파일 네이밍 패턴, 아키텍처 패턴
+2. Regenerate context.md:
+   - Rewrite context.md based on updated manifest
+   - Preserve manually added sections in existing context.md (if any)
+   - **`[Harness #` prefix rules must be preserved** (auto-generated rules from harness-learn.sh)
+   - Project stack summary, coding conventions, file naming patterns, architecture patterns
+   - After regeneration, if context.md exceeds 300 lines, output warning:
+     `[Evolve] context.md is {N} lines (recommended 300 or fewer). Use the gc skill to prune unused harness rules.`
 
-3. 완료 보고:
+3. Completion report:
    ```
-   [Evolve] 완료:
-   - manifest.json 갱신됨
-   - context.md 갱신됨
+   [Evolve] Complete:
+   - manifest.json updated
+   - context.md updated
    - lastEvolved: {ISO8601}
    ```
 
-## 자동 권장 (setup-check 훅 연동)
+## Auto-Recommendation (setup-check hook integration)
 
-setup-check 훅에서 다음 조건일 때 evolve 실행을 권장합니다 (자동 실행 아님):
+The setup-check hook recommends running evolve (not auto-run) under these conditions:
 
-- `lastEvolved`가 7일 이상 경과
-- 주요 의존성 파일(package.json, requirements.txt 등)의 mtime이 lastEvolved보다 최근
+- `lastEvolved` is more than 7 days old
+- Major dependency files (package.json, requirements.txt, etc.) have mtime newer than lastEvolved
 
-권장 메시지:
+Recommendation message:
 ```
-프로젝트 상태가 {N}일 전에 마지막으로 동기화되었습니다.
-evolve 워크플로우로 최신 상태를 확인하세요.
+Project state was last synchronized {N} days ago.
+Run the evolve workflow to check for the latest state.
 ```
 
-## 원칙
+## Principles
 
-- 자동 실행 금지: 항상 사용자에게 변경 리포트를 보여주고 승인을 받음
-- 기준선 보존: diff 방식으로 변경된 항목만 표시 (전체 재출력 아님)
-- 수동 추가 보존: context.md에 사용자가 직접 추가한 내용은 유지
-- 최소 변경: 변경이 없으면 파일을 건드리지 않음
+- No auto-execution: always show the change report to the user and get approval
+- Baseline preservation: show only changed items via diff (not full re-output)
+- Manual additions preserved: retain content the user manually added to context.md
+- Harness rules preserved: lines with `[Harness #` prefix are auto-generated rules and must be preserved during regeneration
+- 300-line warning: recommend gc skill when context.md exceeds 300 lines
+- Minimal changes: do not touch files if there are no changes
