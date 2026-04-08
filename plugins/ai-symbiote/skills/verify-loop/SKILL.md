@@ -114,11 +114,32 @@ Do not fix immediately on verification failure; always analyze the cause first:
 - Fail Fast: skip unnecessary subsequent steps on early failure
 - Verification scope: expand to higher Levels after Level 1 passes
 
+## Scope Verification (Auto-Freeze)
+
+When `manifest.json` has `autoFreeze: true` (default), Inspector must verify that Builder changes stay within the Architect's planned scope.
+
+### Verification Steps
+
+1. Read the Architect's `## Affected Files` section from `results/architect-*.result.md`
+2. Read the Builder's `## Changed Files` section from `results/builder-*.result.md`
+3. Compare: any file in Builder's changes that is NOT in Architect's Affected Files is a **scope violation**
+
+### Scope Violation Handling
+
+- Report scope violations as a FAIL reason: `"Scope violation: {file} was modified but not listed in Affected Files"`
+- **Escape hatch**: If Builder's result includes a `## Out-of-scope justification` section explaining why the out-of-scope change was necessary, Inspector may accept it and PASS
+- Scope violations are recorded in harness-log.jsonl via the auto-loop learning mechanism
+
+### Skip Conditions
+
+- `manifest.json` has `autoFreeze: false` → skip scope verification entirely
+- No Architect result file found → skip (direct execution without planning)
+
 ## Role Injection: Inspector
 
 This section is injected into the prompt when the synapse orchestrator spawns an Inspector subagent.
 
-The Inspector follows the 4-Level Completion Criteria, Self-Correction Loop Flow, and Failure Pattern Classification above.
+The Inspector follows the 4-Level Completion Criteria, Self-Correction Loop Flow, Failure Pattern Classification, and Scope Verification above.
 Verify against the completion criteria Level specified by the orchestrator.
 The overall verdict must be explicitly stated as PASS or FAIL.
 On FAIL, provide specific fix suggestions (file, line number, fix method).

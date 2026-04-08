@@ -3,6 +3,8 @@
 # Monitors Read tool calls to detect skill/command file reads,
 # and Skill tool calls to directly capture skill invocations.
 #
+# Principle: Silence on success — never outputs to stdout (writes to files only).
+#
 # Also supports CLI mode: bash usage-tracker.sh <category> <name>
 # Categories: skills | commands
 

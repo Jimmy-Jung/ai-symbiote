@@ -79,15 +79,47 @@ Harness effectiveness:
   Same mistake recurrence after rule creation: {N}/{M} ({percent}%)
   (Lower recurrence rate = more effective harness)
 
-context.md: {line count}/300 lines  |  harness-log.jsonl: {line count} lines
+Rule prevention stats (v2):
+  Total preventions: {N}
+  Top 5 most effective rules:
+    #1  [Harness #{id}] {description}    prevented: {count} times
+    #2  [Seed #{id}] {description}       prevented: {count} times
+    ...
+  Rules with 0 preventions: {N} (gc candidates)
+
+Guard blocked commands (v2):
+  Total blocks: {N}
+  Top patterns: {command pattern} x{count}
+
+context.md: {line count} lines ({harness rules} + {seed rules})
+harness-log.jsonl: {line count} lines
 ```
 
 Analysis method:
-1. Count `[Harness #` prefixed lines in context.md -> active rule count
-2. Count `rule_created` events in harness-log.jsonl -> total created rule count
-3. Count mistake events in harness-log.jsonl for last 7/14 days -> weekly trend
-4. Aggregate frequency by error_type + file combination -> TOP 5
-5. Check recurrence of same {error_type, file} after rule_created -> recurrence rate
+1. Count `[Harness #` prefixed lines in context.md -> active harness rule count
+2. Count `[Seed #` prefixed lines in context.md -> active seed rule count
+3. Count `rule_created` events in harness-log.jsonl -> total created rule count
+4. Count mistake events in harness-log.jsonl for last 7/14 days -> weekly trend
+5. Aggregate frequency by error_type + file combination -> TOP 5
+6. Check recurrence of same {error_type, file} after rule_created -> recurrence rate
+7. Count `rule_prevented` events per rule_id -> prevention stats (v2 events)
+8. Count `guard_blocked` events -> guard stats (v2 events)
+9. Gracefully skip unknown event types (forward-compatible with future schema versions)
+
+### Step 5.5: Baseline Measurement (--baseline)
+
+When `--baseline` is provided, calculate and display the current repeat rate for tracking improvement:
+
+```
+[Harness Baseline] Measured on {date}
+
+Repeat rate (same {error_type, file} within 7 days):
+  Total unique error patterns: {N}
+  Patterns that recurred: {M}
+  Repeat rate: {M/N * 100}%
+
+Save this baseline to track improvement after harness evolution changes.
+```
 
 ### Step 6: Reset Tracking (--reset)
 
