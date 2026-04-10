@@ -9,23 +9,23 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 # GC -- Harness Garbage Collection
 
 Cleans up auto-generated harness rules and mistake logs.
-Every time the agent makes a mistake, the `harness-learn.sh` hook appends a rule to context.md.
+Every time the agent makes a mistake, the `harness-learn.sh` hook appends a rule to harness-rules.md.
 Over time, obsolete rules accumulate. gc periodically cleans them up.
 
 ## Entry Conditions
 
-`~/ai-symbiote/{slug}/context.md` must exist.
-If not found: display "context.md not found. Please initialize the project with the setup workflow."
+`~/ai-symbiote/{slug}/harness-rules.md` must exist.
+If not found: display "harness-rules.md not found. Please initialize the project with the setup workflow."
 
 ## Workflow
 
 ### Step 1: Parse Harness Rules
 
-Extracts all auto-generated rules with the `[Harness #` prefix from context.md.
+Extracts all auto-generated rules with the `[Harness #` prefix from harness-rules.md.
 
 ```bash
 STATE_DIR=~/ai-symbiote/{slug}
-grep -n '^\[Harness #' "$STATE_DIR/context.md" 2>/dev/null
+grep -n '^\[Harness #' "$STATE_DIR/harness-rules.md" 2>/dev/null
 ```
 
 If no rules are found: output "No auto-generated harness rules found." and skip to Step 4.
@@ -64,7 +64,7 @@ Deletion candidates ({M}, 30+ days untriggered):
   [Harness #2] {description} — last: {relative time} <- recommended for deletion
   [Harness #5] {description} — never triggered since creation <- recommended for deletion
 
-context.md: {current line count}/300 lines
+harness-rules.md: {current line count}/300 lines
 ```
 
 ### Step 4: Log Cleanup Analysis
@@ -93,7 +93,7 @@ Delete {M} candidate rules and {N} log entries older than 90 days?
 With `--force`, execute immediately without confirmation.
 
 Cleanup actions:
-1. Remove deletion candidate rule lines from context.md (using Edit tool)
+1. Remove deletion candidate rule lines from harness-rules.md (using Edit tool)
 2. Remove entries older than 90 days from harness-log.jsonl:
    ```bash
    # Preserve only entries within the last 90 days
@@ -109,7 +109,7 @@ Cleanup actions:
 [GC] Complete:
   Rules deleted: {M}
   Log entries cleaned: {N}
-  context.md: {previous line count} -> {current line count} lines
+  harness-rules.md: {previous line count} -> {current line count} lines
   harness-log.jsonl: {previous line count} -> {current line count} lines
 ```
 
@@ -122,7 +122,7 @@ Cleanup actions:
 
 In addition to auto-generated `[Harness #N]` rules, gc also manages `[Seed #SN]` rules (loaded by setup).
 
-- Parse seed rules: `grep -n '^\[Seed #' "$STATE_DIR/context.md"`
+- Parse seed rules: `grep -n '^\[Seed #' "$STATE_DIR/harness-rules.md"`
 - Same 30-day untriggered deletion criteria as harness rules
 - Display separately in Step 3 output:
   ```

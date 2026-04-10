@@ -334,7 +334,7 @@ Write to `~/ai-symbiote/{slug}/context.md`:
 
 ### Step 4.5: Load Harness Seed Rules
 
-Loads stack-appropriate harness seed rules into context.md to prevent known agent mistakes from the first session.
+Loads stack-appropriate harness seed rules into harness-rules.md to prevent known agent mistakes from the first session.
 
 **Skip if `--no-seed` option is provided.**
 
@@ -355,15 +355,15 @@ Match the detected stack (from Step 1) to seed files in the plugin's `harness-se
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
 SEEDS_DIR="$PLUGIN_ROOT/harness-seeds"
 STATE_DIR=~/ai-symbiote/{slug}
-CONTEXT_FILE="$STATE_DIR/context.md"
+RULES_FILE="$STATE_DIR/harness-rules.md"
 HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
 
-# Append seed rules to context.md
+# Append seed rules to harness-rules.md
 SEED_COUNT=0
 for seed_file in generic.md {stack-specific}.md; do
   if [ -f "$SEEDS_DIR/$seed_file" ]; then
-    echo "" >> "$CONTEXT_FILE"
-    cat "$SEEDS_DIR/$seed_file" >> "$CONTEXT_FILE"
+    echo "" >> "$RULES_FILE"
+    cat "$SEEDS_DIR/$seed_file" >> "$RULES_FILE"
     COUNT=$(grep -c '^\[Seed #' "$SEEDS_DIR/$seed_file")
     SEED_COUNT=$((SEED_COUNT + COUNT))
   fi

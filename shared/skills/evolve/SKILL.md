@@ -129,10 +129,8 @@ Apply these changes to manifest.json and context.md? (yes/no):
 2. Regenerate context.md:
    - Rewrite context.md based on updated manifest
    - Preserve manually added sections in existing context.md (if any)
-   - **`[Harness #` prefix rules must be preserved** (auto-generated rules from harness-learn.sh)
    - Project stack summary, coding conventions, file naming patterns, architecture patterns
-   - After regeneration, if context.md exceeds 300 lines, output warning:
-     `[Evolve] context.md is {N} lines (recommended 300 or fewer). Use the gc skill to prune unused harness rules.`
+   - Note: Harness/Seed rules are stored separately in harness-rules.md (not in context.md)
 
 3. Completion report:
    ```
@@ -160,6 +158,5 @@ Run the evolve workflow to check for the latest state.
 - No auto-execution: always show the change report to the user and get approval
 - Baseline preservation: show only changed items via diff (not full re-output)
 - Manual additions preserved: retain content the user manually added to context.md
-- Harness rules preserved: lines with `[Harness #` prefix are auto-generated rules and must be preserved during regeneration
-- 300-line warning: recommend gc skill when context.md exceeds 300 lines
+- Harness rules are in harness-rules.md (separate from context.md) — evolve does not touch harness-rules.md
 - Minimal changes: do not touch files if there are no changes
