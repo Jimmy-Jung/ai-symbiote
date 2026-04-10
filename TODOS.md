@@ -15,3 +15,19 @@
 **Depends on / blocked by:** dedup 버그 수정 및 auto-GC 구현 후 실제 규칙 누적 패턴 관찰 필요
 
 **Trigger:** harness-rules.md 규칙이 50개 이상이거나 프로젝트 간 규칙 공유 요구 발생 시
+
+## Future Consideration: MCP catalog 설치 커맨드 CI 검증
+
+**What:** mcp-store catalog.json의 설치 커맨드가 실제로 작동하는지 CI에서 자동 검증하는 테스트 추가.
+
+**Why:** catalog.json은 정적 파일로 npm 패키지 이름, args, transport 정보를 포함. 패키지가 이름 변경/삭제되면 설치 명령이 실패하지만 기존 테스트(JSON validity + schema)로는 감지 불가.
+
+**Pros:** 카탈로그 staleness를 CI 단계에서 자동 감지, 사용자에게 항상 작동하는 설치 경험 제공
+
+**Cons:** CI에서 `npx -y <package> --help` 실행 필요 (네트워크 의존, 실행 시간 증가), 일부 MCP는 API 키 없이 실행 불가
+
+**Context:** 2026-04-10 eng review outside voice에서 지적됨. "catalog staleness is the actual failure mode." 현재 카탈로그 규모(~50 entries)에서는 수동 검증으로 충분하지만, 카탈로그 확장 시 필수.
+
+**Depends on / blocked by:** mcp-store 기본 구현 완료 후
+
+**Trigger:** catalog.json 엔트리가 20개 이상이거나 설치 실패 보고 발생 시
