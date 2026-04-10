@@ -1,7 +1,7 @@
 #!/bin/bash
 # ai-symbiote PostToolUse(Write|Edit) hook: Harness learning from agent mistakes.
 # Detects repeated edits to the same file and error patterns.
-# Records failures to harness-log.jsonl and auto-generates context.md rules.
+# Records failures to harness-log.jsonl and auto-generates harness-rules.md rules.
 #
 # Author: JunyoungJung
 # Date: 2026-04-08
@@ -43,7 +43,7 @@ mkdir -p "$SESSION_DIR" 2>/dev/null || exit 0
 
 EVENTS_FILE="$SESSION_DIR/events.jsonl"
 HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
-CONTEXT_FILE="$STATE_DIR/context.md"
+RULES_FILE="$STATE_DIR/harness-rules.md"
 
 # --- 3. Record event ---
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -109,11 +109,15 @@ case "$FILE_PATH" in
             grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
             wc -l | tr -d ' ') || LOOP_FAIL_COUNT=0
 
-          if [ "$LOOP_FAIL_COUNT" -ge 2 ] && [ -f "$CONTEXT_FILE" ]; then
-            RULE_COUNT=$(grep -c '^\[Harness #' "$CONTEXT_FILE" 2>/dev/null) || RULE_COUNT=0
+          if [ "$LOOP_FAIL_COUNT" -ge 2 ] && [ -f "$RULES_FILE" ]; then
+            # Dedup: skip if identical rule already exists
+            if grep -qF "$RULE_CAND" "$RULES_FILE" 2>/dev/null; then
+              exit 0
+            fi
+            RULE_COUNT=$(grep -c '^\[Harness #' "$RULES_FILE" 2>/dev/null) || RULE_COUNT=0
             NEXT_ID=$((RULE_COUNT + 1))
             TODAY=$(date +%Y-%m-%d)
-            printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CAND" "$TODAY" >> "$CONTEXT_FILE" 2>/dev/null
+            printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CAND" "$TODAY" >> "$RULES_FILE" 2>/dev/null
             printf '{"v":2,"ts":"%s","type":"rule_created","rule_id":%d,"description":"%s"}\n' \
               "$NOW" "$NEXT_ID" "$ESC_REASONS" >> "$HARNESS_LOG" 2>/dev/null
             printf '{"continue":true,"systemMessage":"[Harness] Repeated auto-loop failure in %s — auto-added Harness #%d rule."}\n' "$ESC_TASK" "$NEXT_ID"
@@ -179,7 +183,9 @@ if [ -n "$FAILURE_DETECTED" ]; then
     SEVEN_DAYS_AGO=$(date -u -v-7d +%Y-%m-%dT 2>/dev/null || date -u -d '7 days ago' +%Y-%m-%dT 2>/dev/null || echo "0000")
 
     # Count occurrences of same {error_type, file} tuple in recent entries
-    PATTERN_COUNT=$(grep "\"error_type\":\"$ESC_ETYPE\"" "$HARNESS_LOG" 2>/dev/null | \
+    # Filter by error_type field presence to exclude rule_created/rule_prevented events
+    PATTERN_COUNT=$(grep '"error_type"' "$HARNESS_LOG" 2>/dev/null | \
+      grep "\"error_type\":\"$ESC_ETYPE\"" 2>/dev/null | \
       grep "\"file\":\"$ESCAPED_FILE\"" 2>/dev/null | \
       grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
       wc -l | tr -d ' ') || PATTERN_COUNT=0
@@ -202,29 +208,33 @@ if [ -n "$FAILURE_DETECTED" ]; then
         fi
       fi
 
-      # --- 7. Auto-generate rule in context.md ---
-      if [ -f "$CONTEXT_FILE" ]; then
-        LINE_COUNT=$(wc -l < "$CONTEXT_FILE" | tr -d ' ')
+      # --- 7. Auto-generate rule in harness-rules.md ---
+      if [ -f "$RULES_FILE" ]; then
+        # Dedup: skip if identical rule already exists
+        if grep -qF "$RULE_CANDIDATE" "$RULES_FILE" 2>/dev/null; then
+          exit 0
+        fi
+        LINE_COUNT=$(wc -l < "$RULES_FILE" | tr -d ' ')
 
         if [ "$LINE_COUNT" -ge 300 ]; then
           # Context too large — recommend gc instead
-          printf '{"continue":true,"systemMessage":"[Harness] context.md reached %d lines (limit 300). Run gc skill to prune unused rules."}\n' "$LINE_COUNT"
+          printf '{"continue":true,"systemMessage":"[Harness] harness-rules.md reached %d lines (limit 300). Run gc skill to prune unused rules."}\n' "$LINE_COUNT"
           exit 0
         fi
 
         # If pattern rule, remove existing per-file rules for this extension
         if [ -n "$EXT_PATTERN_RULE" ]; then
-          sed -i '' '/^\[Harness #[0-9]*\].*'"$FILE_EXT"'/d' "$CONTEXT_FILE" 2>/dev/null || \
-            sed -i '/^\[Harness #[0-9]*\].*'"$FILE_EXT"'/d' "$CONTEXT_FILE" 2>/dev/null
+          sed -i '' '/^\[Harness #[0-9]*\].*'"$FILE_EXT"'/d' "$RULES_FILE" 2>/dev/null || \
+            sed -i '/^\[Harness #[0-9]*\].*'"$FILE_EXT"'/d' "$RULES_FILE" 2>/dev/null
         fi
 
         # Count existing harness rules to determine next ID
-        RULE_COUNT=$(grep -c '^\[Harness #' "$CONTEXT_FILE" 2>/dev/null) || RULE_COUNT=0
+        RULE_COUNT=$(grep -c '^\[Harness #' "$RULES_FILE" 2>/dev/null) || RULE_COUNT=0
         NEXT_ID=$((RULE_COUNT + 1))
         TODAY=$(date +%Y-%m-%d)
 
         # Append rule to context.md
-        printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CANDIDATE" "$TODAY" >> "$CONTEXT_FILE" 2>/dev/null
+        printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CANDIDATE" "$TODAY" >> "$RULES_FILE" 2>/dev/null
 
         # Record rule creation event
         if [ -n "$EXT_PATTERN_RULE" ]; then
@@ -235,7 +245,7 @@ if [ -n "$FAILURE_DETECTED" ]; then
             "$NOW" "$NEXT_ID" "$ESC_DESC" >> "$HARNESS_LOG" 2>/dev/null
         fi
 
-        printf '{"continue":true,"systemMessage":"[Harness] Repeated mistake detected: %s — auto-added Harness #%d rule to context.md."}\n' "$ESC_DESC" "$NEXT_ID"
+        printf '{"continue":true,"systemMessage":"[Harness] Repeated mistake detected: %s — auto-added Harness #%d rule to harness-rules.md."}\n' "$ESC_DESC" "$NEXT_ID"
         exit 0
       fi
     fi

@@ -21,7 +21,7 @@ if [ ! -f "$STATE_DIR/manifest.json" ]; then
 fi
 
 # Harness: analyze previous sessions for rule_prevented before cleanup
-if [ -d "$STATE_DIR" ] && [ -f "$STATE_DIR/context.md" ]; then
+if [ -d "$STATE_DIR" ] && [ -f "$STATE_DIR/harness-rules.md" ]; then
   HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
   NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   for sess_dir in "$STATE_DIR"/session-*/; do
@@ -48,12 +48,64 @@ if [ -d "$STATE_DIR" ] && [ -f "$STATE_DIR/context.md" ]; then
                 "$NOW" "$RULE_ID" "$(printf '%s' "$RULE_FILE" | tr -d '"')" "$SESS_PID" >> "$HARNESS_LOG" 2>/dev/null
             fi
           fi
-        done < <(grep '^\[Harness #\|^\[Seed #' "$STATE_DIR/context.md" 2>/dev/null)
+        done < <(grep '^\[Harness #\|^\[Seed #' "$STATE_DIR/harness-rules.md" 2>/dev/null)
       fi
       # Clean up stale session
       rm -rf "$sess_dir" 2>/dev/null
     fi
   done
+fi
+
+# --- Auto-GC: remove duplicate and stale harness rules on SessionStart ---
+if [ -f "$STATE_DIR/harness-rules.md" ] && grep -q '^\[Harness #' "$STATE_DIR/harness-rules.md" 2>/dev/null; then
+  _GC_CTX="$STATE_DIR/harness-rules.md"
+  _GC_LOG="$STATE_DIR/harness-log.jsonl"
+  _GC_TMP="$_GC_CTX.autogc.tmp"
+  _GC_REMOVED=0
+  _GC_SEEN=$(mktemp 2>/dev/null || echo "/tmp/harness-gc-seen-$$")
+  _THIRTY_DAYS=$(date -u -v-30d +%Y-%m-%dT 2>/dev/null || date -u -d '30 days ago' +%Y-%m-%dT 2>/dev/null || echo "")
+
+  while IFS= read -r _gc_line || [ -n "$_gc_line" ]; do
+    if printf '%s' "$_gc_line" | grep -q '^\[Harness #'; then
+      # Dedup: extract rule text and skip if already seen
+      _gc_text=$(printf '%s' "$_gc_line" | sed 's/^\[Harness #[0-9]*\] //' | sed 's/ (auto-generated [0-9-]*)$//')
+      if grep -qxF "$_gc_text" "$_GC_SEEN" 2>/dev/null; then
+        _GC_REMOVED=$((_GC_REMOVED + 1))
+        continue
+      fi
+      printf '%s\n' "$_gc_text" >> "$_GC_SEEN"
+
+      # Stale: skip if created 30+ days ago with no recent activity
+      if [ -n "$_THIRTY_DAYS" ] && [ -f "$_GC_LOG" ]; then
+        _gc_rid=$(printf '%s' "$_gc_line" | grep -o '#[0-9]*' | head -1 | tr -d '#')
+        if [ -n "$_gc_rid" ]; then
+          _gc_created=$(grep '"type":"rule_created"' "$_GC_LOG" 2>/dev/null | \
+            grep "\"rule_id\":$_gc_rid[,}]" 2>/dev/null | \
+            grep -o '"ts":"[^"]*"' 2>/dev/null | head -1 | sed 's/"ts":"//;s/"//')
+          _gc_prevented=$(grep '"type":"rule_prevented"' "$_GC_LOG" 2>/dev/null | \
+            grep "\"rule_id\":$_gc_rid[,}]" 2>/dev/null | \
+            tail -1 | grep -o '"ts":"[^"]*"' 2>/dev/null | sed 's/"ts":"//;s/"//')
+          _gc_latest="${_gc_prevented:-$_gc_created}"
+          if [ -n "$_gc_latest" ] && [[ "$_gc_latest" < "$_THIRTY_DAYS" ]]; then
+            _GC_REMOVED=$((_GC_REMOVED + 1))
+            continue
+          fi
+        fi
+      fi
+    fi
+    printf '%s\n' "$_gc_line"
+  done < "$_GC_CTX" > "$_GC_TMP"
+
+  rm -f "$_GC_SEEN" 2>/dev/null
+
+  if [ "$_GC_REMOVED" -gt 0 ]; then
+    # Squeeze consecutive blank lines and apply
+    cat -s "$_GC_TMP" > "$_GC_CTX" 2>/dev/null || mv "$_GC_TMP" "$_GC_CTX" 2>/dev/null
+    rm -f "$_GC_TMP" 2>/dev/null
+    CONTEXT_PARTS+=("[Harness] Auto-GC: removed ${_GC_REMOVED} duplicate/stale rules from harness-rules.md.")
+  else
+    rm -f "$_GC_TMP" 2>/dev/null
+  fi
 fi
 
 # Harness: notify about auto-generated rules from previous sessions
@@ -88,10 +140,17 @@ if [ -f "$STATE_DIR/context.md" ]; then
   CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null)
   if [ -n "$CONTEXT_CONTENT" ]; then
     CONTEXT_PARTS+=("[Symbiote Context] $CONTEXT_CONTENT")
-    # Warn when context.md grows too large (do NOT block injection)
-    CTX_LINES=$(echo "$CONTEXT_CONTENT" | wc -l | tr -d ' ')
-    if [ "$CTX_LINES" -gt 300 ]; then
-      CONTEXT_PARTS+=("[Harness] context.md exceeded ${CTX_LINES} lines (recommended max 300). Run gc skill to prune unused rules.")
+  fi
+fi
+
+# Harness rules: inject from separate file (Seed + Harness rules)
+if [ -f "$STATE_DIR/harness-rules.md" ]; then
+  RULES_CONTENT=$(cat "$STATE_DIR/harness-rules.md" 2>/dev/null)
+  if [ -n "$RULES_CONTENT" ]; then
+    CONTEXT_PARTS+=("[Harness Rules] $RULES_CONTENT")
+    RULES_LINES=$(echo "$RULES_CONTENT" | wc -l | tr -d ' ')
+    if [ "$RULES_LINES" -gt 300 ]; then
+      CONTEXT_PARTS+=("[Harness] harness-rules.md exceeded ${RULES_LINES} lines (recommended max 300). Run gc skill to prune unused rules.")
     fi
   fi
 fi
