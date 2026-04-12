@@ -443,8 +443,8 @@ Include the following sections based on information detected in Steps 1-4:
 
 ## ai-symbiote Plugin Usage
 - State directory: `~/ai-symbiote/{slug}/`
-- Autonomous execution: `/auto-loop <task description>`
-- Parallel execution: `/autopilot <task description>`
+- Autonomous execution: `/auto <task description>`
+- Parallel execution: `/auto <task description> --mode parallel-max`
 - PRD-based: `/prd` -> `/ralph`
 - Analysis: `/analyze <target>`
 - Planning: `/plan <task>`
@@ -452,7 +452,7 @@ Include the following sections based on information detected in Steps 1-4:
 - Commit: `/git-commit`
 - Deep search: `/deep-search <keyword>`
 - Note: `/note <content>`
-- Task Master: `/tm-init`, `/tm-board`
+- Task Master: `/taskmaster init`, `/taskmaster board`, `/taskmaster parse-prd`
 
 ## Coding Conventions
 - Coding conventions detected in Step 1 (file naming, commit patterns, etc.)
@@ -484,7 +484,7 @@ Output setup summary to the user:
   - Claude agents: Scout, Architect, Builder, Inspector, Researcher
   - Codex agents: active/inactive (second opinion, adversarial review, root cause analysis)
 - Available workflows:
-  - In-session autonomous execution: `/auto-loop <task description>`
-  - Maximum parallel performance: `/autopilot <task description>`
+  - In-session autonomous execution: `/auto <task description>`
+  - Maximum parallel performance: `/auto <task description> --mode parallel-max`
   - PRD-based headless execution: `/prd` -> `/ralph` -> `ralph.sh`
 - Recommended next steps

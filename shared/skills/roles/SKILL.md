@@ -109,7 +109,7 @@ Generates actionable plans based on Scout exploration results.
 
 - subagent_type: `Plan`
 - model: `opus`
-- Injected skill: Role Injection: Architect section of `planning/SKILL.md`
+- Injected skill: Role Injection: Architect section of `plan/SKILL.md`
 
 ### Input Contract
 

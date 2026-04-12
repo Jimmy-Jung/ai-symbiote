@@ -116,7 +116,7 @@ export class SessionControlHandler {
         break;
       case 'start':
         await this.writeCommand('start', { task: parsed.args });
-        await this.reply(msg.channelId, `🚀 작업 시작 요청: "${parsed.args}"\n다음 세션에서 auto-loop으로 시작됩니다.`);
+        await this.reply(msg.channelId, `🚀 작업 시작 요청: "${parsed.args}"\n다음 세션에서 auto로 시작됩니다.`);
         break;
       case 'instruct':
         await this.writeCommand('instruct', { instruction: parsed.args });

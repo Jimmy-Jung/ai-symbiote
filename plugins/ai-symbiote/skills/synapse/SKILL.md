@@ -33,7 +33,7 @@ Activates the corresponding mode when the following patterns are detected in use
 | Keyword Pattern | Activated Mode | Team Template |
 |------------|-----------|----------|
 | "until the end", "until complete", "don't stop" | Auto Loop | implementation (autonomous) |
-| "max performance", "in parallel", "autopilot" | Autopilot | implementation (parallel-max) |
+| "max performance", "in parallel", "autopilot" | Auto (parallel-max) | implementation (parallel-max) |
 | "deep analysis", "deep dive", "deep search" | Deep Analysis | analysis |
 | "code review", "review this" | Review | review |
 | "create plan", "plan" | Planning | planning |
@@ -104,7 +104,7 @@ Extended:
 - team-templates
 - deep-search
 - note
-- auto-loop
+- auto
 - PRD/ralph integration workflow
 
 ## Escalation Protocol

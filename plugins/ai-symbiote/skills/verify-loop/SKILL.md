@@ -128,7 +128,7 @@ When `manifest.json` has `autoFreeze: true` (default), Inspector must verify tha
 
 - Report scope violations as a FAIL reason: `"Scope violation: {file} was modified but not listed in Affected Files"`
 - **Escape hatch**: If Builder's result includes a `## Out-of-scope justification` section explaining why the out-of-scope change was necessary, Inspector may accept it and PASS
-- Scope violations are recorded in harness-log.jsonl via the auto-loop learning mechanism
+- Scope violations are recorded in harness-log.jsonl via the auto learning mechanism
 
 ### Skip Conditions
 

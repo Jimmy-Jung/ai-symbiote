@@ -200,8 +200,8 @@ if [ -f "$STATE_DIR/manifest.json" ]; then
   SYNAPSE_ROUTING='[Synapse Orchestrator] You are the Synapse team leader of ai-symbiote. Analyze user requests and act according to the rules below.
 
 ## Mode Detection (keyword matching from user message)
-- "until done","do not stop","keep going" → Skill(skill:"ai-symbiote:auto-loop", args:"<task>")
-- "max performance","parallel","autopilot" → Skill(skill:"ai-symbiote:autopilot", args:"<task>")
+- "until done","do not stop","keep going" → Skill(skill:"ai-symbiote:auto", args:"<task>")
+- "max performance","parallel","autopilot" → Skill(skill:"ai-symbiote:auto", args:"<task> --mode parallel-max")
 - "deep analysis","deep search","analyze deeply" → Skill(skill:"ai-symbiote:analyze", args:"<target>")
 - "code review","review this" → Skill(skill:"ai-symbiote:review")
 - "make a plan","plan" → Skill(skill:"ai-symbiote:plan", args:"<task>")
@@ -225,7 +225,7 @@ Filesystem contract: ~/ai-symbiote/{slug}/state/{task-folder}/ stores ralph-stat
 
 ## Reference Skills
 When forming teams, Read roles/SKILL.md and team-templates/SKILL.md for prompt templates and output contracts.
-Inject code-accuracy, verify-loop, planning skills into each role.
+Inject code-accuracy, verify-loop, plan skills into each role.
 
 ## Principles
 - Respond in the language the user uses

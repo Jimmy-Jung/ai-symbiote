@@ -120,7 +120,7 @@ case "$FILE_PATH" in
             printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CAND" "$TODAY" >> "$RULES_FILE" 2>/dev/null
             printf '{"v":2,"ts":"%s","type":"rule_created","rule_id":%d,"description":"%s"}\n' \
               "$NOW" "$NEXT_ID" "$ESC_REASONS" >> "$HARNESS_LOG" 2>/dev/null
-            printf '{"continue":true,"systemMessage":"[Harness] Repeated auto-loop failure in %s — auto-added Harness #%d rule."}\n' "$ESC_TASK" "$NEXT_ID"
+            printf '{"continue":true,"systemMessage":"[Harness] Repeated auto failure in %s — auto-added Harness #%d rule."}\n' "$ESC_TASK" "$NEXT_ID"
             exit 0
           fi
         fi

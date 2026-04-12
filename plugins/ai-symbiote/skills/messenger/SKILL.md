@@ -1,6 +1,6 @@
 ---
 name: messenger
-description: "Messenger bridge setup and management. Integrates with Slack, Discord, Telegram to monitor and control auto-loop/autopilot sessions while away. Triggers on: messenger, notification setup."
+description: "Messenger bridge setup and management. Integrates with Slack, Discord, Telegram to monitor and control auto sessions while away. Triggers on: messenger, notification setup."
 argument-hint: <setup|start|stop|status|test>
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
@@ -8,7 +8,7 @@ allowed-tools: [Read, Write, Edit, Bash, Glob, Grep]
 
 # Messenger Bridge
 
-Remotely monitor and control auto-loop/autopilot sessions via messenger.
+Remotely monitor and control auto sessions via messenger.
 
 State files are stored in `~/ai-symbiote/{slug}/messenger/`. Claude and Codex can share this directory based on the same project slug.
 

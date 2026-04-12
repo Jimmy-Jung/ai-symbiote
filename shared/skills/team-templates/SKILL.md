@@ -14,7 +14,7 @@ Each template defines role placement, phase ordering, parallelization rules, and
 | Task Type | Template | Trigger |
 |-----------|----------|---------|
 | Deep analysis, research, architecture analysis | analysis | analyze workflow, "deep analysis", "structure analysis" |
-| Feature implementation, bug fix, autonomous execution | implementation | auto-loop, autopilot, "to completion", "implement" |
+| Feature implementation, bug fix, autonomous execution | implementation | auto, auto --mode parallel-max, "to completion", "implement" |
 | Code review, PR review | review | review workflow, "code review" |
 | Implementation planning | planning | planning workflow, "create plan" |
 | External research, migration planning | research | "investigate", "research", "migration" |
@@ -52,7 +52,7 @@ The orchestrator reads the Architect's result file and reports to the user.
 ## Template: implementation
 
 Implementation team. Handles the full process from analysis through implementation to verification.
-Executes the auto-loop and autopilot 4-Phase pipeline on a team basis.
+Executes the auto 4-Phase pipeline on a team basis.
 
 ### Team Composition
 
@@ -84,14 +84,14 @@ If Codex is unavailable, skip this section and proceed with Claude agents only.
 
 ### Mode Variants
 
-#### autonomous mode (auto-loop)
+#### autonomous mode (auto)
 - Loop enabled: return to Phase 2 on Inspector FAIL
 - maxIterations: 10 (default, overridable in manifest.json)
 - completionLevel: 2 (default)
 - Escalation: maxIterations reached, same error 3 times, destructive changes
 - Codex deployment: automatic on 2 repeated errors (if available)
 
-#### parallel-max mode (autopilot)
+#### parallel-max mode (auto --mode parallel-max)
 - Maximize Builder count (as many as independent steps)
 - maxIterations: 3
 - On loop failure, change approach and retry
@@ -102,8 +102,8 @@ The orchestrator reads each Phase's results and decides whether to proceed to th
 On Inspector FAIL: issue analysis -> fix plan -> Builder redispatch.
 
 ### Applicable Skills
-- auto-loop (autonomous mode)
-- autopilot (parallel-max mode)
+- auto (autonomous mode, default)
+- auto --mode parallel-max (parallel-max mode)
 - "to completion", "max performance" natural language triggers
 
 ---
@@ -245,7 +245,7 @@ All teams create `team-manifest.json` in the task-folder to track team state.
 ### Escalation
 When an unresolvable situation arises within the team, the orchestrator escalates to the user.
 If the messenger bridge is active, escalation occurs via messenger.
-(Details: messenger bridge integration section of auto-loop/SKILL.md)
+(Details: messenger bridge integration section of auto/SKILL.md)
 
 ### Result File Cleanup
 After team completion, result files are preserved in the task-folder.

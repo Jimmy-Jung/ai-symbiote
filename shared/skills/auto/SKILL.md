@@ -1,22 +1,27 @@
 ---
-name: auto-loop
-description: "Starts an in-session autonomous execution loop that runs until completion. Repeats Analyze->Plan->Execute->Verify to autonomously complete tasks. Triggers on: auto-loop, autonomous."
-argument-hint: <task description>
+name: auto
+description: "Autonomous task execution. Two modes: auto (loop until done) and autopilot (max parallel). Triggers on: auto-loop, autonomous, autopilot, max performance, parallel."
+argument-hint: <task description> [--mode autonomous|parallel-max]
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
 ---
 
-# Auto Loop -- In-Session Autonomous Execution
+# Auto -- Autonomous Task Execution
 
 Runs the synapse orchestrator's implementation team in autonomous mode.
 Accepts a free-form task description and autonomously completes it.
 
+**Two execution modes:**
+- **autonomous** (default, formerly auto-loop): Loop until task completion. maxIterations: 10.
+- **parallel-max** (formerly autopilot): Maximize parallelism for peak performance. maxIterations: 3.
+
 For PRD-based headless autonomous execution, use the separate PRD/ralph integration workflow.
 
-## Team Composition
+---
 
-Assembles the implementation team according to synapse's orchestration lifecycle.
-Team templates and role definitions are automatically referenced by synapse.
+## Mode: autonomous (default)
+
+### Team Composition
 
 - Team template: `implementation`
 - Mode: `autonomous`
@@ -38,6 +43,40 @@ Team templates and role definitions are automatically referenced by synapse.
 - Inspector FAIL + iterations remaining -> Issue analysis -> Re-dispatch Builder
 - Inspector FAIL + same error 2x -> Change approach -> Re-dispatch Architect
 - Iteration limit reached -> Escalation
+
+---
+
+## Mode: parallel-max
+
+### Team Composition
+
+- Team template: `implementation`
+- Mode: `parallel-max`
+- maxIterations: 3
+- completionLevel: 2
+
+### Phase-by-Phase Team Deployment
+
+| Phase | Role | Count | Purpose |
+|-------|------|-------|---------|
+| Phase 0: Analyze | Scout | 2 (parallel) | Requirements analysis + codebase exploration simultaneously |
+| Phase 1: Plan | Architect | 1 | Implementation plan based on Scout results + Builder allocation |
+| Phase 2: Execute | Builder | up to 3 (parallel) | Parallel implementation of parallelizable steps |
+| Phase 3: Verify | Inspector | 1 | Integrated verification of all implementation results |
+
+### Differences from autonomous mode
+
+- Maximizes Builder count
+- maxIterations limited to 3
+- On loop failure, changes approach and retries
+
+### Loop Behavior
+
+- Inspector PASS -> Complete
+- Inspector FAIL + iterations remaining -> Change approach -> Re-dispatch Architect
+- 3 failures unresolved -> Escalation
+
+---
 
 ## State Directory
 
@@ -72,7 +111,7 @@ Automatically referenced by synapse during team composition:
 - `roles/SKILL.md`
 - `team-templates/SKILL.md`
 - `verify-loop/SKILL.md`
-- `planning/SKILL.md`
+- `plan/SKILL.md`
 - `code-accuracy/SKILL.md`
 - `deep-search/SKILL.md`
 - `~/ai-symbiote/{slug}/context.md`
@@ -112,14 +151,19 @@ When messenger mode is active:
 ## Progress Report Format
 
 ```text
-[Auto Loop Progress] iteration N/M
+[Auto Progress] iteration N/M
 - Task: {task-folder}
+- Mode: [autonomous|parallel-max]
 - Phase: [current phase]
 - Team: {active agent list}
 - Latest result: [summary]
 - Remaining issues: [list]
 - Next action: [dispatch|synthesize|escalate]
 ```
+
+## Post-Pipeline
+
+- On "commit too" keyword, create commit via `git-commit` skill
 
 ## Cleanup on Completion
 
