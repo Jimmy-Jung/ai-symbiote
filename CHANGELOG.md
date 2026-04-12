@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3] - 2026-04-12
+
+### Added
+- **MCP Store 스킬** — 프로젝트 스택 기반 MCP 서버 자동 추천/설치 (`shared/skills/mcp-store/`)
+- **MCP Store 카탈로그** — 156개 MCP 서버 메타데이터 및 카탈로그 검증 테스트
+- **ADK 패턴 문서** — Google Agent Development Kit 주요 패턴 설명
+- **harness 통합 테스트** — harness-learn 훅 및 mcp-store 카탈로그 검증 테스트 스위트
+- **setup에 mcpServers 스키마** — manifest.json에 MCP 서버 설정 스키마 추가
+
+### Fixed
+- **harness-learn 규칙 중복 생성 방지** — 동일 패턴 규칙이 반복 생성되지 않도록 개선, harness-rules.md 분리
+
+### Changed
+- 스킬 문서를 harness-rules.md 기반으로 업데이트 (evolve, gc, setup)
+
 ## [0.6.2] - 2026-04-08
 
 ### Fixed
