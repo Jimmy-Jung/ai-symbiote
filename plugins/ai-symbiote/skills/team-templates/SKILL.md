@@ -1,6 +1,6 @@
 ---
 name: team-templates
-description: Team composition templates. Referenced by the synapse orchestrator when composing subagent teams based on task types. Defines 6 templates: analysis, implementation, review, planning, research, dynamic.
+description: "Team composition templates. Referenced by the synapse orchestrator when composing subagent teams based on task types. Defines 6 templates: analysis, implementation, review, planning, research, dynamic."
 user-invocable: false
 ---
 

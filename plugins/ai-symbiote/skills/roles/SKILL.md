@@ -1,6 +1,6 @@
 ---
 name: roles
-description: Subagent role definitions. Defines input/output contracts and prompt templates for 5 roles: Scout, Architect, Builder, Inspector, Researcher. Referenced by the synapse orchestrator when composing teams.
+description: "Subagent role definitions. Defines input/output contracts and prompt templates for 5 roles: Scout, Architect, Builder, Inspector, Researcher. Referenced by the synapse orchestrator when composing teams."
 user-invocable: false
 ---
 
