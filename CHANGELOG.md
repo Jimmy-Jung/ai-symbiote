@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - 2026-04-12
+
+### Fixed
+- **SKILL front matter YAML 파싱 오류** — `roles`, `team-templates` 스킬의 `description` 값을 인용 처리해 콜론 포함 문자열이 로컬 플러그인 로딩 중 YAML 에러를 내지 않도록 수정
+
 ## [0.7.0] - 2026-04-12
 
 ### Added

@@ -107,6 +107,6 @@ flowchart LR
 - 제품 이름: `ai-symbiote`
 - Claude 플러그인 식별자: `ai-symbiote`
 - Codex 플러그인 식별자: `ai-symbiote`
-- 현재 버전: `0.7.0`
+- 현재 버전: `0.7.1`
 
 즉 저장소는 하나지만, 사용자에게 노출되는 플러그인 이름은 양쪽 모두 `ai-symbiote`로 통일됩니다.
