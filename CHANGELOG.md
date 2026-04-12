@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1] - 2026-04-12
+
+### Changed
+- **dev-docs 스킬 워크플로우 전환** — generate-dev-docs.sh heredoc 기반에서 SKILL.md 워크플로우 기반 동적 문서 생성으로 전환. Claude가 실제 소스(스킬 frontmatter, 훅 매핑, Intent Contract 등)를 읽고 맥락 있는 설명을 생성
+- **23개 섹션 매핑** — Deep Scan/Model/Render 3단계 파이프라인에 전체 섹션별 소스-다이어그램 매핑 테이블 명시
+- **Workflow Ownership** — SKILL.md가 primary, generate-dev-docs.sh는 baseline fallback으로 소유권 경계 명시
+
+### Fixed
+- **테스트 동적 카운트** — test-dev-docs-skill.sh의 하드코딩된 "27개" assertion을 동적 카운트로 전환
+
+### Added
+- **test-dev-docs-quality.sh** — 마커 블록 내 최소 줄 수 검증 테스트 (워크플로우 실행 후 품질 게이트)
+
+## [0.8.0] - 2026-04-12
+
+### Changed
+- **Synapse Intent-Based Routing** — 키워드 기반 라우팅을 Intent Contract 기반 의도 라우팅으로 전환
+- **ADK 패턴 매핑** — 6개 팀 템플릿에 ADK 실행 패턴 명시적 매핑
+
 ## [0.7.1] - 2026-04-12
 
 ### Fixed
