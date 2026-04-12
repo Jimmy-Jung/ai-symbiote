@@ -270,6 +270,19 @@ Run Glob, Grep, Read in parallel to comprehensively analyze the project stack.
 Recommends relevant skills from the awesome-agent-skills catalog (1,060+) based on the detected stack.
 Runs Skill Store's `--auto` mode.
 
+### Step 2.5: MCP Server Recommendation and Installation
+
+Recommends relevant MCP servers from the awesome-mcp-servers catalog (530+) based on the detected stack.
+Runs MCP Store's `--auto` mode.
+
+1. Read detected stack from Step 1 results
+2. Match against `stacks` and `services` in `skills/mcp-store/catalog.json`
+3. Scan dependency files for service detection (same patterns as skill-store but mapping to MCP servers)
+4. Check already installed MCPs via `claude mcp list`
+5. Display recommended MCPs with required environment variables
+6. Install selected MCPs via `claude mcp add -s local`
+7. Record in manifest.json `mcpServers` section
+
 ### Step 3: Generate manifest.json
 
 Write to `~/ai-symbiote/{slug}/manifest.json`:
@@ -310,6 +323,13 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
       "source": "github:openai/codex-plugin-cc",
       "installed": true,
       "cliReady": true
+    }
+  },
+  "mcpServers": {
+    "github": {
+      "transport": "stdio",
+      "installed": "ISO8601",
+      "platform": "claude"
     }
   }
 }
