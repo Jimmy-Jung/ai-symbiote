@@ -60,7 +60,7 @@ assert_contains "skill documents simple evidence gates" "build flow diagrams req
 assert_contains "skill defines internal pipeline" "## Internal Pipeline" "$SKILL_FILE"
 assert_contains "skill defines scan phase" "### 1. Scan" "$SKILL_FILE"
 assert_contains "skill defines model phase" "### 2. Model" "$SKILL_FILE"
-assert_contains "skill defines render phase" "### 3. Render / Update" "$SKILL_FILE"
+assert_contains "skill defines render phase" "### 3. Render" "$SKILL_FILE"
 assert_contains "skill references updater helper" "scripts/update-doc-section.sh" "$SKILL_FILE"
 assert_contains "skill references generator helper" "scripts/generate-dev-docs.sh" "$SKILL_FILE"
 assert_contains "skill covers README doc target" "| \`readme\` | \`README.md\` |" "$SKILL_FILE"
@@ -77,11 +77,10 @@ assert_contains "skill requires selective update isolation tests in spec" "selec
 assert_contains "skill requires low-confidence fallback tests in spec" "low-confidence fallback test that emits \`확인 필요\`" "$SKILL_FILE"
 
 SKILL_COUNT=$(find "$PROJECT_ROOT/shared/skills" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
-assert_eq "README skill count matches directory count" "27" "$SKILL_COUNT"
-assert_contains "README skill count updated" "## 스킬 목록 (27개)" "$README_FILE"
+assert_contains "README skill count updated" "## 스킬 목록 (${SKILL_COUNT}개)" "$README_FILE"
 assert_contains "README utility table lists dev-docs" "| \`dev-docs\` | 코드 기준으로 README/docs 문서를 Mermaid 중심으로 생성·갱신 |" "$README_FILE"
-assert_contains "README tree skill count updated" "│   ├── skills/                #   27개 스킬" "$README_FILE"
-assert_contains "ARCHITECTURE skill count updated" "27개 스킬 정의" "$ARCH_FILE"
+assert_contains "README tree skill count updated" "│   ├── skills/                #   ${SKILL_COUNT}개 스킬" "$README_FILE"
+assert_contains "ARCHITECTURE skill count updated" "${SKILL_COUNT}개 스킬 정의" "$ARCH_FILE"
 assert_contains "README links conventions doc" "[docs/CONVENTIONS.md](docs/CONVENTIONS.md)" "$README_FILE"
 assert_contains "README links onboarding doc" "[docs/ONBOARDING.md](docs/ONBOARDING.md)" "$README_FILE"
 assert_contains "README links dependencies doc" "[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md)" "$README_FILE"

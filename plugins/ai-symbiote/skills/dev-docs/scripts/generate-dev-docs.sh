@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Generate Mermaid-heavy developer docs from repo structure.
 #
+# NOTE: This script is a baseline fallback for Codex bundles and standalone execution.
+# Primary document generation is handled by the SKILL.md workflow in Claude Code sessions.
+# Do NOT run this script after the SKILL.md workflow has enriched the docs.
+#
 # Usage:
 #   generate-dev-docs.sh [repo-root] [all|readme|architecture|conventions|onboarding|dependencies|flows ...]
 
