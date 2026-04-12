@@ -4,16 +4,25 @@
 
 ## Core
 
+<!-- AI-SYMBIOTE:START architecture:subsystems -->
 `shared/`는 플랫폼에 독립적인 자산을 담습니다.
 
-- `skills/` — 28개 스킬 정의 (lint 포함)
-- `hooks/scripts/` — 훅 스크립트 6개 (setup-check, guard-shell, usage-tracker, harness-learn, comment-checker, messenger-notify)
-- `hooks/scripts/lib/common.sh` — 훅 공용 라이브러리
-- `harness-seeds/` — 스택별 초기 하네스 규칙 시드 (generic, swift, nextjs, python)
-- `taskmaster/` — PRD/task/state JSON 스키마 및 템플릿
-- `messenger-bridge/` — Telegram/Slack/Discord 브릿지 (TypeScript)
+- `skills/` — 27개 스킬 정의
+- `hooks/scripts/` — 6개 훅 스크립트
+- `docs/` — 6개 상세 문서
+- `scripts/` — 3개 빌드 스크립트
 
 이 디렉터리의 내용은 Claude 번들과 Codex 번들 모두에 공통으로 들어갑니다.
+
+```mermaid
+flowchart LR
+    A["shared/"] --> B["skills/"]
+    A --> C["hooks/scripts/"]
+    A --> D["docs/"]
+    A --> E["scripts/"]
+    B --> F["Claude/Codex bundles"]
+```
+<!-- AI-SYMBIOTE:END architecture:subsystems -->
 
 ## Platform Overlay
 
@@ -63,17 +72,28 @@ auto-loop에서 Architect가 `## Affected Files` 섹션을 작성하면, Inspect
 
 ## Build Flow
 
+<!-- AI-SYMBIOTE:START architecture:build-flow -->
 1. `shared/` 자산을 빌드 대상으로 복사
 2. `platforms/<name>/overlay/`를 같은 위치에 덮어쓰기
 3. 결과 번들을 설치 스크립트에서 사용
 
-빌드 출력:
+플랫폼 지원:
+- Claude overlay: yes
+- Codex overlay: yes
 
-| 스크립트 | 출력 경로 | 용도 |
-|----------|-----------|------|
-| `build-claude.sh` | `plugins/ai-symbiote/` + `dist/claude-symbiote/` | Claude marketplace 번들 (Git에 포함) |
-| `build-codex.sh` | `dist/codex-symbiote/` | Codex 설치용 번들 |
-| `build-all.sh` | 위 두 가지 모두 | 전체 빌드 |
+```mermaid
+flowchart LR
+    S["shared/"] --> C["platforms/claude/overlay"]
+    S --> X["platforms/codex/overlay"]
+    C --> P["plugins/ai-symbiote / dist/claude-symbiote"]
+    X --> D["dist/codex-symbiote"]
+```
+
+빌드 스크립트:
+- `scripts/build-all.sh`
+- `scripts/build-claude.sh`
+- `scripts/build-codex.sh`
+<!-- AI-SYMBIOTE:END architecture:build-flow -->
 
 ## State Strategy
 

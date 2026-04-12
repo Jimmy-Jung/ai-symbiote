@@ -114,7 +114,22 @@ Claude: /ai-symbiote:update
 Codex:  $ai-symbiote:update
 ```
 
-## 스킬 목록 (28개)
+## 개발자 문서
+
+<!-- AI-SYMBIOTE:START readme:docs-map -->
+프로젝트를 빠르게 파악하려면 아래 문서부터 보는 게 가장 빠릅니다.
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — 시스템 구조, 빌드 흐름, 플랫폼 차이
+- [docs/CONVENTIONS.md](docs/CONVENTIONS.md) — 어디를 수정해야 하는지, 생성물과 원본의 경계
+- [docs/ONBOARDING.md](docs/ONBOARDING.md) — 처음 들어온 개발자를 위한 읽기 순서와 로컬 확인 절차
+- [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) — 외부 도구, 플러그인, 런타임 의존성
+- [docs/FLOWS.md](docs/FLOWS.md) — 시스템/데이터/운영 흐름을 Mermaid로 요약
+- [docs/MESSENGER.md](docs/MESSENGER.md) — 메신저 브릿지 상세 설정
+
+이 문서 묶음은 `dev-docs` 스킬로 코드 기준 갱신을 전제로 설계되어 있습니다.
+<!-- AI-SYMBIOTE:END readme:docs-map -->
+
+## 스킬 목록 (27개)
 
 `/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
 
@@ -165,6 +180,7 @@ Codex:  $ai-symbiote:update
 | 스킬 | 설명 |
 |------|------|
 | `note` | Compaction 내성 메모장. 컨텍스트 윈도우 초과 시에도 정보 보존 |
+| `dev-docs` | 코드 기준으로 README/docs 문서를 Mermaid 중심으로 생성·갱신 |
 | `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
 | `update` | 저장소 pull + 플랫폼별 재설치를 자동 수행 |
 | `clean` | 완료된 작업의 상태 폴더 정리 |
@@ -186,7 +202,7 @@ Codex:  $ai-symbiote:update
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   28개 스킬
+│   ├── skills/                #   27개 스킬
 │   ├── hooks/scripts/         #   6개 훅 스크립트
 │   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
 │   │   ├── guard-shell.sh     #     위험 명령 차단 + 우회 경로 + 로깅
@@ -204,7 +220,7 @@ ai-symbiote/
 ├── plugins/ai-symbiote/       # Claude marketplace용 번들 (빌드 생성물)
 ├── dist/                      # 빌드 출력
 ├── scripts/                   # build-claude.sh, build-codex.sh, build-all.sh
-└── docs/                      # ARCHITECTURE.md, MESSENGER.md
+└── docs/                      # ARCHITECTURE, CONVENTIONS, ONBOARDING, DEPENDENCIES, FLOWS, MESSENGER
 ```
 
 ### 빌드 흐름
