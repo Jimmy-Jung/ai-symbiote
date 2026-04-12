@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0] - 2026-04-12
+
+### Added
+- **harness-rules 요약 모드** — 규칙 50줄 초과 시 prevented count 기반 정렬 후 상위 50줄만 컨텍스트에 주입하여 토큰 절감
+- **테스트** — setup-check 요약 모드 테스트 10개 (`tests/test-setup-check-summary.sh`)
+
+### Changed
+- **스킬 병합 (30→26)** — `tm-board`+`tm-init`+`tm-parse-prd`→`taskmaster`, `planning`→`plan`에 흡수, `auto-loop`+`autopilot`→`auto`
+- 14개 파일의 크로스 레퍼런스 업데이트 (synapse, team-templates, roles, setup, verify-loop, messenger, harness-learn, setup-check, session-control)
+- TODOS.md에 스킬 병합 폭발 반경 분석 기록
+
 ## [0.6.3] - 2026-04-12
 
 ### Added
