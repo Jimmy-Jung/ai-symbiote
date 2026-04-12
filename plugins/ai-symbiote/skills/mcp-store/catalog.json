@@ -1,0 +1,156 @@
+{
+  "_source": "https://github.com/wong2/awesome-mcp-servers",
+  "_updated": "2026-04-10",
+  "_note": "install commands are curated from official READMEs. Run --update to refresh.",
+  "stacks": {
+    "nextjs": [
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" },
+      { "id": "playwright", "name": "Playwright", "repo": "microsoft/playwright-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "env": [], "category": "testing", "description": "Browser automation and testing" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "react": [
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" },
+      { "id": "playwright", "name": "Playwright", "repo": "microsoft/playwright-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "env": [], "category": "testing", "description": "Browser automation and testing" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "react-native": [
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "swift": [
+      { "id": "xcodebuildmcp", "name": "XcodeBuildMCP", "repo": "cameroncooke/xcodebuildmcp", "transport": "stdio", "command": "npx", "args": ["-y", "xcodebuildmcp@latest"], "env": [], "category": "build", "description": "Build, run, and test iOS/macOS apps" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "python": [
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" },
+      { "id": "e2b", "name": "E2B", "repo": "e2b-dev/mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@e2b/mcp-server"], "env": ["E2B_API_KEY"], "category": "sandbox", "description": "Run code in secure sandboxes" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "typescript": [
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" },
+      { "id": "playwright", "name": "Playwright", "repo": "microsoft/playwright-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "env": [], "category": "testing", "description": "Browser automation and testing" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "rust": [
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" },
+      { "id": "filesystem", "name": "Filesystem", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."], "env": [], "category": "core", "description": "Secure file operations with configurable access" }
+    ],
+    "go": [
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" },
+      { "id": "filesystem", "name": "Filesystem", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."], "env": [], "category": "core", "description": "Secure file operations with configurable access" }
+    ],
+    "java": [
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" },
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" }
+    ],
+    "dotnet": [
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" },
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" }
+    ]
+  },
+  "services": {
+    "supabase": [
+      { "id": "supabase", "name": "Supabase", "repo": "supabase-community/supabase-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "supabase-mcp-server"], "env": ["SUPABASE_ACCESS_TOKEN"], "category": "database", "description": "Database, auth, edge functions access" }
+    ],
+    "neon": [
+      { "id": "neon", "name": "Neon", "repo": "neondatabase/mcp-server-neon", "transport": "stdio", "command": "npx", "args": ["-y", "@neondatabase/mcp-server-neon"], "env": ["NEON_API_KEY"], "category": "database", "description": "Neon serverless Postgres platform" }
+    ],
+    "stripe": [
+      { "id": "stripe", "name": "Stripe", "repo": "stripe/agent-toolkit", "transport": "stdio", "command": "npx", "args": ["-y", "@stripe/agent-toolkit", "mcp"], "env": ["STRIPE_SECRET_KEY"], "category": "payment", "description": "Interact with Stripe API" }
+    ],
+    "cloudflare": [
+      { "id": "cloudflare", "name": "Cloudflare", "repo": "cloudflare/mcp-server-cloudflare", "transport": "stdio", "command": "npx", "args": ["-y", "@cloudflare/mcp-server-cloudflare"], "env": ["CLOUDFLARE_API_TOKEN"], "category": "cloud", "description": "Deploy and configure Cloudflare resources" }
+    ],
+    "sentry": [
+      { "id": "sentry", "name": "Sentry", "repo": "getsentry/sentry-mcp", "transport": "http", "command": "https://mcp.sentry.dev/sse", "args": [], "env": [], "category": "monitoring", "description": "Sentry official MCP" }
+    ],
+    "github": [
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "postgres": [
+      { "id": "postgres", "name": "PostgreSQL", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": ["DATABASE_URL"], "category": "database", "description": "PostgreSQL integration with schema inspection" }
+    ],
+    "sqlite": [
+      { "id": "sqlite", "name": "SQLite", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"], "env": [], "category": "database", "description": "SQLite database operations" }
+    ],
+    "mongodb": [
+      { "id": "mongodb", "name": "MongoDB", "repo": "kiliczsh/mcp-mongo-server", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-mongo-server"], "env": ["MONGODB_URI"], "category": "database", "description": "Interact with MongoDB databases" }
+    ],
+    "notion": [
+      { "id": "notion", "name": "Notion", "repo": "makenotion/notion-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@notionhq/notion-mcp-server"], "env": ["OPENAPI_MCP_HEADERS"], "category": "productivity", "description": "Notion official MCP server" }
+    ],
+    "linear": [
+      { "id": "linear", "name": "Linear", "repo": "tacticlaunch/mcp-linear", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-linear"], "env": ["LINEAR_API_KEY"], "category": "productivity", "description": "Linear project management integration" }
+    ],
+    "slack": [
+      { "id": "slack", "name": "Slack", "repo": "korotovsky/slack-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "slack-mcp-server"], "env": ["SLACK_BOT_TOKEN"], "category": "communication", "description": "Slack workspace integration" }
+    ],
+    "docker": [
+      { "id": "docker", "name": "Docker", "repo": "QuantGeekDev/docker-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "docker-mcp"], "env": [], "category": "devops", "description": "Docker container management" }
+    ],
+    "grafana": [
+      { "id": "grafana", "name": "Grafana", "repo": "grafana/mcp-grafana", "transport": "stdio", "command": "npx", "args": ["-y", "@grafana/mcp-grafana"], "env": ["GRAFANA_URL", "GRAFANA_API_KEY"], "category": "monitoring", "description": "Search dashboards and query datasources" }
+    ],
+    "vercel": [
+      { "id": "next-devtools", "name": "Next.js DevTools", "repo": "vercel/next-devtools-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@vercel/next-devtools-mcp"], "env": [], "category": "development", "description": "Next.js development tools for AI assistants" }
+    ],
+    "terraform": [
+      { "id": "terraform", "name": "Terraform", "repo": "hashicorp/terraform-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@hashicorp/terraform-mcp-server"], "env": [], "category": "infra", "description": "Terraform documentation and best practices" }
+    ],
+    "aws": [
+      { "id": "aws-docs", "name": "AWS Documentation", "repo": "awslabs/mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@aws/aws-documentation-mcp-server"], "env": [], "category": "cloud", "description": "Fetch and search AWS documentation" }
+    ]
+  },
+  "domains": {
+    "search": [
+      { "id": "brave-search", "name": "Brave Search", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-brave-search"], "env": ["BRAVE_API_KEY"], "category": "search", "description": "Web search using Brave Search API" },
+      { "id": "exa", "name": "Exa", "repo": "exa-labs/exa-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "exa-mcp-server"], "env": ["EXA_API_KEY"], "category": "search", "description": "AI-optimized search engine by Exa" },
+      { "id": "tavily", "name": "Tavily", "repo": "tavily-ai/tavily-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "tavily-mcp@latest"], "env": ["TAVILY_API_KEY"], "category": "search", "description": "Search engine for AI agents" }
+    ],
+    "database": [
+      { "id": "postgres", "name": "PostgreSQL", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-postgres"], "env": ["DATABASE_URL"], "category": "database", "description": "PostgreSQL integration with schema inspection" },
+      { "id": "sqlite", "name": "SQLite", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sqlite"], "env": [], "category": "database", "description": "SQLite database operations" },
+      { "id": "mongodb", "name": "MongoDB", "repo": "kiliczsh/mcp-mongo-server", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-mongo-server"], "env": ["MONGODB_URI"], "category": "database", "description": "Interact with MongoDB databases" },
+      { "id": "supabase", "name": "Supabase", "repo": "supabase-community/supabase-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "supabase-mcp-server"], "env": ["SUPABASE_ACCESS_TOKEN"], "category": "database", "description": "Database, auth, edge functions access" }
+    ],
+    "testing": [
+      { "id": "playwright", "name": "Playwright", "repo": "microsoft/playwright-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@playwright/mcp@latest"], "env": [], "category": "testing", "description": "Browser automation and testing" },
+      { "id": "browserbase", "name": "Browserbase", "repo": "browserbase/mcp-server-browserbase", "transport": "stdio", "command": "npx", "args": ["-y", "@browserbase/mcp-server-browserbase"], "env": ["BROWSERBASE_API_KEY"], "category": "testing", "description": "Browser automation in the cloud" },
+      { "id": "e2b", "name": "E2B", "repo": "e2b-dev/mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@e2b/mcp-server"], "env": ["E2B_API_KEY"], "category": "sandbox", "description": "Run code in secure sandboxes" }
+    ],
+    "monitoring": [
+      { "id": "sentry", "name": "Sentry", "repo": "getsentry/sentry-mcp", "transport": "http", "command": "https://mcp.sentry.dev/sse", "args": [], "env": [], "category": "monitoring", "description": "Sentry official MCP" },
+      { "id": "grafana", "name": "Grafana", "repo": "grafana/mcp-grafana", "transport": "stdio", "command": "npx", "args": ["-y", "@grafana/mcp-grafana"], "env": ["GRAFANA_URL", "GRAFANA_API_KEY"], "category": "monitoring", "description": "Search dashboards and query datasources" },
+      { "id": "axiom-logs", "name": "Axiom", "repo": "axiomhq/mcp-server-axiom", "transport": "stdio", "command": "npx", "args": ["-y", "@axiomhq/mcp-server-axiom"], "env": ["AXIOM_TOKEN"], "category": "monitoring", "description": "Query logs, traces, and events in natural language" }
+    ],
+    "devops": [
+      { "id": "docker", "name": "Docker", "repo": "QuantGeekDev/docker-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "docker-mcp"], "env": [], "category": "devops", "description": "Docker container management" },
+      { "id": "kubernetes", "name": "Kubernetes", "repo": "Flux159/mcp-server-kubernetes", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-server-kubernetes"], "env": [], "category": "devops", "description": "Kubernetes cluster management" },
+      { "id": "github", "name": "GitHub", "repo": "github/github-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@github/mcp-server"], "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"], "category": "version-control", "description": "GitHub official MCP Server" }
+    ],
+    "ai": [
+      { "id": "e2b", "name": "E2B", "repo": "e2b-dev/mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@e2b/mcp-server"], "env": ["E2B_API_KEY"], "category": "sandbox", "description": "Run code in secure sandboxes" },
+      { "id": "context7", "name": "Context7", "repo": "upstash/context7-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@upstash/context7-mcp@latest"], "env": [], "category": "docs", "description": "Up-to-date documentation for any prompt" }
+    ],
+    "security": [
+      { "id": "semgrep", "name": "Semgrep", "repo": "semgrep/mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@semgrep/mcp"], "env": [], "category": "security", "description": "Static analysis for secure code" },
+      { "id": "sonarqube", "name": "SonarQube", "repo": "SonarSource/sonarqube-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "sonarqube-mcp-server"], "env": ["SONARQUBE_URL", "SONARQUBE_TOKEN"], "category": "security", "description": "SonarQube code quality integration" }
+    ],
+    "web-scraping": [
+      { "id": "firecrawl", "name": "Firecrawl", "repo": "mendableai/firecrawl-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "firecrawl-mcp"], "env": ["FIRECRAWL_API_KEY"], "category": "scraping", "description": "Extract web data with Firecrawl" },
+      { "id": "fetch", "name": "Fetch", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-fetch"], "env": [], "category": "core", "description": "Web content fetching and conversion" },
+      { "id": "bright-data", "name": "Bright Data", "repo": "brightdata/brightdata-mcp", "transport": "stdio", "command": "npx", "args": ["-y", "@brightdata/mcp"], "env": ["BRIGHT_DATA_API_TOKEN"], "category": "scraping", "description": "Web discovery and extraction" }
+    ],
+    "productivity": [
+      { "id": "notion", "name": "Notion", "repo": "makenotion/notion-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "@notionhq/notion-mcp-server"], "env": ["OPENAPI_MCP_HEADERS"], "category": "productivity", "description": "Notion official MCP server" },
+      { "id": "linear", "name": "Linear", "repo": "tacticlaunch/mcp-linear", "transport": "stdio", "command": "npx", "args": ["-y", "mcp-linear"], "env": ["LINEAR_API_KEY"], "category": "productivity", "description": "Linear project management" },
+      { "id": "todoist", "name": "Todoist", "repo": "stanislavlysenko0912/todoist-mcp-server", "transport": "stdio", "command": "npx", "args": ["-y", "todoist-mcp-server"], "env": ["TODOIST_API_TOKEN"], "category": "productivity", "description": "Todoist task management" }
+    ],
+    "core": [
+      { "id": "filesystem", "name": "Filesystem", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "."], "env": [], "category": "core", "description": "Secure file operations with configurable access" },
+      { "id": "memory", "name": "Memory", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"], "env": [], "category": "core", "description": "Knowledge graph-based persistent memory" },
+      { "id": "git", "name": "Git", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-git"], "env": [], "category": "core", "description": "Read, search, and manipulate Git repositories" },
+      { "id": "sequential-thinking", "name": "Sequential Thinking", "repo": "modelcontextprotocol/servers", "transport": "stdio", "command": "npx", "args": ["-y", "@modelcontextprotocol/server-sequentialthinking"], "env": [], "category": "core", "description": "Dynamic and reflective problem-solving" }
+    ]
+  }
+}
