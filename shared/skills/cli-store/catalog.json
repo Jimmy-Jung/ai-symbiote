@@ -1,0 +1,98 @@
+{
+  "_note": "CLI tools that can replace or complement MCP servers. When a CLI is installed and authenticated, it is preferred over the equivalent MCP server.",
+  "_updated": "2026-04-12",
+  "stacks": {
+    "nextjs": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh", "npm": "npm install -g @github/cli" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
+      { "id": "vercel", "name": "Vercel CLI", "cmd": "vercel", "checkCmd": "vercel --version", "installCmd": { "npm": "npm install -g vercel" }, "mcpEquivalent": "next-devtools", "category": "deploy", "description": "Deploy and manage Vercel projects" }
+    ],
+    "react": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "react-native": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "swift": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
+      { "id": "xcodebuild", "name": "Xcode Build Tools", "cmd": "xcodebuild", "checkCmd": "xcodebuild -version", "installCmd": { "xcode": "xcode-select --install" }, "mcpEquivalent": "xcodebuildmcp", "category": "build", "description": "Build, test, and archive Xcode projects" }
+    ],
+    "python": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "typescript": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "rust": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "go": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "java": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "dotnet": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
+      { "id": "dotnet", "name": ".NET CLI", "cmd": "dotnet", "checkCmd": "dotnet --version", "installCmd": { "brew": "brew install dotnet", "apt": "sudo apt install dotnet-sdk-8.0" }, "mcpEquivalent": null, "category": "build", "description": "Build, test, publish .NET projects" }
+    ]
+  },
+  "services": {
+    "supabase": [
+      { "id": "supabase", "name": "Supabase CLI", "cmd": "supabase", "checkCmd": "supabase --version", "installCmd": { "brew": "brew install supabase/tap/supabase", "npm": "npm install -g supabase" }, "mcpEquivalent": "supabase", "category": "database", "description": "Database migrations, edge functions, auth, storage" }
+    ],
+    "stripe": [
+      { "id": "stripe", "name": "Stripe CLI", "cmd": "stripe", "checkCmd": "stripe --version", "installCmd": { "brew": "brew install stripe/stripe-cli/stripe" }, "mcpEquivalent": "stripe", "category": "payment", "description": "Events, logs, webhooks, resources, testing" }
+    ],
+    "cloudflare": [
+      { "id": "wrangler", "name": "Wrangler CLI", "cmd": "wrangler", "checkCmd": "wrangler --version", "installCmd": { "npm": "npm install -g wrangler" }, "mcpEquivalent": "cloudflare", "category": "cloud", "description": "Workers, Pages, KV, D1, R2 management" }
+    ],
+    "sentry": [
+      { "id": "sentry-cli", "name": "Sentry CLI", "cmd": "sentry-cli", "checkCmd": "sentry-cli --version", "installCmd": { "brew": "brew install getsentry/tools/sentry-cli", "npm": "npm install -g @sentry/cli" }, "mcpEquivalent": "sentry", "category": "monitoring", "description": "Releases, sourcemaps, debug files, DIFS" }
+    ],
+    "github": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "postgres": [
+      { "id": "psql", "name": "PostgreSQL Client", "cmd": "psql", "checkCmd": "psql --version", "installCmd": { "brew": "brew install postgresql@16", "apt": "sudo apt install postgresql-client" }, "mcpEquivalent": "postgres", "category": "database", "description": "SQL queries, schema inspection, data import/export" }
+    ],
+    "sqlite": [
+      { "id": "sqlite3", "name": "SQLite3", "cmd": "sqlite3", "checkCmd": "sqlite3 --version", "installCmd": { "brew": "brew install sqlite", "apt": "sudo apt install sqlite3" }, "mcpEquivalent": "sqlite", "category": "database", "description": "Database operations, queries, schema management" }
+    ],
+    "mongodb": [
+      { "id": "mongosh", "name": "MongoDB Shell", "cmd": "mongosh", "checkCmd": "mongosh --version", "installCmd": { "brew": "brew install mongosh", "npm": "npm install -g mongosh" }, "mcpEquivalent": "mongodb", "category": "database", "description": "Queries, aggregation, admin operations" }
+    ],
+    "docker": [
+      { "id": "docker", "name": "Docker CLI", "cmd": "docker", "checkCmd": "docker --version", "installCmd": { "brew": "brew install --cask docker" }, "mcpEquivalent": "docker", "category": "devops", "description": "Containers, images, compose, networks, volumes" }
+    ],
+    "terraform": [
+      { "id": "terraform", "name": "Terraform CLI", "cmd": "terraform", "checkCmd": "terraform --version", "installCmd": { "brew": "brew install terraform" }, "mcpEquivalent": "terraform", "category": "infra", "description": "Plan, apply, state management, imports" }
+    ],
+    "aws": [
+      { "id": "aws", "name": "AWS CLI", "cmd": "aws", "checkCmd": "aws --version", "installCmd": { "brew": "brew install awscli", "pip": "pip install awscli" }, "mcpEquivalent": "aws-docs", "category": "cloud", "description": "All AWS services via command line" }
+    ],
+    "vercel": [
+      { "id": "vercel", "name": "Vercel CLI", "cmd": "vercel", "checkCmd": "vercel --version", "installCmd": { "npm": "npm install -g vercel" }, "mcpEquivalent": "next-devtools", "category": "deploy", "description": "Deploy, manage domains, environment variables" }
+    ],
+    "kubernetes": [
+      { "id": "kubectl", "name": "Kubernetes CLI", "cmd": "kubectl", "checkCmd": "kubectl version --client", "installCmd": { "brew": "brew install kubectl" }, "mcpEquivalent": "kubernetes", "category": "devops", "description": "Cluster operations, pods, services, deployments" }
+    ]
+  },
+  "domains": {
+    "devops": [
+      { "id": "docker", "name": "Docker CLI", "cmd": "docker", "checkCmd": "docker --version", "installCmd": { "brew": "brew install --cask docker" }, "mcpEquivalent": "docker", "category": "devops", "description": "Containers, images, compose, networks, volumes" },
+      { "id": "kubectl", "name": "Kubernetes CLI", "cmd": "kubectl", "checkCmd": "kubectl version --client", "installCmd": { "brew": "brew install kubectl" }, "mcpEquivalent": "kubernetes", "category": "devops", "description": "Cluster operations, pods, services, deployments" },
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
+    ],
+    "database": [
+      { "id": "psql", "name": "PostgreSQL Client", "cmd": "psql", "checkCmd": "psql --version", "installCmd": { "brew": "brew install postgresql@16", "apt": "sudo apt install postgresql-client" }, "mcpEquivalent": "postgres", "category": "database", "description": "SQL queries, schema inspection, data import/export" },
+      { "id": "sqlite3", "name": "SQLite3", "cmd": "sqlite3", "checkCmd": "sqlite3 --version", "installCmd": { "brew": "brew install sqlite", "apt": "sudo apt install sqlite3" }, "mcpEquivalent": "sqlite", "category": "database", "description": "Database operations, queries, schema management" },
+      { "id": "mongosh", "name": "MongoDB Shell", "cmd": "mongosh", "checkCmd": "mongosh --version", "installCmd": { "brew": "brew install mongosh", "npm": "npm install -g mongosh" }, "mcpEquivalent": "mongodb", "category": "database", "description": "Queries, aggregation, admin operations" }
+    ],
+    "cloud": [
+      { "id": "aws", "name": "AWS CLI", "cmd": "aws", "checkCmd": "aws --version", "installCmd": { "brew": "brew install awscli", "pip": "pip install awscli" }, "mcpEquivalent": "aws-docs", "category": "cloud", "description": "All AWS services via command line" },
+      { "id": "wrangler", "name": "Wrangler CLI", "cmd": "wrangler", "checkCmd": "wrangler --version", "installCmd": { "npm": "npm install -g wrangler" }, "mcpEquivalent": "cloudflare", "category": "cloud", "description": "Workers, Pages, KV, D1, R2 management" },
+      { "id": "gcloud", "name": "Google Cloud CLI", "cmd": "gcloud", "checkCmd": "gcloud --version", "installCmd": { "brew": "brew install google-cloud-sdk" }, "mcpEquivalent": null, "category": "cloud", "description": "All GCP services via command line" },
+      { "id": "az", "name": "Azure CLI", "cmd": "az", "checkCmd": "az --version", "installCmd": { "brew": "brew install azure-cli" }, "mcpEquivalent": null, "category": "cloud", "description": "All Azure services via command line" }
+    ]
+  }
+}

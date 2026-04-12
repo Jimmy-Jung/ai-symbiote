@@ -59,12 +59,13 @@ Workflow:
    - `@playwright/test` -> playwright recommendation
    - `*.tf` files -> terraform recommendation
    - `Dockerfile` -> docker recommendation
-4. Check already installed MCPs:
+4. **CLI deduplication**: Check `~/ai-symbiote/{slug}/state/cli-covered-mcps.json` for MCP IDs already covered by CLI tools (produced by cli-store). Remove those IDs from the recommendation list and mark them as: `~~{name} MCP~~ — covered by CLI`
+5. Check already installed MCPs:
    ```bash
    claude mcp list 2>/dev/null
    ```
-5. Display matched MCP list with install status
-6. Install when user selects by number
+6. Display matched MCP list with install status (excluding CLI-covered entries)
+7. Install when user selects by number
 
 Output format:
 ```
@@ -283,6 +284,7 @@ During the `setup` workflow, the `--auto` mode runs automatically at Step 2.5 (a
 
 ## Principles
 
+- **CLI-first**: Skip MCP servers when an equivalent CLI tool is installed and authenticated (see `cli-covered-mcps.json` produced by cli-store)
 - Never force-install (always user's choice)
 - 3-tier fallback: local catalog -> awesome-mcp-servers source -> GitHub/web search
 - Clearly mark Tier 2/3 results as "⚠️ install command not verified"

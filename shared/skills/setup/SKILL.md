@@ -265,25 +265,42 @@ Run Glob, Grep, Read in parallel to comprehensively analyze the project stack.
 #### Track F -- Build Tool Detection
 - Xcode: `*.xcodeproj`, Tuist: `Project.swift`, Web: `webpack`, `vite`, `next.config`
 
-### Step 2: Community Skill Recommendation and Installation
+### Step 2: Community Skill Recommendation and Installation (skill-store)
 
 Recommends relevant skills from the awesome-agent-skills catalog (1,060+) based on the detected stack.
 Runs Skill Store's `--auto` mode.
 
-### Step 2.5: MCP Server Recommendation and Installation
+### Step 3: CLI Tool Recommendation and Installation (cli-store)
+
+Recommends relevant CLI tools based on the detected stack.
+Runs CLI Store's `--auto` mode.
+
+**Priority**: skill → **cli** → mcp. CLI tools are preferred over MCP servers when available.
+
+1. Read detected stack from Step 1 results
+2. Match against `stacks` and `services` in `skills/cli-store/catalog.json`
+3. Run `checkCmd` for each matched CLI to detect install/auth status
+4. Display CLI list grouped by status (Ready / Installable / Needs auth)
+5. Install selected CLIs via platform package manager (brew/apt/npm/pip)
+6. Record in manifest.json `cliTools` section
+7. Export CLI-covered MCP IDs to `~/ai-symbiote/{slug}/state/cli-covered-mcps.json`
+
+### Step 4: MCP Server Recommendation and Installation (mcp-store)
 
 Recommends relevant MCP servers from the awesome-mcp-servers catalog (530+) based on the detected stack.
 Runs MCP Store's `--auto` mode.
+**Skips MCP servers already covered by CLI tools from Step 3.**
 
 1. Read detected stack from Step 1 results
-2. Match against `stacks` and `services` in `skills/mcp-store/catalog.json`
-3. Scan dependency files for service detection (same patterns as skill-store but mapping to MCP servers)
-4. Check already installed MCPs via `claude mcp list`
-5. Display recommended MCPs with required environment variables
-6. Install selected MCPs via `claude mcp add -s local`
-7. Record in manifest.json `mcpServers` section
+2. Read `~/ai-symbiote/{slug}/state/cli-covered-mcps.json` to get CLI-covered MCP IDs
+3. Match against `stacks` and `services` in `skills/mcp-store/catalog.json`
+4. Remove entries whose `id` is in the CLI-covered list
+5. Check already installed MCPs via `claude mcp list`
+6. Display recommended MCPs with required environment variables (only those NOT covered by CLIs)
+7. Install selected MCPs via `claude mcp add -s local`
+8. Record in manifest.json `mcpServers` section
 
-### Step 3: Generate manifest.json
+### Step 5: Generate manifest.json
 
 Write to `~/ai-symbiote/{slug}/manifest.json`:
 
@@ -325,8 +342,16 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
       "cliReady": true
     }
   },
+  "cliTools": {
+    "gh": {
+      "cmd": "gh",
+      "installed": "ISO8601",
+      "mcpEquivalent": "github",
+      "status": "ready"
+    }
+  },
   "mcpServers": {
-    "github": {
+    "context7": {
       "transport": "stdio",
       "installed": "ISO8601",
       "platform": "claude"
@@ -343,7 +368,7 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
 - If `agentPlatforms` already exists in the manifest, merge rather than overwrite.
 - Always maintain `["claude", "codex"]` regardless of which platform the current session is running on.
 
-### Step 4: Generate context.md
+### Step 6: Generate context.md
 
 Write to `~/ai-symbiote/{slug}/context.md`:
 
@@ -352,7 +377,7 @@ Write to `~/ai-symbiote/{slug}/context.md`:
 - File naming patterns
 - Architecture patterns
 
-### Step 4.5: Load Harness Seed Rules
+### Step 7: Load Harness Seed Rules
 
 Loads stack-appropriate harness seed rules into harness-rules.md to prevent known agent mistakes from the first session.
 
@@ -397,7 +422,7 @@ printf '{"v":2,"ts":"%s","type":"seed_loaded","seed":"{stack}","count":%d}\n' \
 
 Output: `[Setup] Loaded {N} harness seed rules for {stack} stack.`
 
-### Step 4.1: Generate Project CLAUDE.md
+### Step 8: Generate Project CLAUDE.md
 
 **Warning: Required step -- must be executed.**
 Without `CLAUDE.md` at the project root, Claude Code cannot recognize the project context and ai-symbiote skills.
@@ -445,7 +470,7 @@ Include the following sections based on information detected in Steps 1-4:
 
 Both must exist for the plugin to function correctly.
 
-### Step 5: Report
+### Step 9: Report
 
 Output setup summary to the user:
 - Detected stack
