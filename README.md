@@ -137,7 +137,7 @@ Codex:  $ai-symbiote:update
 
 | 스킬 | 설명 |
 |------|------|
-| `synapse` | 사용자 의도를 분석하여 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
+| `synapse` | Intent Contract 기반 의도 라우팅으로 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
 | `auto-loop` | Analyze → Plan → Execute → Verify를 반복하여 작업을 자율 완료 (최대 10회) |
 | `autopilot` | auto-loop의 병렬 극대화 모드. Builder를 최대한 동시 투입 |
 | `setup` | 프로젝트 스택 감지, 연동 플러그인 자동 설치, 상태 디렉터리 초기화 |

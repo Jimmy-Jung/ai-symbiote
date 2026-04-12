@@ -7,7 +7,7 @@
 <!-- AI-SYMBIOTE:START architecture:subsystems -->
 `shared/`는 플랫폼에 독립적인 자산을 담습니다.
 
-- `skills/` — 27개 스킬 정의
+- `skills/` — 27개 스킬 정의 (Synapse Intent-Based Routing 포함)
 - `hooks/scripts/` — 6개 훅 스크립트
 - `docs/` — 6개 상세 문서
 - `scripts/` — 3개 빌드 스크립트
@@ -66,6 +66,32 @@ Codex CLI는 PostToolUse에서 Bash 매처만 지원하므로 Read, Write, Edit,
 
 `setup` 스킬이 감지된 스택에 맞는 시드를 context.md에 로딩합니다. `[Seed #SN]` 접두사는 자동 생성 규칙 `[Harness #N]`과 분리되어 gc에서 독립적으로 관리됩니다.
 
+### Synapse Intent-Based Routing (v0.8.0)
+
+Synapse 오케스트레이터는 v0.8.0부터 키워드 매칭 대신 **Intent Contract 기반 의도 라우팅**을 사용합니다.
+
+```mermaid
+flowchart TD
+    A["사용자 요청"] --> B{"Skill Direct Routes?"}
+    B -->|"매칭"| C["스킬 직접 실행"]
+    B -->|"없음"| D{"Intent Contract"}
+    D -->|"none"| E["직접 처리 (단순 작업)"]
+    D -->|"analysis"| F["analysis 팀"]
+    D -->|"implementation"| G["implementation 팀"]
+    D -->|"review"| H["review 팀"]
+    D -->|"planning"| I["planning 팀"]
+    D -->|"research"| J["research 팀"]
+    D -->|"dynamic"| K["dynamic 팀 (fallback)"]
+```
+
+각 팀 템플릿은 ADK 패턴이 명시적으로 매핑되어 있습니다:
+- analysis: Parallel Fan-Out/Gather + Hierarchical
+- implementation: Sequential Pipeline + Reflection + Retry/Fallback
+- review: Parallel Fan-Out/Gather + Multi-Agent Collaboration
+- planning: Sequential Pipeline + Planning
+- research: Parallel Fan-Out/Gather + Routing
+- dynamic: Routing + ReAct
+
 ### Scope Verification (Auto-Freeze)
 
 auto-loop에서 Architect가 `## Affected Files` 섹션을 작성하면, Inspector가 Builder의 실제 변경과 비교하여 범위 밖 변경을 scope violation으로 보고합니다. `manifest.json`의 `autoFreeze: false`로 비활성화 가능합니다.
@@ -107,6 +133,6 @@ flowchart LR
 - 제품 이름: `ai-symbiote`
 - Claude 플러그인 식별자: `ai-symbiote`
 - Codex 플러그인 식별자: `ai-symbiote`
-- 현재 버전: `0.7.1`
+- 현재 버전: `0.8.0`
 
 즉 저장소는 하나지만, 사용자에게 노출되는 플러그인 이름은 양쪽 모두 `ai-symbiote`로 통일됩니다.

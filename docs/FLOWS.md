@@ -6,12 +6,16 @@
 
 <!-- AI-SYMBIOTE:START flows:system-flow -->
 ```mermaid
-flowchart LR
-    A["사용자 요청"] --> B["적절한 스킬 선택"]
-    B --> C["shared/ 원본 수정"]
-    C --> D["테스트 실행"]
-    D --> E["build-all.sh"]
-    E --> F["Claude/Codex 번들 반영"]
+flowchart TD
+    A["사용자 요청"] --> B{"Skill Direct Routes?"}
+    B -->|"매칭"| C["스킬 직접 실행<br/>(skill-store, messenger, evolve 등)"]
+    B -->|"없음"| D{"Intent Contract<br/>의도 분석"}
+    D -->|"none"| E["직접 처리<br/>(단순 작업)"]
+    D -->|"analysis/implementation/<br/>review/planning/<br/>research/dynamic"| F["팀 구성"]
+    F --> G["Scout → Architect →<br/>Builder → Inspector"]
+    G --> H{"Inspector<br/>PASS/FAIL?"}
+    H -->|"PASS"| I["결과 전달"]
+    H -->|"FAIL"| G
 ```
 <!-- AI-SYMBIOTE:END flows:system-flow -->
 
