@@ -5,22 +5,50 @@
 ## Core
 
 <!-- AI-SYMBIOTE:START architecture:subsystems -->
-`shared/`는 플랫폼에 독립적인 자산을 담습니다.
+`shared/`는 플랫폼에 독립적인 자산을 담는 **유일한 편집 대상**입니다.
 
-- `skills/` — 27개 스킬 정의 (Synapse Intent-Based Routing 포함)
-- `hooks/scripts/` — 6개 훅 스크립트
-- `docs/` — 6개 상세 문서
-- `scripts/` — 3개 빌드 스크립트
+| 디렉터리 | 내용 | 수량 |
+|-----------|------|------|
+| `skills/` | 27개 스킬 정의 (SKILL.md + 보조 스크립트) | 27 |
+| `hooks/scripts/` | 훅 스크립트 + `lib/common.sh` 공용 라이브러리 | 6개 |
+| `harness-seeds/` | 스택별 초기 규칙 시드 (generic, swift, nextjs, python) | 4개 |
+| `taskmaster/` | PRD/task JSON 스키마 및 템플릿 | — |
+| `messenger-bridge/` | Telegram/Slack/Discord 브릿지 (TypeScript/Node.js) | — |
 
-이 디렉터리의 내용은 Claude 번들과 Codex 번들 모두에 공통으로 들어갑니다.
+저장소 루트의 다른 주요 디렉터리:
+
+| 디렉터리 | 역할 | 편집 가능 |
+|-----------|------|-----------|
+| `platforms/{claude,codex}/overlay/` | 플랫폼별 plugin.json, hooks.json 오버레이 | O |
+| `scripts/` | 빌드 스크립트 (build-all/claude/codex.sh) + version_sync.py | O |
+| `docs/` | 개발자 문서 6개 (마커 블록 기반 자동 갱신) | O |
+| `tests/` | 셸 기반 통합 테스트 | O |
+| `plugins/ai-symbiote/` | Claude 마켓플레이스 번들 (**빌드 생성물**) | X |
+| `dist/` | 배포용 번들 (**빌드 생성물**) | X |
 
 ```mermaid
-flowchart LR
-    A["shared/"] --> B["skills/"]
-    A --> C["hooks/scripts/"]
-    A --> D["docs/"]
-    A --> E["scripts/"]
-    B --> F["Claude/Codex bundles"]
+flowchart TD
+    subgraph "shared/ (원본)"
+        SK["skills/ (27)"]
+        HK["hooks/scripts/ (6)"]
+        HS["harness-seeds/ (4)"]
+        TM["taskmaster/"]
+        MB["messenger-bridge/"]
+    end
+    subgraph "플랫폼 오버레이"
+        CL["platforms/claude/overlay/"]
+        CX["platforms/codex/overlay/"]
+    end
+    subgraph "빌드 생성물"
+        PL["plugins/ai-symbiote/"]
+        DC["dist/claude-symbiote/"]
+        DX["dist/codex-symbiote/"]
+    end
+    SK & HK & HS & TM & MB --> CL
+    SK & HK & HS & TM & MB --> CX
+    CL -->|"rsync + overlay"| PL
+    CL -->|"rsync + overlay"| DC
+    CX -->|"rsync + overlay"| DX
 ```
 <!-- AI-SYMBIOTE:END architecture:subsystems -->
 
@@ -99,26 +127,36 @@ auto-loop에서 Architect가 `## Affected Files` 섹션을 작성하면, Inspect
 ## Build Flow
 
 <!-- AI-SYMBIOTE:START architecture:build-flow -->
-1. `shared/` 자산을 빌드 대상으로 복사
-2. `platforms/<name>/overlay/`를 같은 위치에 덮어쓰기
-3. 결과 번들을 설치 스크립트에서 사용
+빌드는 3단계로 구성됩니다:
 
-플랫폼 지원:
-- Claude overlay: yes
-- Codex overlay: yes
+1. **복사** — `shared/`의 skills, hooks, taskmaster, messenger-bridge, harness-seeds를 `rsync -a`로 대상 디렉터리에 복사
+2. **오버레이** — `platforms/<name>/overlay/`를 같은 위치에 덮어쓰기 (plugin.json, hooks.json)
+3. **검증** — `.claude-plugin/plugin.json` 또는 `.codex-plugin/plugin.json` 존재 확인
 
 ```mermaid
-flowchart LR
-    S["shared/"] --> C["platforms/claude/overlay"]
-    S --> X["platforms/codex/overlay"]
-    C --> P["plugins/ai-symbiote / dist/claude-symbiote"]
-    X --> D["dist/codex-symbiote"]
+flowchart TD
+    subgraph "1. 복사"
+        S["shared/"] -->|"rsync -a"| T1["skills/ hooks/ taskmaster/<br/>messenger-bridge/ harness-seeds/"]
+    end
+    subgraph "2. 오버레이"
+        T1 --> OV{"플랫폼?"}
+        OV -->|"Claude"| CL["platforms/claude/overlay/<br/>(.claude-plugin/ + hooks/)"]
+        OV -->|"Codex"| CX["platforms/codex/overlay/<br/>(.codex-plugin/ + hooks/)"]
+    end
+    subgraph "3. 출력"
+        CL --> P["plugins/ai-symbiote/"]
+        CL --> DC["dist/claude-symbiote/"]
+        CX --> DX["dist/codex-symbiote/"]
+    end
 ```
 
-빌드 스크립트:
-- `scripts/build-all.sh`
-- `scripts/build-claude.sh`
-- `scripts/build-codex.sh`
+| 스크립트 | 출력 | 용도 |
+|----------|------|------|
+| `scripts/build-all.sh` | Claude + Codex 모두 | 릴리즈 전 필수 |
+| `scripts/build-claude.sh` | `plugins/ai-symbiote/` + `dist/claude-symbiote/` | Claude만 |
+| `scripts/build-codex.sh` | `dist/codex-symbiote/` | Codex만 |
+
+CI(`ci.yml`)는 `build-all.sh` 후 `git diff --exit-code`로 빌드 산출물이 최신인지 검증합니다.
 <!-- AI-SYMBIOTE:END architecture:build-flow -->
 
 ## State Strategy

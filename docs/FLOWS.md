@@ -7,15 +7,21 @@
 <!-- AI-SYMBIOTE:START flows:system-flow -->
 ```mermaid
 flowchart TD
-    A["사용자 요청"] --> B{"Skill Direct Routes?"}
-    B -->|"매칭"| C["스킬 직접 실행<br/>(skill-store, messenger, evolve 등)"]
-    B -->|"없음"| D{"Intent Contract<br/>의도 분석"}
-    D -->|"none"| E["직접 처리<br/>(단순 작업)"]
-    D -->|"analysis/implementation/<br/>review/planning/<br/>research/dynamic"| F["팀 구성"]
-    F --> G["Scout → Architect →<br/>Builder → Inspector"]
-    G --> H{"Inspector<br/>PASS/FAIL?"}
+    A["사용자 요청"] --> B{"Synapse 오케스트레이터"}
+    B -->|"Skill Direct Route<br/>(skill-store, messenger,<br/>evolve, setup 등)"| C["스킬 직접 실행"]
+    B -->|"Intent Contract 분석"| D{"의도 분류"}
+    D -->|"none"| E["직접 처리 (단순 작업)"]
+    D -->|"analysis"| F1["analysis 팀<br/>Parallel Fan-Out + Hierarchical"]
+    D -->|"implementation"| F2["implementation 팀<br/>Sequential Pipeline + Reflection"]
+    D -->|"review"| F3["review 팀<br/>Parallel Fan-Out + Multi-Agent"]
+    D -->|"planning"| F4["planning 팀<br/>Sequential Pipeline"]
+    D -->|"research"| F5["research 팀<br/>Parallel Fan-Out + Routing"]
+    D -->|"dynamic"| F6["dynamic 팀<br/>Routing + ReAct (fallback)"]
+    F1 & F2 & F3 & F4 & F5 & F6 --> G["역할 배정<br/>Scout · Architect · Builder · Inspector"]
+    G --> H{"Inspector 검증"}
     H -->|"PASS"| I["결과 전달"]
-    H -->|"FAIL"| G
+    H -->|"FAIL"| J["harness-learn.sh<br/>실수 기록 + 패턴 학습"]
+    J --> G
 ```
 <!-- AI-SYMBIOTE:END flows:system-flow -->
 
@@ -24,12 +30,24 @@ flowchart TD
 <!-- AI-SYMBIOTE:START flows:data-flow -->
 ```mermaid
 flowchart TD
-    A["프로젝트 코드"] --> B["setup/evolve 감지"]
-    B --> C["manifest.json / context.md"]
-    C --> D["SessionStart 주입"]
-    D --> E["에이전트 작업"]
-    E --> F["harness-log.jsonl"]
-    F --> G["stats / gc / 다음 세션 분석"]
+    A["프로젝트 코드 변경"] --> B["setup / evolve 스킬"]
+    B --> C["manifest.json<br/>(스택, 설정, 플러그인 상태)"]
+    B --> D["context.md<br/>(컨벤션, 하네스 규칙, 시드)"]
+
+    E["SessionStart"] -->|"setup-check.sh"| F["context.md →<br/>systemMessage 주입"]
+    E -->|"이전 세션 분석"| G["rule_prevented 카운터"]
+
+    H["에이전트 작업"] -->|"PreToolUse"| I["guard-shell.sh<br/>위험 명령 차단"]
+    H -->|"PostToolUse"| J["harness-learn.sh<br/>실수 감지 + 패턴 학습"]
+    H -->|"PostToolUse"| K["usage-tracker.sh<br/>사용 통계"]
+
+    I & J -->|"이벤트 기록"| L["harness-log.jsonl (v1/v2)"]
+    J -->|"7일 내 2회+ 반복"| M["context.md에<br/>규칙 자동 추가"]
+    J -->|"동일 확장자 3개+"| N["패턴 규칙 일반화"]
+
+    L --> O["stats 스킬<br/>(진화 지표)"]
+    L --> P["gc 스킬<br/>(30일+ 미사용 정리)"]
+    L --> Q["다음 세션<br/>rule_prevented 분석"]
 ```
 <!-- AI-SYMBIOTE:END flows:data-flow -->
 
@@ -38,13 +56,27 @@ flowchart TD
 <!-- AI-SYMBIOTE:START flows:user-or-operator-flow -->
 ```mermaid
 sequenceDiagram
-    participant Dev as Developer
-    participant Skill as Skill
-    participant Build as Build Scripts
-    Dev->>Skill: shared/ 또는 docs/ 수정
-    Dev->>Build: bash scripts/build-all.sh
-    Build-->>Dev: plugins/ + dist/ 갱신
-    Dev->>Dev: 결과 확인 및 테스트
+    participant Dev as 개발자
+    participant CLI as Claude/Codex CLI
+    participant Hook as Hooks
+    participant State as ~/ai-symbiote/{slug}/
+
+    Dev->>CLI: 스킬 호출 (/ai-symbiote:plan 등)
+    CLI->>Hook: SessionStart → setup-check.sh
+    Hook->>State: context.md 로드 → systemMessage 주입
+    CLI->>CLI: Synapse가 의도 분석 → 팀 구성
+
+    rect rgb(240, 240, 255)
+        Note over CLI,Hook: 작업 루프
+        CLI->>Hook: PreToolUse(Bash) → guard-shell.sh
+        Hook-->>CLI: 위험 명령 차단 또는 허용
+        CLI->>CLI: 에이전트 작업 수행
+        CLI->>Hook: PostToolUse(Write|Edit) → harness-learn.sh
+        Hook->>State: harness-log.jsonl 기록
+    end
+
+    CLI-->>Dev: 결과 전달
+    Dev->>Dev: 코드 확인 및 테스트
 ```
 <!-- AI-SYMBIOTE:END flows:user-or-operator-flow -->
 
@@ -53,10 +85,25 @@ sequenceDiagram
 <!-- AI-SYMBIOTE:START flows:operational-flow -->
 ```mermaid
 flowchart TD
-    A["공용 변경"] --> B["shared/ 수정"]
-    B --> C["테스트"]
-    C --> D["build-claude.sh / build-codex.sh"]
-    D --> E["번들 산출물 생성"]
-    E --> F["설치 또는 업데이트"]
+    subgraph "개발"
+        A["shared/ 수정"] --> B["tests/test-*.sh 실행"]
+        B --> C["bash scripts/build-all.sh"]
+        C --> D["python3 scripts/version_sync.py --check"]
+    end
+    subgraph "CI (ci.yml)"
+        E["PR / push main"] --> F["version_sync.py --check"]
+        F --> G["build-all.sh"]
+        G --> H["git diff --exit-code"]
+        H -->|"변경 있음"| I["CI FAIL<br/>(빌드 산출물 미갱신)"]
+        H -->|"변경 없음"| J["CI PASS"]
+    end
+    subgraph "릴리즈 (release.yml)"
+        K["VERSION/CHANGELOG 변경<br/>또는 수동 트리거"] --> L["버전 검증 + 빌드"]
+        L --> M["CHANGELOG에서<br/>릴리즈 노트 추출"]
+        M --> N["git tag v{VERSION}"]
+        N --> O["GitHub Release 생성"]
+    end
+    D --> E
+    J --> K
 ```
 <!-- AI-SYMBIOTE:END flows:operational-flow -->
