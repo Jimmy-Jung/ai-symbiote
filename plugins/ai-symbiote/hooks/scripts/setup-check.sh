@@ -144,13 +144,53 @@ if [ -f "$STATE_DIR/context.md" ]; then
 fi
 
 # Harness rules: inject from separate file (Seed + Harness rules)
+# Token optimization: when rules exceed 50 lines, inject only the most effective
+# rules ranked by prevented count from harness-log.jsonl.
 if [ -f "$STATE_DIR/harness-rules.md" ]; then
   RULES_CONTENT=$(cat "$STATE_DIR/harness-rules.md" 2>/dev/null)
   if [ -n "$RULES_CONTENT" ]; then
-    CONTEXT_PARTS+=("[Harness Rules] $RULES_CONTENT")
     RULES_LINES=$(echo "$RULES_CONTENT" | wc -l | tr -d ' ')
-    if [ "$RULES_LINES" -gt 300 ]; then
-      CONTEXT_PARTS+=("[Harness] harness-rules.md exceeded ${RULES_LINES} lines (recommended max 300). Run gc skill to prune unused rules.")
+    if [ "$RULES_LINES" -le 50 ]; then
+      CONTEXT_PARTS+=("[Harness Rules] $RULES_CONTENT")
+    else
+      # Summary mode: rank rules by prevented count and inject top 50 lines
+      HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+      if [ -f "$HARNESS_LOG" ]; then
+        # Count prevented events per rule_id, sort descending
+        RANKED_IDS=$(grep '"type":"rule_prevented"' "$HARNESS_LOG" 2>/dev/null | \
+          grep -o '"rule_id":[0-9]*' | sed 's/"rule_id"://' | \
+          sort | uniq -c | sort -rn | awk '{print $2}')
+        if [ -n "$RANKED_IDS" ]; then
+          # Build ranked rules content: rules ordered by effectiveness
+          RANKED_RULES=""
+          for rid in $RANKED_IDS; do
+            RULE_LINE=$(grep -m1 "\\[Harness #${rid}\\]\\|\\[Seed #${rid}\\]" "$STATE_DIR/harness-rules.md" 2>/dev/null)
+            [ -n "$RULE_LINE" ] && RANKED_RULES="${RANKED_RULES}${RULE_LINE}
+"
+          done
+          # Append remaining rules not in prevented log
+          while IFS= read -r line; do
+            case "$line" in \[Harness\ \#*\]* | \[Seed\ \#*\]*)
+              if ! echo "$RANKED_RULES" | grep -qF "$line" 2>/dev/null; then
+                RANKED_RULES="${RANKED_RULES}${line}
+"
+              fi
+              ;; esac
+          done < "$STATE_DIR/harness-rules.md"
+          SUMMARY_CONTENT=$(echo "$RANKED_RULES" | head -50)
+        else
+          # No prevented data: fall back to first 50 lines
+          SUMMARY_CONTENT=$(head -50 "$STATE_DIR/harness-rules.md")
+        fi
+      else
+        SUMMARY_CONTENT=$(head -50 "$STATE_DIR/harness-rules.md")
+      fi
+      OMITTED=$((RULES_LINES - 50))
+      CONTEXT_PARTS+=("[Harness Rules (top 50 of ${RULES_LINES}, ranked by effectiveness)] $SUMMARY_CONTENT
+[${OMITTED} additional rules omitted. Run /gc to prune unused rules.]")
+      if [ "$RULES_LINES" -gt 300 ]; then
+        CONTEXT_PARTS+=("[Harness] harness-rules.md has ${RULES_LINES} lines (recommended max 300). Run gc skill to prune.")
+      fi
     fi
   fi
 fi

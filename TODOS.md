@@ -31,3 +31,24 @@
 **Depends on / blocked by:** mcp-store 기본 구현 완료 후
 
 **Trigger:** catalog.json 엔트리가 20개 이상이거나 설치 실패 보고 발생 시
+
+## Future Consideration: 스킬 병합으로 토큰 추가 절감 (v0.8)
+
+**What:** 관련 스킬을 병합하여 system-reminder 항목 수를 30 → 24로 줄여 토큰 추가 ~20% 절감.
+
+**Why:** 2026-04-12 eng review에서 description 다이어트(51% 절감) 이후 추가 최적화로 평가됨. 단, 폭발 반경이 크므로 별도 PR로 진행.
+
+**Pros:** 스킬 수 감소로 매 턴 토큰 절감, 사용자 관점에서 스킬 목록 간소화
+
+**Cons:** 크로스 레퍼런스 업데이트 필요, 특히 auto-loop+autopilot(14개 파일) 및 store 스킬(런타임 의존성)
+
+**Context:** 2026-04-12 eng review 폭발 반경 분석 결과:
+- `plan` + `planning` → `plan` (9 files, medium risk)
+- `tm-board` + `tm-init` + `tm-parse-prd` → `taskmaster` (2 files, low risk)
+- `auto-loop` + `autopilot` → `auto` (14+ files, HIGH risk: synapse, team-templates, messenger, setup, verify-loop, harness-learn.sh, setup-check.sh, ARCHITECTURE.md, MESSENGER.md, codex plugin.json, session-control.ts)
+- `mcp-store` + `cli-store` + `skill-store` → `store` (10+ files, HIGH risk: cli-store↔mcp-store 양방향 런타임 의존성, setup 순차 오케스트레이션, test script paths)
+- `verify-loop`은 병합 제외 (Synapse가 주입하는 가이드라인, 사용자 호출 아님)
+
+**Depends on / blocked by:** Description 다이어트 완료 후 실제 토큰 절감 측정
+
+**Trigger:** description 다이어트 후에도 토큰 절감이 부족하다고 판단될 때
