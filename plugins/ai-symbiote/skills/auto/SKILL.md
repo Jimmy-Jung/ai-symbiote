@@ -8,6 +8,8 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
 
 # Auto -- Autonomous Task Execution
 
+**ADK Patterns:** Sequential Pipeline + Reflection + Retry/Fallback
+
 Runs the synapse orchestrator's implementation team in autonomous mode.
 Accepts a free-form task description and autonomously completes it.
 

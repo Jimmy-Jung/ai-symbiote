@@ -9,20 +9,9 @@ user-invocable: false
 Templates referenced by the synapse orchestrator for composing optimal teams by task type.
 Each template defines role placement, phase ordering, parallelization rules, and result synthesis strategy.
 
-## Template Selection Criteria
-
-| Task Type | Template | Trigger |
-|-----------|----------|---------|
-| Deep analysis, research, architecture analysis | analysis | analyze workflow, "deep analysis", "structure analysis" |
-| Feature implementation, bug fix, autonomous execution | implementation | auto, auto --mode parallel-max, "to completion", "implement" |
-| Code review, PR review | review | review workflow, "code review" |
-| Implementation planning | planning | planning workflow, "create plan" |
-| External research, migration planning | research | "investigate", "research", "migration" |
-| None of the above | dynamic | synapse analyzes the task and decides |
-
----
-
 ## Template: analysis
+
+**ADK Patterns:** Parallel Fan-Out/Gather + Hierarchical
 
 Deep analysis team. Explores the codebase from multiple angles and produces structured analysis results.
 
@@ -50,6 +39,8 @@ The orchestrator reads the Architect's result file and reports to the user.
 ---
 
 ## Template: implementation
+
+**ADK Patterns:** Sequential Pipeline + Reflection + Retry/Fallback
 
 Implementation team. Handles the full process from analysis through implementation to verification.
 Executes the auto 4-Phase pipeline on a team basis.
@@ -110,6 +101,8 @@ On Inspector FAIL: issue analysis -> fix plan -> Builder redispatch.
 
 ## Template: review
 
+**ADK Patterns:** Parallel Fan-Out/Gather + Multi-Agent Collaboration
+
 Review team. Verifies code changes from multiple perspectives.
 
 ### Team Composition
@@ -149,6 +142,8 @@ Mark Codex findings with "[Codex]" source tag for distinction.
 
 ## Template: planning
 
+**ADK Patterns:** Sequential Pipeline + Planning (Plan-and-Execute)
+
 Planning team. Creates actionable plans before implementation.
 
 ### Team Composition
@@ -173,6 +168,8 @@ Can transition to the implementation team after user approval.
 
 ## Template: research
 
+**ADK Patterns:** Parallel Fan-Out/Gather + Routing
+
 Research team. Combines external information with internal codebase information.
 
 ### Team Composition
@@ -192,6 +189,8 @@ Research team. Combines external information with internal codebase information.
 ---
 
 ## Template: dynamic
+
+**ADK Patterns:** Routing + ReAct (Tool-Using)
 
 Dynamic team. For tasks that do not match any template above, synapse composes the team directly.
 

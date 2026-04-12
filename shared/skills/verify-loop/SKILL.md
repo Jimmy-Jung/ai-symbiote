@@ -6,6 +6,8 @@ description: Guidelines for self-correcting behavior in autonomous execution loo
 
 # Verify Loop
 
+**ADK Pattern:** Reflection (Generate → Critique → Improve)
+
 Guidelines for self-correcting behavior in autonomous execution loops.
 
 ## Self-Correction Loop Flow

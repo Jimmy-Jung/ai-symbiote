@@ -1,0 +1,36 @@
+{"prompt": "이 변수 이름 바꿔줘", "expected_team": "none", "category": "simple_direct"}
+{"prompt": "console.log 하나 추가해줘", "expected_team": "none", "category": "simple_direct"}
+{"prompt": "이 타입 에러 고쳐줘", "expected_team": "none", "category": "simple_direct"}
+{"prompt": "이 버그 수정해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "새로운 API 엔드포인트 추가해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "이 함수를 리팩토링해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "인증 미들웨어 구현해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "테스트 코드 작성해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "이 기능 완성해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "에러 핸들링 추가해줘", "expected_team": "implementation", "category": "direct_action"}
+{"prompt": "이 코드 좀 봐줘", "expected_team": "review", "category": "ambiguous_korean"}
+{"prompt": "이거 좀 해줘", "expected_team": "dynamic", "category": "ambiguous_korean"}
+{"prompt": "이거 좀 도와줘", "expected_team": "dynamic", "category": "ambiguous_korean"}
+{"prompt": "이거 확인해줘", "expected_team": "review", "category": "ambiguous_korean"}
+{"prompt": "이 파일 좀 봐줘", "expected_team": "review", "category": "ambiguous_korean"}
+{"prompt": "이거 고쳐줘", "expected_team": "implementation", "category": "ambiguous_korean"}
+{"prompt": "이 모듈의 아키텍처를 분석해줘", "expected_team": "analysis", "category": "exploration"}
+{"prompt": "의존성 구조가 어떻게 되어있어?", "expected_team": "analysis", "category": "exploration"}
+{"prompt": "이 패턴이 코드베이스에서 어떻게 사용되고 있는지 찾아줘", "expected_team": "analysis", "category": "exploration"}
+{"prompt": "이 시스템 전체 구조 알려줘", "expected_team": "analysis", "category": "exploration"}
+{"prompt": "이 클래스가 어떻게 동작하는지 설명해줘", "expected_team": "analysis", "category": "exploration"}
+{"prompt": "분석하고 수정해줘", "expected_team": "planning", "category": "compound_intent"}
+{"prompt": "조사한 다음 구현해줘", "expected_team": "planning", "category": "compound_intent"}
+{"prompt": "리뷰하고 고쳐줘", "expected_team": "planning", "category": "compound_intent"}
+{"prompt": "아키텍처 분석 후 리팩토링해줘", "expected_team": "planning", "category": "compound_intent"}
+{"prompt": "refactor this module", "expected_team": "implementation", "category": "english_mixed"}
+{"prompt": "review the PR", "expected_team": "review", "category": "english_mixed"}
+{"prompt": "analyze the dependency graph", "expected_team": "analysis", "category": "english_mixed"}
+{"prompt": "끝까지 해줘", "expected_team": "implementation", "category": "autonomous"}
+{"prompt": "max performance로 해줘", "expected_team": "implementation", "category": "autonomous"}
+{"prompt": "멈추지 말고 완성해줘", "expected_team": "implementation", "category": "autonomous"}
+{"prompt": "스킬 추천해줘", "expected_team": "skill-store", "category": "skill_direct"}
+{"prompt": "메신저 설정해줘", "expected_team": "messenger", "category": "skill_direct"}
+{"prompt": "프로젝트 상태 동기화해줘", "expected_team": "evolve", "category": "skill_direct"}
+{"prompt": "", "expected_team": "dynamic", "category": "boundary"}
+{"prompt": "I need you to thoroughly investigate the performance characteristics of our GraphQL resolver chain, identify bottlenecks, and then implement optimizations with comprehensive test coverage", "expected_team": "planning", "category": "boundary"}

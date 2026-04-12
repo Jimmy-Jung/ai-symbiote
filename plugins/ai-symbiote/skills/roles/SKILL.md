@@ -1,6 +1,6 @@
 ---
 name: roles
-description: "Subagent role definitions. Defines input/output contracts and prompt templates for 5 roles: Scout, Architect, Builder, Inspector, Researcher. Referenced by the synapse orchestrator when composing teams."
+description: "Subagent role definitions. Defines input/output contracts and prompt templates for 6 roles: Scout, Architect, Builder, Inspector, Researcher, Codex. Referenced by the synapse orchestrator when composing teams."
 user-invocable: false
 ---
 
@@ -19,6 +19,17 @@ Each role has a clear input/output contract, model selection criteria, and promp
 | Inspector | Verification, code review, testing | sonnet | general-purpose | verify-loop |
 | Researcher | External docs/API investigation | haiku | general-purpose | - |
 | Codex | Independent implementation/diagnosis/review (GPT-5.4) | GPT-5.4 | codex:codex-rescue | gpt-5-4-prompting |
+
+## ADK Pattern Mapping
+
+| Role | Primary ADK Pattern | Nature |
+|------|---------------------|--------|
+| Scout | Tool-Using (ReAct) | Reason → Act(search) → Observe → Repeat |
+| Architect | Planning (Plan-and-Execute) | Decompose → Plan → Validate |
+| Builder | Sequential Pipeline | Plan steps → Execute in order |
+| Inspector | Reflection | Generate criteria → Evaluate → Report |
+| Researcher | Parallel Fan-Out/Gather | Multi-source search → Synthesize |
+| Codex | Multi-Agent Collaboration | Independent parallel voice |
 
 ## Filesystem Contract
 

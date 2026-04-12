@@ -26,28 +26,77 @@ Dynamically loaded from `~/ai-symbiote/{slug}/context.md`:
 - Coding convention summary
 - Active skill list
 
-## Mode Detection
+## Routing
 
-Activates the corresponding mode when the following patterns are detected in user messages:
+### Skill Direct Routes
 
-| Keyword Pattern | Activated Mode | Team Template |
-|------------|-----------|----------|
-| "until the end", "until complete", "don't stop" | Auto Loop | implementation (autonomous) |
-| "max performance", "in parallel", "autopilot" | Auto (parallel-max) | implementation (parallel-max) |
-| "deep analysis", "deep dive", "deep search" | Deep Analysis | analysis |
-| "code review", "review this" | Review | review |
-| "create plan", "plan" | Planning | planning |
-| "investigate", "research" | Research | research |
-| "architecture", "structure analysis" | Architecture | analysis |
-| "migration", "upgrade" | Migration | research |
-| "include security", "security review" | Security Mode | review |
-| "including tests", "tdd", "test first" | TDD Mode | implementation |
-| "requirements", "PRD", "feature planning" | PRD Mode | Run PRD workflow |
-| "project update", "sync state", "stack change", "evolve" | Evolve | Run evolve skill |
-| "skill recommend", "skill install", "skill store" | Skill Store | Run skill-store skill |
-| "messenger", "notification setup" | Messenger Bridge | Run messenger skill |
-| "cancel", "abort" | Cancel | Abort current loop |
-| "help", "usage" | Help | Show available skills/commands |
+특정 키워드가 감지되면 팀 구성 없이 해당 스킬/워크플로우를 직접 실행한다:
+
+| Pattern | Action |
+|---------|--------|
+| "skill recommend", "skill install", "skill store" | Run skill-store skill |
+| "mcp recommend", "mcp install", "mcp store" | Run mcp-store skill |
+| "messenger", "notification setup" | Run messenger skill |
+| "project update", "sync state", "stack change", "evolve" | Run evolve skill |
+| "requirements", "PRD", "feature planning" | Run PRD workflow |
+| "cancel", "abort" | Abort current loop |
+| "help", "usage" | Show available skills/commands |
+
+### Intent-Based Team Selection
+
+Skill Direct Routes에 매칭되지 않는 요청은 아래 Intent Contract로 팀을 선택한다.
+
+**모호한 프롬프트 해소 규칙:**
+- 코드 변경 의도가 조금이라도 있으면 implementation 우선
+- "봐줘"처럼 변경/평가 모두 가능한 표현은 review 우선 (비파괴적 선택)
+- 복합 의도("분석하고 수정해줘")는 planning 또는 요청 분해
+
+#### none (direct handling)
+- intent_description: 단순하고 명확한 요청. 1개 파일 수정, 변경 내용이 구체적.
+- when_to_use: "이 함수 이름 바꿔줘", "타입 에러 고쳐줘", "console.log 추가해줘", "이 변수명 수정해줘"
+- when_not_to_use: 여러 파일 변경, 탐색 필요, 불확실한 요구사항
+
+#### analysis
+- intent_description: 코드베이스의 구조, 패턴, 의존성, 아키텍처를 깊이 이해해야 할 때
+- when_to_use: 구조 분석, 아키텍처 파악, 의존성 탐색, "이거 어떻게 동작해?", "전체 구조 알려줘"
+- when_not_to_use: 코드 수정이 필요한 경우, 단순 질문
+- example_prompts: "이 모듈 아키텍처 분석해줘", "의존성 구조가 어떻게 되어있어?", "이 패턴이 코드베이스에서 어떻게 사용되는지 찾아줘"
+
+#### implementation
+- intent_description: 코드를 실제로 변경, 추가, 수정해야 할 때. 버그 수정 포함. 여러 파일이 관련되거나 탐색이 필요한 경우.
+- when_to_use: 기능 구현, 버그 수정, 리팩토링, "이거 고쳐줘", "이 기능 만들어줘", "끝까지 해줘", "끝까지 완성해줘"
+- when_not_to_use: 코드 변경 없이 이해만 필요한 경우, 계획만 필요한 경우
+- example_prompts: "이 버그 수정해줘", "새로운 API 엔드포인트 추가해줘", "이 함수를 리팩토링해줘", "끝까지 완성해줘", "max performance"
+
+#### review
+- intent_description: 기존 코드나 변경사항의 품질, 정확성, 보안을 평가할 때
+- when_to_use: 코드 리뷰, PR 검토, 보안 점검, "이 코드 봐줘", "리뷰해줘"
+- when_not_to_use: 코드를 직접 수정해야 하는 경우 (→ implementation)
+- example_prompts: "이 PR 리뷰해줘", "이 코드에 문제 없어?", "보안 점검 해줘", "코드 리뷰해줘"
+
+#### planning
+- intent_description: 구현 전에 계획을 세우고 설계를 확정해야 할 때
+- when_to_use: 구현 계획, 설계 논의, 접근법 결정, "어떻게 하면 좋을까?", "계획 세워줘"
+- when_not_to_use: 이미 계획이 있고 바로 구현해야 하는 경우 (→ implementation)
+- example_prompts: "이 기능 어떻게 구현하면 좋을까?", "리팩토링 계획 세워줘", "접근법을 정리해줘"
+
+#### research
+- intent_description: 외부 문서, API, 라이브러리에 대한 조사가 필요할 때
+- when_to_use: 외부 API 조사, 라이브러리 비교, 기술 조사, "이거 찾아줘", "어떤 라이브러리가 좋아?", "마이그레이션 가이드"
+- when_not_to_use: 내부 코드만 분석하면 되는 경우 (→ analysis)
+- example_prompts: "이 API의 사용법 찾아줘", "마이그레이션 가이드 조사해줘", "React 19의 새 기능 정리해줘"
+
+#### dynamic
+- intent_description: 위 카테고리에 명확히 맞지 않거나 복합적인 의도일 때의 기본값
+- when_to_use: 모호한 요청, 복합 의도, 탐색 후 결정이 필요한 경우
+- when_not_to_use: 의도가 명확한 경우 (위 카테고리 중 하나로 라우팅)
+- example_prompts: "이거 좀 도와줘" (모호), "이 파일 관련해서 할 일이 있어" (복합)
+
+### Routing Behavior Rules
+
+- 두 팀 이상이 동등하게 적합한 경우: 사용자에게 "어떤 방향으로 진행할까요?"라고 묻는다
+- 요청에 두 가지 이상의 독립된 의도가 포함된 경우: planning 팀으로 라우팅하거나 요청을 분해
+- 어떤 팀에도 매칭되지 않는 경우: dynamic 팀으로 라우팅하고 경고 로그 기록
 
 ## Orchestration Lifecycle
 
