@@ -1,5 +1,22 @@
 # AI Symbiote
 
+## Release rules
+
+When bumping version, ALL of the following must be updated in a single commit:
+
+1. `VERSION` — source of truth
+2. `platforms/claude/overlay/.claude-plugin/plugin.json` — `"version"` field
+3. `platforms/codex/overlay/.codex-plugin/plugin.json` — `"version"` field
+4. `plugins/ai-symbiote/.claude-plugin/plugin.json` — `"version"` field
+5. `.claude-plugin/marketplace.json` — `"version"` field
+6. `docs/ARCHITECTURE.md` — `현재 버전:` line
+7. `CHANGELOG.md` — add `## [x.y.z] - YYYY-MM-DD` section with release notes
+
+CI (`scripts/version_sync.py --check`) will fail if any of these are out of sync.
+The release workflow also extracts notes from CHANGELOG.md, so a missing entry blocks the GitHub release.
+
+After updating all files, run `bash scripts/build-all.sh` to sync bundles.
+
 ## Skill routing
 
 When the user's request matches an available skill, ALWAYS invoke it using the Skill
