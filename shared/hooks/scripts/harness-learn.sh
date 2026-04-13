@@ -59,16 +59,33 @@ else
 fi
 
 HAS_ERROR="ok"
+ERROR_CATEGORY=""
 if [ -n "$TOOL_RESPONSE" ]; then
-  # Check tool_response for real failure signals
-  if printf '%s' "$TOOL_RESPONSE" | grep -qiE '(error|failed|not found|not unique|does not exist|no such file|permission denied)' 2>/dev/null; then
+  # Classify error category from tool_response for precise pattern matching
+  if printf '%s' "$TOOL_RESPONSE" | grep -qiE 'not unique' 2>/dev/null; then
     HAS_ERROR="error"
+    ERROR_CATEGORY="not_unique"
+  elif printf '%s' "$TOOL_RESPONSE" | grep -qiE '(not found|was not found)' 2>/dev/null; then
+    HAS_ERROR="error"
+    ERROR_CATEGORY="not_found"
+  elif printf '%s' "$TOOL_RESPONSE" | grep -qiE '(no such file|does not exist)' 2>/dev/null; then
+    HAS_ERROR="error"
+    ERROR_CATEGORY="no_such_file"
+  elif printf '%s' "$TOOL_RESPONSE" | grep -qiE 'permission denied' 2>/dev/null; then
+    HAS_ERROR="error"
+    ERROR_CATEGORY="permission_denied"
+  elif printf '%s' "$TOOL_RESPONSE" | grep -qiE '(same as|new_string.*same|no changes|must be different)' 2>/dev/null; then
+    HAS_ERROR="error"
+    ERROR_CATEGORY="no_change"
+  elif printf '%s' "$TOOL_RESPONSE" | grep -qiE '(error|failed|FAIL)' 2>/dev/null; then
+    HAS_ERROR="error"
+    ERROR_CATEGORY="generic_error"
   fi
 fi
 
 ESCAPED_FILE=$(json_escape "$FILE_PATH")
 FILE_EXT="${FILE_PATH##*.}"
-printf '{"ts":"%s","tool":"%s","file":"%s","ext":"%s","status":"%s"}\n' "$NOW" "$TOOL_NAME" "$ESCAPED_FILE" "$FILE_EXT" "$HAS_ERROR" >> "$EVENTS_FILE" 2>/dev/null
+printf '{"ts":"%s","tool":"%s","file":"%s","ext":"%s","status":"%s","error_category":"%s"}\n' "$NOW" "$TOOL_NAME" "$ESCAPED_FILE" "$FILE_EXT" "$HAS_ERROR" "$ERROR_CATEGORY" >> "$EVENTS_FILE" 2>/dev/null
 
 # --- 3a. Auto-loop Inspector result detection ---
 # When file_path matches an Inspector result file, parse FAIL/PASS from content.
@@ -103,10 +120,9 @@ case "$FILE_PATH" in
 
         # Check if same loop_task had repeated verify failures (2+ in 7 days)
         if [ -f "$HARNESS_LOG" ]; then
-          SEVEN_DAYS_AGO=$(date -u -v-7d +%Y-%m-%dT 2>/dev/null || date -u -d '7 days ago' +%Y-%m-%dT 2>/dev/null || echo "0000")
-          LOOP_FAIL_COUNT=$(grep '"error_type":"loop_verify_fail"' "$HARNESS_LOG" 2>/dev/null | \
+          LOOP_FAIL_COUNT=$(filter_recent_jsonl "$HARNESS_LOG" 7 | \
+            grep '"error_type":"loop_verify_fail"' 2>/dev/null | \
             grep "\"loop_task\":\"$ESC_TASK\"" 2>/dev/null | \
-            grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
             wc -l | tr -d ' ') || LOOP_FAIL_COUNT=0
 
           if [ "$LOOP_FAIL_COUNT" -ge 2 ] && [ -f "$RULES_FILE" ]; then
@@ -146,11 +162,41 @@ RULE_CANDIDATE=""
 BASENAME=$(basename "$FILE_PATH")
 
 # Pattern 1: Tool returned an error (from tool_response)
+# Error-category-specific rules for precise pattern matching
 if [ "$HAS_ERROR" = "error" ]; then
   FAILURE_DETECTED="yes"
-  ERROR_TYPE="tool_error"
-  DESCRIPTION="$BASENAME: tool returned error"
-  RULE_CANDIDATE="Read $BASENAME content before editing; verify the exact target string exists"
+  case "$ERROR_CATEGORY" in
+    not_unique)
+      ERROR_TYPE="edit_not_unique"
+      DESCRIPTION="$BASENAME: old_string is not unique"
+      RULE_CANDIDATE="Provide more surrounding context lines in old_string to ensure uniqueness"
+      ;;
+    not_found)
+      ERROR_TYPE="edit_not_found"
+      DESCRIPTION="$BASENAME: old_string not found"
+      RULE_CANDIDATE="Read $BASENAME content before editing; verify the exact target string exists with correct whitespace"
+      ;;
+    no_such_file)
+      ERROR_TYPE="file_not_found"
+      DESCRIPTION="$BASENAME: file does not exist"
+      RULE_CANDIDATE="Verify $BASENAME exists (use Glob or ls) before attempting to edit"
+      ;;
+    permission_denied)
+      ERROR_TYPE="permission_denied"
+      DESCRIPTION="$BASENAME: permission denied"
+      RULE_CANDIDATE="Check file permissions before editing $BASENAME; it may be read-only or a build artifact"
+      ;;
+    no_change)
+      ERROR_TYPE="edit_no_change"
+      DESCRIPTION="$BASENAME: new_string same as old_string"
+      RULE_CANDIDATE="Verify the replacement is actually different from the original before calling Edit"
+      ;;
+    *)
+      ERROR_TYPE="tool_error"
+      DESCRIPTION="$BASENAME: tool returned error"
+      RULE_CANDIDATE="Read $BASENAME content before editing; verify the exact target string exists"
+      ;;
+  esac
 fi
 
 # Pattern 2: Same file had 2+ errors in this session (struggling)
@@ -175,19 +221,18 @@ if [ -n "$FAILURE_DETECTED" ]; then
   ESC_RULE=$(json_escape "$RULE_CANDIDATE")
   ESC_ETYPE=$(json_escape "$ERROR_TYPE")
 
-  printf '{"ts":"%s","error_type":"%s","file":"%s","description":"%s","rule_candidate":"%s","session_pid":"%s"}\n' \
-    "$NOW" "$ESC_ETYPE" "$ESCAPED_FILE" "$ESC_DESC" "$ESC_RULE" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
+  ESC_ECAT=$(json_escape "$ERROR_CATEGORY")
+  printf '{"ts":"%s","error_type":"%s","error_category":"%s","file":"%s","description":"%s","rule_candidate":"%s","session_pid":"%s"}\n' \
+    "$NOW" "$ESC_ETYPE" "$ESC_ECAT" "$ESCAPED_FILE" "$ESC_DESC" "$ESC_RULE" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
 
   # --- 6. Check if same pattern repeated 2+ times in last 7 days ---
   if [ -f "$HARNESS_LOG" ]; then
-    SEVEN_DAYS_AGO=$(date -u -v-7d +%Y-%m-%dT 2>/dev/null || date -u -d '7 days ago' +%Y-%m-%dT 2>/dev/null || echo "0000")
-
     # Count occurrences of same {error_type, file} tuple in recent entries
     # Filter by error_type field presence to exclude rule_created/rule_prevented events
-    PATTERN_COUNT=$(grep '"error_type"' "$HARNESS_LOG" 2>/dev/null | \
+    PATTERN_COUNT=$(filter_recent_jsonl "$HARNESS_LOG" 7 | \
+      grep '"error_type"' 2>/dev/null | \
       grep "\"error_type\":\"$ESC_ETYPE\"" 2>/dev/null | \
       grep "\"file\":\"$ESCAPED_FILE\"" 2>/dev/null | \
-      grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
       wc -l | tr -d ' ') || PATTERN_COUNT=0
 
     if [ "$PATTERN_COUNT" -ge 2 ]; then
@@ -197,10 +242,10 @@ if [ -n "$FAILURE_DETECTED" ]; then
       EXT_PATTERN_RULE=""
       if [ -n "$FILE_EXT" ] && [ "$FILE_EXT" != "$FILE_PATH" ]; then
         # Count unique files with same {ext, error_type} in recent entries
-        EXT_FILE_COUNT=$(grep "\"error_type\":\"$ESC_ETYPE\"" "$HARNESS_LOG" 2>/dev/null | \
-          grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
-          grep -o '"file":"[^"]*\.'"$FILE_EXT"'"' 2>/dev/null | \
-          sort -u | wc -l | tr -d ' ') || EXT_FILE_COUNT=0
+          EXT_FILE_COUNT=$(filter_recent_jsonl "$HARNESS_LOG" 7 | \
+            grep "\"error_type\":\"$ESC_ETYPE\"" 2>/dev/null | \
+            grep -o '"file":"[^"]*\.'"$FILE_EXT"'"' 2>/dev/null | \
+            sort -u | wc -l | tr -d ' ') || EXT_FILE_COUNT=0
 
         if [ "$EXT_FILE_COUNT" -ge 3 ]; then
           EXT_PATTERN_RULE="yes"
