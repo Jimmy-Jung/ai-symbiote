@@ -51,6 +51,10 @@ get_state_root() {
 
 # Get state directory path: prefer ~/ai-symbiote/{slug}/ and fall back to legacy dirs
 get_state_dir() {
+  if [ -n "${HARNESS_TEST_STATE_DIR:-}" ]; then
+    printf '%s' "$HARNESS_TEST_STATE_DIR"
+    return 0
+  fi
   local slug
   local shared_root
   local shared_dir
@@ -92,11 +96,33 @@ ensure_state_dir() {
   printf '%s' "$state_dir"
 }
 
-# JSON field extractor (jq with fallback to grep+sed)
+# JSON field extractor (jq with fallback to python3, then grep+sed)
 json_field() {
   local json="$1" field="$2"
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$json" | jq -r ".$field // empty" 2>/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    printf '%s' "$json" | python3 -c '
+import json, sys
+
+field = sys.argv[1]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+
+value = data.get(field, "")
+if value in ("", None):
+    raise SystemExit(0)
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (int, float)):
+    print(value)
+elif isinstance(value, str):
+    print(value)
+else:
+    print(json.dumps(value, separators=(",", ":")))
+' "$field" 2>/dev/null
   else
     printf '%s' "$json" | grep -o "\"$field\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 | sed "s/\"$field\"[[:space:]]*:[[:space:]]*\"//" | sed 's/"$//'
   fi
@@ -107,6 +133,33 @@ json_nested_field() {
   local json="$1" parent="$2" field="$3"
   if command -v jq >/dev/null 2>&1; then
     printf '%s' "$json" | jq -r ".$parent.$field // empty" 2>/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    printf '%s' "$json" | python3 -c '
+import json, sys
+
+parent = sys.argv[1]
+field = sys.argv[2]
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(0)
+
+parent_val = data.get(parent, {})
+if not isinstance(parent_val, dict):
+    raise SystemExit(0)
+
+value = parent_val.get(field, "")
+if value in ("", None):
+    raise SystemExit(0)
+if isinstance(value, bool):
+    print("true" if value else "false")
+elif isinstance(value, (int, float)):
+    print(value)
+elif isinstance(value, str):
+    print(value)
+else:
+    print(json.dumps(value, separators=(",", ":")))
+' "$parent" "$field" 2>/dev/null
   else
     local parent_val
     parent_val=$(printf '%s' "$json" | grep -o "\"$parent\"[[:space:]]*:[[:space:]]*{[^}]*}" | head -1)
@@ -119,4 +172,29 @@ json_nested_field() {
 # JSON escape helper
 json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | tr '\n' ' '
+}
+
+# ISO-8601 UTC cutoff timestamp helper for recent-event filtering.
+recent_cutoff_ts() {
+  local days="${1:-7}"
+  date -u -v-"$days"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || \
+    date -u -d "$days days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || \
+    echo "0000-00-00T00:00:00Z"
+}
+
+# Filter JSONL entries whose "ts" field is within the last N days.
+# ISO-8601 UTC timestamps compare lexicographically, so string compare is enough.
+filter_recent_jsonl() {
+  local file="$1" days="${2:-7}"
+  [ -f "$file" ] || return 0
+  local cutoff
+  cutoff=$(recent_cutoff_ts "$days")
+  awk -v cutoff="$cutoff" '
+    {
+      if (match($0, /"ts":"[^"]+"/)) {
+        ts = substr($0, RSTART + 6, RLENGTH - 7)
+        if (ts >= cutoff) print
+      }
+    }
+  ' "$file" 2>/dev/null
 }

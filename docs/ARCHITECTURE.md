@@ -65,19 +65,23 @@ flowchart TD
 |--------|------|----------|--------|-------|------|
 | SessionStart | — | setup-check.sh | O | O | context.md 전체 주입 + rule_prevented 분석 |
 | PreToolUse | Bash | guard-shell.sh | O | O | 차단 시 우회 경로 제시 + harness-log 기록 |
+| PostToolUse | Bash | build-watcher.sh | O | O | build/test 실패 감지 + 반복 패턴 규칙화 |
 | PostToolUse | Read\|Skill | usage-tracker.sh | O | X | |
 | PostToolUse | Write\|Edit | harness-learn.sh | O | X | auto-loop FAIL 연동 + 확장자 패턴 학습 |
 | PostToolUse | Write\|Edit | comment-checker.sh | O | X | |
 | PostToolUse | Write\|Edit | messenger-notify.sh | O | X | |
 
 Codex CLI는 PostToolUse에서 Bash 매처만 지원하므로 Read, Write, Edit, Skill 매처 훅은 Claude 전용입니다.
+build-watcher.sh 는 Bash 매처만 사용하므로 Claude와 Codex 양쪽에서 동작합니다.
 
 ### Harness Log Schema
 
 `harness-log.jsonl`은 두 가지 스키마 버전을 사용합니다:
 
 - **v1** (`"v"` 필드 없음): `tool_error`, `repeated_error`, `churn`, `rule_created`
-- **v2** (`"v":2`): `loop_verify_fail`, `guard_blocked`, `pattern_*`, `rule_prevented`, `seed_loaded`
+- **v2** (`"v":2`): `build_build_failed`, `build_test_failed`, `guard_blocked`, `loop_verify_fail`, `pattern_*`, `rule_prevented`, `seed_loaded`, `user_feedback`
+
+v2 실패 이벤트는 공통적으로 `error_type`, `error_category`, `file`, `description`, `rule_candidate`, `session_pid`를 포함하고, build-watcher 이벤트는 `command`, `error_summary`를 추가로 기록합니다.
 
 파서(gc, stats)는 알 수 없는 이벤트 타입을 gracefully skip합니다.
 

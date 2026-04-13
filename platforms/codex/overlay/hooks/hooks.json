@@ -23,6 +23,18 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/build-watcher.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

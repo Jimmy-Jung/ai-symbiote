@@ -76,19 +76,33 @@ EOF
 
 teardown_env() { rm -rf "$1" 2>/dev/null; }
 
+recent_cutoff_ts() {
+  local days="${1:-7}"
+  date -u -v-"$days"d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || \
+    date -u -d "$days days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || \
+    echo "0000-00-00T00:00:00Z"
+}
+
+filter_recent_jsonl() {
+  local file="$1" days="${2:-7}"
+  local cutoff
+  cutoff=$(recent_cutoff_ts "$days")
+  awk -v cutoff="$cutoff" '
+    {
+      if (match($0, /"ts":"[^"]+"/)) {
+        ts = substr($0, RSTART + 6, RLENGTH - 7)
+        if (ts >= cutoff) print
+      }
+    }
+  ' "$file" 2>/dev/null
+}
+
 # Run harness-learn.sh with overridden state dir via env sourcing
 run_hook() {
   local state_dir="$1" input="$2"
   printf '%s' "$input" | \
     HARNESS_TEST_STATE_DIR="$state_dir" \
-    bash -c '
-      trap "exit 0" ERR; set +e
-      SCRIPT_DIR="'"$PROJECT_ROOT"'/shared/hooks/scripts"
-      source "$SCRIPT_DIR/lib/common.sh"
-      get_state_dir() { echo "$HARNESS_TEST_STATE_DIR"; }
-      export -f get_state_dir json_escape json_field json_nested_field 2>/dev/null
-      source "$SCRIPT_DIR/harness-learn.sh"
-    ' 2>/dev/null
+    bash "$PROJECT_ROOT/shared/hooks/scripts/harness-learn.sh" 2>/dev/null
 }
 
 # Run auto-GC logic (extracted from setup-check.sh)
@@ -349,8 +363,6 @@ test_extension_aggregation() {
 
   local NOW
   NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  local SEVEN_DAYS_AGO
-  SEVEN_DAYS_AGO=$(date -u -v-7d +%Y-%m-%dT 2>/dev/null || date -u -d '7 days ago' +%Y-%m-%dT 2>/dev/null || echo "0000")
 
   # 3 different .swift files with tool_error
   for f in "/tmp/A.swift" "/tmp/B.swift" "/tmp/C.swift"; do
@@ -359,8 +371,8 @@ test_extension_aggregation() {
 
   # Count unique .swift files with tool_error (extension aggregation logic)
   local EXT_FILE_COUNT
-  EXT_FILE_COUNT=$(grep '"error_type":"tool_error"' "$dir/harness-log.jsonl" 2>/dev/null | \
-    grep "$SEVEN_DAYS_AGO\|$(date -u +%Y-%m-%d)" 2>/dev/null | \
+  EXT_FILE_COUNT=$(filter_recent_jsonl "$dir/harness-log.jsonl" 7 | \
+    grep '"error_type":"tool_error"' 2>/dev/null | \
     grep -o '"file":"[^"]*\.swift"' 2>/dev/null | \
     sort -u | wc -l | tr -d ' ') || EXT_FILE_COUNT=0
 
@@ -401,6 +413,126 @@ test_300_line_limit() {
 }
 
 # ============================================================
+# Test 9: Recent filter includes entries from 1-6 days ago
+# ============================================================
+test_recent_filter_uses_real_7_day_window() {
+  printf "${YELLOW}Test 9: Recent filter includes full 7-day window${NC}\n"
+  local dir
+  dir=$(setup_env)
+
+  local NOW TWO_DAYS_AGO EIGHT_DAYS_AGO COUNT
+  NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  TWO_DAYS_AGO=$(date -u -v-2d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '2 days ago' +%Y-%m-%dT%H:%M:%SZ)
+  EIGHT_DAYS_AGO=$(date -u -v-8d +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '8 days ago' +%Y-%m-%dT%H:%M:%SZ)
+
+  printf '{"ts":"%s","error_type":"tool_error","file":"/tmp/Today.swift"}\n' "$NOW" >> "$dir/harness-log.jsonl"
+  printf '{"ts":"%s","error_type":"tool_error","file":"/tmp/TwoDays.swift"}\n' "$TWO_DAYS_AGO" >> "$dir/harness-log.jsonl"
+  printf '{"ts":"%s","error_type":"tool_error","file":"/tmp/EightDays.swift"}\n' "$EIGHT_DAYS_AGO" >> "$dir/harness-log.jsonl"
+
+  COUNT=$(filter_recent_jsonl "$dir/harness-log.jsonl" 7 | grep -c '"error_type":"tool_error"' | tr -d ' ') || COUNT=0
+  assert_eq "Today + 2 days ago counted, 8 days ago excluded" "2" "$COUNT"
+
+  teardown_env "$dir"
+}
+
+# ============================================================
+# Test 10: build-watcher detects Xcode test failure banner
+# ============================================================
+test_build_watcher_detects_xcode_test_failed_banner() {
+  printf "${YELLOW}Test 10: build-watcher catches xcode test failure banner${NC}\n"
+  local dir input output count
+  dir=$(setup_env)
+  input='{"tool_name":"Bash","tool_input":{"command":"xcodebuild test"},"tool_response":"** TEST FAILED **"}'
+
+  output=$(printf '%s' "$input" | \
+    HARNESS_TEST_STATE_DIR="$dir" \
+    bash "$PROJECT_ROOT/shared/hooks/scripts/build-watcher.sh" 2>/dev/null)
+
+  count=$(grep -c '"error_type":"build_test_failed"' "$dir/harness-log.jsonl" | tr -d ' ') || count=0
+  assert_eq "Test failure logged from banner" "1" "$count"
+  assert_eq "No rule emitted on first failure" "" "$output"
+
+  teardown_env "$dir"
+}
+
+# ============================================================
+# Test 11: build-watcher classifies npm test FAIL output as test_failed
+# ============================================================
+test_build_watcher_classifies_node_test_failures() {
+  printf "${YELLOW}Test 11: build-watcher classifies node test failures${NC}\n"
+  local dir input count
+  dir=$(setup_env)
+  input='{"tool_name":"Bash","tool_input":{"command":"npm test"},"tool_response":"FAIL src/app.test.ts\nAssertionError: expected true to be false"}'
+
+  printf '%s' "$input" | \
+    HARNESS_TEST_STATE_DIR="$dir" \
+    bash "$PROJECT_ROOT/shared/hooks/scripts/build-watcher.sh" 2>/dev/null
+
+  count=$(grep -c '"error_type":"build_test_failed"' "$dir/harness-log.jsonl" | tr -d ' ') || count=0
+  assert_eq "Node test output stored as test failure" "1" "$count"
+
+  teardown_env "$dir"
+}
+
+# ============================================================
+# Test 12: build-watcher logs structured non-zero exit code without output
+# ============================================================
+test_build_watcher_uses_structured_exit_code_without_output() {
+  printf "${YELLOW}Test 12: build-watcher uses structured exit code without output${NC}\n"
+  local dir input count
+  dir=$(setup_env)
+  input='{"tool_name":"Bash","tool_input":{"command":"npm test"},"exit_code":1,"tool_response":""}'
+
+  printf '%s' "$input" | \
+    HARNESS_TEST_STATE_DIR="$dir" \
+    bash "$PROJECT_ROOT/shared/hooks/scripts/build-watcher.sh" 2>/dev/null
+
+  count=$(grep -c '"error_type":"build_test_failed"' "$dir/harness-log.jsonl" | tr -d ' ') || count=0
+  assert_eq "Structured exit_code still logs failure" "1" "$count"
+  assert_contains "Structured exit summary recorded" "command exited with code 1" "$dir/harness-log.jsonl"
+
+  teardown_env "$dir"
+}
+
+# ============================================================
+# Test 13: common.sh python fallback parses escaped JSON strings
+# ============================================================
+test_common_json_field_python_fallback_handles_escaped_quotes() {
+  printf "${YELLOW}Test 13: common.sh python fallback parses escaped quotes${NC}\n"
+  local tmp_bin actual
+  tmp_bin=$(mktemp -d /tmp/harness-json-fallback-XXXXXX)
+  ln -s "$(command -v python3)" "$tmp_bin/python3"
+
+  actual=$(PATH="$tmp_bin:/bin:/usr/bin" bash -c '
+    source "'"$PROJECT_ROOT"'/shared/hooks/scripts/lib/common.sh"
+    json_field "{\"tool_response\":\"Error: \\\"bad\\\"\"}" "tool_response"
+  ' 2>/dev/null)
+
+  assert_eq "Escaped quote survives python fallback" 'Error: "bad"' "$actual"
+
+  rm -rf "$tmp_bin" 2>/dev/null
+}
+
+# ============================================================
+# Test 14: feedback-logger creates rule after second rejection
+# ============================================================
+test_feedback_logger_second_rejection_creates_rule() {
+  printf "${YELLOW}Test 14: feedback-logger adds rule on second rejection${NC}\n"
+  local dir output
+  dir=$(setup_env)
+
+  output=$(HARNESS_TEST_STATE_DIR="$dir" bash "$PROJECT_ROOT/shared/hooks/scripts/feedback-logger.sh" "/tmp/App.swift" "layout breaks" "Test on iPad before submitting" 2>/dev/null)
+  assert_eq "First rejection only logs" "Feedback logged." "$output"
+
+  output=$(HARNESS_TEST_STATE_DIR="$dir" bash "$PROJECT_ROOT/shared/hooks/scripts/feedback-logger.sh" "/tmp/App.swift" "layout breaks" "Test on iPad before submitting" 2>/dev/null)
+
+  assert_eq "Second rejection adds rule" "Feedback logged. Auto-added Harness #1 rule." "$output"
+  assert_contains "Feedback rule persisted" "Test on iPad before submitting" "$dir/harness-rules.md"
+
+  teardown_env "$dir"
+}
+
+# ============================================================
 printf "\n${YELLOW}=== ai-symbiote Harness Integration Tests ===${NC}\n\n"
 
 test_dedup_blocks_duplicate
@@ -418,6 +550,18 @@ echo ""
 test_extension_aggregation
 echo ""
 test_300_line_limit
+echo ""
+test_recent_filter_uses_real_7_day_window
+echo ""
+test_build_watcher_detects_xcode_test_failed_banner
+echo ""
+test_build_watcher_classifies_node_test_failures
+echo ""
+test_build_watcher_uses_structured_exit_code_without_output
+echo ""
+test_common_json_field_python_fallback_handles_escaped_quotes
+echo ""
+test_feedback_logger_second_rejection_creates_rule
 
 printf "\n${YELLOW}=== Results ===${NC}\n"
 printf "Total: %d  Passed: ${GREEN}%d${NC}  Failed: ${RED}%d${NC}\n\n" "$TOTAL" "$PASSED" "$FAILED"

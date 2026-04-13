@@ -69,8 +69,8 @@ flowchart TD
 
 | 항목 | Claude | Codex |
 |------|--------|-------|
-| 훅 수 | 6개 (SessionStart, PreToolUse, PostToolUse×4) | 2개 (SessionStart, PreToolUse) |
-| PostToolUse 매처 | Read\|Skill, Write\|Edit | Bash만 지원 |
+| 훅 수 | 7개 (SessionStart, PreToolUse, PostToolUse×5) | 3개 (SessionStart, PreToolUse, PostToolUse×1) |
+| PostToolUse 매처 | Read\|Skill, Write\|Edit, Bash | Bash만 지원 |
 | 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}` |
 <!-- AI-SYMBIOTE:END dependencies:platform-dependencies -->
 

@@ -362,13 +362,14 @@ bash scripts/build-codex.sh    # Codex만
 | 항목 | Claude Code | Codex CLI |
 |------|-------------|-----------|
 | 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `~/plugins/ai-symbiote` |
-| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse |
-| PostToolUse 매처 | Read\|Skill, Write\|Edit | Bash만 지원 |
+| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse, PostToolUse |
+| PostToolUse 매처 | Read\|Skill, Write\|Edit, Bash | Bash만 지원 |
 | Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
 | 기본 모델 | — | gpt-5.4 |
 
-Codex에서 PostToolUse의 Read\|Skill, Write\|Edit 매처가 지원되지 않으므로,
-usage-tracker, harness-learn, comment-checker, messenger-notify 훅은 Claude에서만 동작합니다.
+Codex에서 PostToolUse는 Bash 매처만 지원하므로,
+usage-tracker, harness-learn, comment-checker, messenger-notify 훅은 Claude 전용입니다.
+대신 build-watcher 훅은 Claude와 Codex 모두에서 동작합니다.
 
 ## 상태 관리
 
