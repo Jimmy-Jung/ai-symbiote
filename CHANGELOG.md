@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.2] - 2026-04-13
+
+### Added
+- **build-watcher 훅** — Claude와 Codex의 Bash PostToolUse에서 build/test 실패를 공통 감지하고 `harness-log.jsonl`에 반복 패턴 학습용 이벤트 기록
+- **feedback-logger 유틸리티** — 사용자가 변경을 반려했을 때 반복 피드백을 기록하고 동일 패턴이 누적되면 Harness 규칙으로 승격
+
+### Changed
+- **Codex 훅 문서 및 배선 갱신** — Codex의 Bash PostToolUse 지원 범위를 README, ARCHITECTURE, DEPENDENCIES와 훅 설정에 반영
+- **하네스 로그 스키마 확장** — `build_build_failed`, `build_test_failed`, `user_feedback`, `error_category`, `error_summary`를 문서화
+
+### Fixed
+- **build/test 실패 분류 정밀화** — `** TEST FAILED **`, `npm test`의 `FAIL ...test.ts`, 구조화된 `exit_code` 실패를 `test_failed`로 올바르게 분류
+- **최근 7일 집계 정확도 개선** — 문자열 grep 대신 ISO-8601 cutoff 기반 필터를 사용해 1~6일 전 실패도 누락 없이 집계
+- **jq 없는 환경 JSON 파싱 보강** — 공통 유틸이 `python3` fallback을 사용해 escaped quote와 scalar 값을 안정적으로 읽도록 수정
+- **편집 실패 카테고리 분리** — `not_unique`, `not_found`, `no_such_file`, `permission_denied`, `no_change`를 개별 error type으로 학습하도록 개선
+
 ## [0.8.1] - 2026-04-12
 
 ### Changed
