@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4] - 2026-04-14
+
+### Added
+- **실시간 보안 가드레일** — guard-shell.sh에 16개 보안 패턴(SEC-001~SEC-016) 추가. Secret Exposure(API키 노출, .env 커밋), Dangerous Execution(eval 원격실행, chmod -R 777, docker --privileged), Data Exfiltration(민감파일 아카이브, netcat 전송) 3개 카테고리로 분류하여 차단
+- **security-guard.sh 훅** — PostToolUse Write/Edit에서 파일 내용을 스캔하여 하드코딩 시크릿, SQL injection, XSS, 디버그 모드 활성화를 경고 (Claude 전용). 100KB 초과/바이너리 자동 스킵, 확장자 화이트리스트 적용
+- **보안 시드 규칙** — security.md에 6개 보안 시드 규칙 추가. setup 시 프로젝트 harness-rules에 자동 주입
+- **security-log.jsonl** — 보안 이벤트 전용 로그. 최대 10,000줄 자동 rotation, harness-log.jsonl에도 통합 기록
+
+### Changed
+- **위험도 낮은 패턴 경고로 완화** — git clean -fd, chmod 777(단일파일), npm --no-audit, env dump를 차단에서 경고(continue=true)로 변경. 캐시 정리, CI 플래그 등 일상적 작업을 허용하면서 인지는 유지
+
 ## [0.8.3] - 2026-04-14
 
 ### Added
