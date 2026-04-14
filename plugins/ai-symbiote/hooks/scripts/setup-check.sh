@@ -18,6 +18,35 @@ CONTEXT_PARTS=()
 
 if [ ! -f "$STATE_DIR/manifest.json" ]; then
   CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup to initialize the project.")
+else
+  # Inject project and stack summary from manifest.json into context
+  MANIFEST_JSON=$(cat "$STATE_DIR/manifest.json" 2>/dev/null)
+  if [ -n "$MANIFEST_JSON" ]; then
+    PROJ_NAME=$(json_nested_field "$MANIFEST_JSON" "project" "name")
+    PROJ_TYPE=$(json_nested_field "$MANIFEST_JSON" "project" "type")
+    PROJ_LANGS=$(json_nested_field "$MANIFEST_JSON" "project" "languages")
+    STACK_PM=$(json_nested_field "$MANIFEST_JSON" "stack" "packageManager")
+    STACK_BUILD=$(json_nested_field "$MANIFEST_JSON" "stack" "buildTool")
+    STACK_FW=$(json_nested_field "$MANIFEST_JSON" "stack" "frameworks")
+    STACK_ARCH=$(json_nested_field "$MANIFEST_JSON" "stack" "architecture")
+    STACK_TEST=$(json_nested_field "$MANIFEST_JSON" "stack" "testFramework")
+    STACK_CICD=$(json_nested_field "$MANIFEST_JSON" "stack" "cicd")
+
+    MANIFEST_SUMMARY=""
+    [ -n "$PROJ_NAME" ] && MANIFEST_SUMMARY="project: ${PROJ_NAME}"
+    [ -n "$PROJ_TYPE" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, type: ${PROJ_TYPE}"
+    [ -n "$PROJ_LANGS" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, languages: ${PROJ_LANGS}"
+    [ -n "$STACK_PM" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, packageManager: ${STACK_PM}"
+    [ -n "$STACK_BUILD" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, buildTool: ${STACK_BUILD}"
+    [ -n "$STACK_FW" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, frameworks: ${STACK_FW}"
+    [ -n "$STACK_ARCH" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, architecture: ${STACK_ARCH}"
+    [ -n "$STACK_TEST" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, testFramework: ${STACK_TEST}"
+    [ -n "$STACK_CICD" ] && MANIFEST_SUMMARY="${MANIFEST_SUMMARY}, cicd: ${STACK_CICD}"
+
+    if [ -n "$MANIFEST_SUMMARY" ]; then
+      CONTEXT_PARTS+=("[Symbiote Manifest] ${MANIFEST_SUMMARY}")
+    fi
+  fi
 fi
 
 # Harness: analyze previous sessions for rule_prevented before cleanup
