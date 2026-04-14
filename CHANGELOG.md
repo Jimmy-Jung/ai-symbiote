@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.3] - 2026-04-14
+
+### Added
+- **manifest context 주입** — SessionStart 훅에서 `manifest.json`의 project/stack 정보를 `[Symbiote Manifest]` 태그로 context에 자동 주입하여 매 세션마다 프로젝트 탐색 없이 즉시 맥락 파악 가능
+
 ## [0.8.2] - 2026-04-13
 
 ### Added
