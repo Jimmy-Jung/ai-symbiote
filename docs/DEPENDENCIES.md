@@ -48,7 +48,7 @@ flowchart TD
     subgraph "Claude Code"
         CL1["claude CLI"]
         CL2[".claude-plugin/plugin.json"]
-        CL3["hooks.json (6개 훅)"]
+        CL3["hooks.json (8개 훅)"]
         CL4["env: CLAUDE_PLUGIN_ROOT"]
     end
     subgraph "Codex CLI"

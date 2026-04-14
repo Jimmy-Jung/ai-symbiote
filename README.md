@@ -44,21 +44,25 @@ flowchart LR
 
 | Hook | Event | Action |
 |------|-------|--------|
-| `guard-shell.sh` | PreToolUse(Bash) | 위험 명령 차단 + 안전한 우회 경로 제시 + harness-log 기록 |
+| `guard-shell.sh` | PreToolUse(Bash) | 위험 명령 차단 + 보안 패턴 16개(SEC-001~016) 실시간 차단 + 안전한 우회 경로 제시 |
+| `security-guard.sh` | PostToolUse(Write\|Edit) | 파일 작성 후 보안 스캔: 하드코딩 시크릿, SQL injection, XSS, 디버그 모드 감지 (Claude 전용) |
 | `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 + auto-loop FAIL 연동 + 확장자 패턴 학습 → 자동 규칙 생성 |
 | `comment-checker.sh` | PostToolUse(Write\|Edit) | 자명한 주석, 주석 처리된 코드 경고 |
 
 ```mermaid
 flowchart LR
     subgraph PreToolUse
-        A["Bash 명령"] -->|guard-shell.sh| B{"위험한 명령?"}
-        B -->|"Yes"| C["차단"]
-        B -->|"No"| D["허용"]
+        A["Bash 명령"] -->|guard-shell.sh| B{"위험한 명령?<br/>보안 위반?"}
+        B -->|"차단"| C["deny + 규칙ID/위험등급/대안"]
+        B -->|"경고"| C2["continue + 경고 메시지"]
+        B -->|"안전"| D["허용"]
     end
     subgraph PostToolUse
-        E["Write/Edit"] -->|harness-learn.sh| F{"반복 실수?"}
-        F -->|"Yes"| G["기록 + 규칙 자동 생성"]
-        F -->|"No"| H["조용히 통과"]
+        E["Write/Edit"] -->|security-guard.sh| E2{"보안 패턴?"}
+        E2 -->|"Yes"| E3["경고 + security-log 기록"]
+        E2 -->|"No"| F2["harness-learn.sh"]
+        F2 -->|"반복 실수"| G["규칙 자동 생성"]
+        F2 -->|"정상"| H["조용히 통과"]
     end
 ```
 
@@ -87,7 +91,9 @@ flowchart TD
     F["gc 스킬"] -->|"30일+ 미사용<br/>규칙 정리"| D
     C -->|"stats 스킬"| G["하네스 진화 지표<br/>+ 규칙 효과 대시보드"]
     H["auto-loop Inspector FAIL"] -->|"파일 패턴 감지"| B
-    I["guard-shell 차단"] -->|"guard_blocked 이벤트"| C
+    I["guard-shell 차단<br/>(파괴적 명령 + SEC-001~016)"] -->|"guard_blocked /<br/>security_blocked 이벤트"| C
+    I2["security-guard.sh<br/>(파일 보안 스캔)"] -->|"보안 경고"| L["security-log.jsonl"]
+    L --> G
     J["setup-check.sh"] -->|"이전 세션 분석"| K["rule_prevented 기록"]
     K --> G
 ```
@@ -321,9 +327,10 @@ flowchart LR
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
 │   ├── skills/                #   27개 스킬
-│   ├── hooks/scripts/         #   6개 훅 스크립트
+│   ├── hooks/scripts/         #   8개 훅 스크립트
 │   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
-│   │   ├── guard-shell.sh     #     위험 명령 차단 + 우회 경로 + 로깅
+│   │   ├── guard-shell.sh     #     위험 명령 차단 + 보안 패턴 16개 실시간 차단
+│   │   ├── security-guard.sh  #     파일 보안 스캔 (시크릿/SQLi/XSS 감지, Claude 전용)
 │   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
 │   │   ├── harness-learn.sh   #     실수 감지 + auto-loop 연동 + 패턴 학습
 │   │   ├── comment-checker.sh #     코드 주석 품질 검사
@@ -368,8 +375,8 @@ bash scripts/build-codex.sh    # Codex만
 | 기본 모델 | — | gpt-5.4 |
 
 Codex에서 PostToolUse는 Bash 매처만 지원하므로,
-usage-tracker, harness-learn, comment-checker, messenger-notify 훅은 Claude 전용입니다.
-대신 build-watcher 훅은 Claude와 Codex 모두에서 동작합니다.
+usage-tracker, harness-learn, comment-checker, messenger-notify, security-guard 훅은 Claude 전용입니다.
+대신 build-watcher 훅과 guard-shell.sh의 보안 패턴(SEC-001~016)은 Claude와 Codex 모두에서 동작합니다.
 
 ## 상태 관리
 
@@ -387,6 +394,7 @@ slug는 <b>git 루트 디렉터리의 basename</b>을 소문자로 변환하여 
 ├── manifest.json       # 프로젝트 스택, 설정, 경로, 연동 플러그인 상태
 ├── context.md          # 동적 컨텍스트 (스택, 컨벤션, 하네스 규칙)
 ├── harness-log.jsonl   # 에이전트 실수 로그 (자동 관리)
+├── security-log.jsonl  # 보안 이벤트 로그 (차단/경고, 최대 10,000줄 rotation)
 ├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
 ├── taskmaster/         # PRD, task graph
 ├── usage-data/         # 스킬/커맨드 사용 통계

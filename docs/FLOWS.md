@@ -37,11 +37,13 @@ flowchart TD
     E["SessionStart"] -->|"setup-check.sh"| F["context.md →<br/>systemMessage 주입"]
     E -->|"이전 세션 분석"| G["rule_prevented 카운터"]
 
-    H["에이전트 작업"] -->|"PreToolUse"| I["guard-shell.sh<br/>위험 명령 차단"]
+    H["에이전트 작업"] -->|"PreToolUse"| I["guard-shell.sh<br/>위험 명령 + 보안 패턴 차단"]
     H -->|"PostToolUse"| J["harness-learn.sh<br/>실수 감지 + 패턴 학습"]
+    H -->|"PostToolUse"| J2["security-guard.sh<br/>파일 보안 스캔"]
     H -->|"PostToolUse"| K["usage-tracker.sh<br/>사용 통계"]
 
     I & J -->|"이벤트 기록"| L["harness-log.jsonl (v1/v2)"]
+    I & J2 -->|"보안 이벤트"| L2["security-log.jsonl"]
     J -->|"7일 내 2회+ 반복"| M["context.md에<br/>규칙 자동 추가"]
     J -->|"동일 확장자 3개+"| N["패턴 규칙 일반화"]
 
@@ -69,10 +71,12 @@ sequenceDiagram
     rect rgb(240, 240, 255)
         Note over CLI,Hook: 작업 루프
         CLI->>Hook: PreToolUse(Bash) → guard-shell.sh
-        Hook-->>CLI: 위험 명령 차단 또는 허용
+        Hook-->>CLI: 위험 명령/보안 위반 차단 또는 허용
         CLI->>CLI: 에이전트 작업 수행
+        CLI->>Hook: PostToolUse(Write|Edit) → security-guard.sh
+        Hook-->>CLI: 보안 경고 (시크릿, SQLi, XSS)
         CLI->>Hook: PostToolUse(Write|Edit) → harness-learn.sh
-        Hook->>State: harness-log.jsonl 기록
+        Hook->>State: harness-log.jsonl + security-log.jsonl 기록
     end
 
     CLI-->>Dev: 결과 전달

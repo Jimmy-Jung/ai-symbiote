@@ -10,8 +10,8 @@
 | 디렉터리 | 내용 | 수량 |
 |-----------|------|------|
 | `skills/` | 27개 스킬 정의 (SKILL.md + 보조 스크립트) | 27 |
-| `hooks/scripts/` | 훅 스크립트 + `lib/common.sh` 공용 라이브러리 | 6개 |
-| `harness-seeds/` | 스택별 초기 규칙 시드 (generic, swift, nextjs, python) | 4개 |
+| `hooks/scripts/` | 훅 스크립트 + `lib/common.sh` 공용 라이브러리 | 8개 |
+| `harness-seeds/` | 스택별 초기 규칙 시드 (generic, swift, nextjs, python, security) | 5개 |
 | `taskmaster/` | PRD/task JSON 스키마 및 템플릿 | — |
 | `messenger-bridge/` | Telegram/Slack/Discord 브릿지 (TypeScript/Node.js) | — |
 
@@ -30,8 +30,8 @@
 flowchart TD
     subgraph "shared/ (원본)"
         SK["skills/ (27)"]
-        HK["hooks/scripts/ (6)"]
-        HS["harness-seeds/ (4)"]
+        HK["hooks/scripts/ (8)"]
+        HS["harness-seeds/ (5)"]
         TM["taskmaster/"]
         MB["messenger-bridge/"]
     end
@@ -64,10 +64,11 @@ flowchart TD
 | 이벤트 | 매처 | 스크립트 | Claude | Codex | 비고 |
 |--------|------|----------|--------|-------|------|
 | SessionStart | — | setup-check.sh | O | O | context.md 전체 주입 + rule_prevented 분석 |
-| PreToolUse | Bash | guard-shell.sh | O | O | 차단 시 우회 경로 제시 + harness-log 기록 |
+| PreToolUse | Bash | guard-shell.sh | O | O | 위험 명령 차단 + SEC-001~016 보안 패턴 실시간 차단 |
 | PostToolUse | Bash | build-watcher.sh | O | O | build/test 실패 감지 + 반복 패턴 규칙화 |
 | PostToolUse | Read\|Skill | usage-tracker.sh | O | X | |
 | PostToolUse | Write\|Edit | harness-learn.sh | O | X | auto-loop FAIL 연동 + 확장자 패턴 학습 |
+| PostToolUse | Write\|Edit | security-guard.sh | O | X | 파일 보안 스캔: 시크릿, SQLi, XSS, 디버그 모드 감지 |
 | PostToolUse | Write\|Edit | comment-checker.sh | O | X | |
 | PostToolUse | Write\|Edit | messenger-notify.sh | O | X | |
 
@@ -79,7 +80,14 @@ build-watcher.sh 는 Bash 매처만 사용하므로 Claude와 Codex 양쪽에서
 `harness-log.jsonl`은 두 가지 스키마 버전을 사용합니다:
 
 - **v1** (`"v"` 필드 없음): `tool_error`, `repeated_error`, `churn`, `rule_created`
-- **v2** (`"v":2`): `build_build_failed`, `build_test_failed`, `guard_blocked`, `loop_verify_fail`, `pattern_*`, `rule_prevented`, `seed_loaded`, `user_feedback`
+- **v2** (`"v":2`): `build_build_failed`, `build_test_failed`, `guard_blocked`, `guard_warned`, `security_blocked`, `loop_verify_fail`, `pattern_*`, `rule_prevented`, `seed_loaded`, `user_feedback`
+
+### Security Log Schema
+
+`security-log.jsonl`은 보안 전용 이벤트 로그입니다 (최대 10,000줄, 자동 rotation).
+
+- guard-shell.sh 보안 차단: `{"v":2,"ts":"...","type":"security","category":"secret_exposure|dangerous_execution|data_exfiltration","rule_id":"SEC-NNN","risk":"CRITICAL|HIGH|MEDIUM","action":"blocked"}`
+- security-guard.sh 파일 스캔 경고: `{"v":2,"ts":"...","type":"security","category":"file_scan","file":"...","warn_count":N,"action":"warned"}`
 
 v2 실패 이벤트는 공통적으로 `error_type`, `error_category`, `file`, `description`, `rule_candidate`, `session_pid`를 포함하고, build-watcher 이벤트는 `command`, `error_summary`를 추가로 기록합니다.
 
