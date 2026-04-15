@@ -10,12 +10,18 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../../../hooks/scripts/lib/common.sh"
 
 CATALOG="$SCRIPT_DIR/../catalog.json"
+SERVICE_PATTERNS_PATH="$SCRIPT_DIR/../../../lib/service-patterns.json"
 STATE_DIR="${CLI_STORE_STATE_DIR:-$(ensure_state_dir)}"
 MANIFEST_PATH="$STATE_DIR/manifest.json"
 STATE_SUBDIR="$STATE_DIR/state"
 COVERED_MCP_PATH="$STATE_SUBDIR/cli-covered-mcps.json"
 RECOMMENDATION_PATH="$STATE_SUBDIR/cli-store-recommendations.json"
 PROJECT_ROOT_OVERRIDE="${CLI_STORE_PROJECT_ROOT:-}"
+
+if [ ! -f "$CATALOG" ]; then
+  echo "[CLI Store] catalog.json not found: $CATALOG" >&2
+  exit 1
+fi
 
 mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
 
@@ -97,7 +103,7 @@ tool_forced_install_command() {
 
 query_catalog() {
   local mode="$1" arg="$2" project_root="$3"
-  python3 - "$CATALOG" "$mode" "$arg" "$project_root" <<'PY'
+  python3 - "$CATALOG" "$mode" "$arg" "$project_root" "$SERVICE_PATTERNS_PATH" <<'PY'
 import json, sys
 from pathlib import Path
 
@@ -105,20 +111,12 @@ catalog = json.loads(Path(sys.argv[1]).read_text())
 mode = sys.argv[2]
 arg = sys.argv[3].strip().lower()
 project_root_arg = sys.argv[4].strip()
+sp_path = Path(sys.argv[5])
 
-SERVICE_PATTERNS = {
-    "supabase": ["@supabase/supabase-js", "supabase"],
-    "neon": ["@neondatabase/", "neon"],
-    "stripe": ["stripe"],
-    "cloudflare": ["@cloudflare/", "wrangler"],
-    "sentry": ["@sentry/", "sentry-sdk"],
-    "github": ["github", "@octokit/"],
-    "postgres": ["pg", "postgres"],
-    "sqlite": ["sqlite", "better-sqlite3"],
-    "mongodb": ["mongodb", "mongoose"],
-    "docker": ["docker"],
-    "terraform": [".tf"],
-}
+all_patterns = json.loads(sp_path.read_text())
+catalog_services = set(catalog.get("services", {}).keys())
+SERVICE_PATTERNS = {k: v for k, v in all_patterns["patterns"].items() if k in catalog_services}
+CANDIDATE_FILES = all_patterns.get("candidateFiles", [])
 
 def detect_project_root(manifest_path):
     if project_root_arg:
@@ -137,18 +135,9 @@ def detect_project_root(manifest_path):
 def scan_services(project_root):
     if project_root is None or not project_root.exists():
         return []
-    candidate_files = [
-        project_root / "package.json",
-        project_root / "requirements.txt",
-        project_root / "pyproject.toml",
-        project_root / "Cargo.toml",
-        project_root / "go.mod",
-        project_root / "Package.swift",
-        project_root / "Dockerfile",
-        project_root / "wrangler.toml",
-    ]
     haystacks = []
-    for path in candidate_files:
+    for name in CANDIDATE_FILES:
+        path = project_root / name
         if path.is_file():
             try:
                 haystacks.append(path.read_text(encoding="utf-8", errors="ignore").lower())
