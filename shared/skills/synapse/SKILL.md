@@ -37,6 +37,7 @@ Dynamically loaded from `~/ai-symbiote/{slug}/context.md`:
 | "skill recommend", "skill install", "skill store" | Run skill-store skill |
 | "mcp recommend", "mcp install", "mcp store" | Run mcp-store skill |
 | "messenger", "notification setup" | Run messenger skill |
+| "security scan", "security audit", "security status", "보안 점검", "보안 상태" | Run security skill |
 | "project update", "sync state", "stack change", "evolve" | Run evolve skill |
 | "requirements", "PRD", "feature planning" | Run PRD workflow |
 | "cancel", "abort" | Abort current loop |
