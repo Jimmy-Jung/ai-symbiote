@@ -81,17 +81,23 @@ PY
 
 run_recommendation_pass() {
   echo "[Setup] Running store recommendations..."
-  SKILL_STORE_STATE_DIR="$STATE_DIR" \
-  SKILL_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
-  bash "$PLUGIN_ROOT/skills/skill-store/scripts/skill-store.sh" --auto
+  if ! SKILL_STORE_STATE_DIR="$STATE_DIR" \
+    SKILL_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    bash "$PLUGIN_ROOT/skills/skill-store/scripts/skill-store.sh" --auto; then
+    echo "[Setup] WARNING: skill-store recommendation failed." >&2
+  fi
 
-  CLI_STORE_STATE_DIR="$STATE_DIR" \
-  CLI_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
-  bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" --auto
+  if ! CLI_STORE_STATE_DIR="$STATE_DIR" \
+    CLI_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" --auto; then
+    echo "[Setup] WARNING: cli-store recommendation failed." >&2
+  fi
 
-  MCP_STORE_STATE_DIR="$STATE_DIR" \
-  MCP_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
-  bash "$PLUGIN_ROOT/skills/mcp-store/scripts/mcp-store.sh" --auto
+  if ! MCP_STORE_STATE_DIR="$STATE_DIR" \
+    MCP_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    bash "$PLUGIN_ROOT/skills/mcp-store/scripts/mcp-store.sh" --auto; then
+    echo "[Setup] WARNING: mcp-store recommendation failed." >&2
+  fi
 }
 
 build_summary_file() {

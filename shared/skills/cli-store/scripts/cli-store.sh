@@ -414,7 +414,11 @@ PY
   fi
 
   echo "[CLI Store] Installing $tool_name..."
-  bash -c "$install_cmd"
+  if ! bash -c "$install_cmd"; then
+    echo "[CLI Store] Installation command failed for $tool_name." >&2
+    update_manifest_and_state "$entry_json" "install-failed"
+    return 0
+  fi
 
   if tool_forced_after_status "$tool_id" >/dev/null 2>&1; then
     status=$(tool_forced_after_status "$tool_id")
