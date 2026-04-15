@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.2] - 2026-04-15
+
+### Added
+- **Setup plan-first 워크플로우** — setup 스킬이 기본적으로 plan 모드에서 시작하여 사용자 승인 전까지 파일 생성/설치를 보류. begin-setup.sh, render-setup-plan.sh, run-store-setup.sh 엔트리포인트 추가
+- **Usage tracker UserPromptSubmit 지원** — Claude slash-command(command-message) 이벤트 감지 및 15초 윈도우 내 Read 이벤트 중복 카운팅 방지
+- **CLI Store service scanning** — 프로젝트 의존성 파일에서 서비스 패턴(supabase, stripe 등) 자동 감지, auto 모드에서 ready/installable 분류 및 recommendation 상태 파일 기록
+- **Skill Store / MCP Store 자동화 스크립트** — 카탈로그 기반 자동 추천, 설치 상태 확인, guided 모드 지원
+- **manifest-defaults.sh 테스트** — agentPlatforms 자동 추가, security 기본값, 타입 교정 등 10개 어설션
+
+### Fixed
+- **빌드 파이프라인 shared/lib 누락** — service-patterns.json이 번들에 미포함되어 배포 환경에서 스토어 스크립트 실패하는 문제 수정
+- **하드코딩 경로 제거** — install.sh의 절대 경로를 $REPO_ROOT 변수로, SKILL.md의 절대 경로를 상대 경로로 교체
+- **Store install 실패 핸들링** — cli-store.sh 설치 명령 실패 시 에러 감지 및 install-failed 상태 기록, run-store-setup.sh 실패 시 WARNING 출력
+
+### Changed
+- **SERVICE_PATTERNS 통합** — 3개 스토어에 하드코딩되어 불일치했던 감지 패턴을 shared/lib/service-patterns.json으로 추출. 각 스토어는 자기 catalog 키로 필터링
+- **catalog.json 가드 추가** — 3개 스토어 스크립트 상단에 catalog 미존재 시 명확한 에러 메시지 출력
+
 ## [0.10.1] - 2026-04-15
 
 ### Fixed
