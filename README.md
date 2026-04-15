@@ -103,6 +103,7 @@ auto-loop의 실패도 자동으로 학습하고, 파일 단위 규칙은 확장
 
 `stats --baseline`으로 반복률 기준선을 측정하고,
 `stats`로 하네스 진화 지표(규칙 수, 실수 빈도 추이, 재발률, 규칙 효과)를 확인할 수 있습니다.
+SessionStart 시에는 `setup-check.sh`가 `security-baseline.json`, `security-log.jsonl`, 설치 대기 중인 보안 추천 도구를 우선순위 기반의 한 줄 요약으로 압축해 주입하며, `manifest.json`의 `security.sessionSummaryLevel`로 민감도를 조절할 수 있습니다 (`auto`, `quiet`, `verbose`).
 
 ## 설치
 
@@ -187,7 +188,7 @@ Codex:  $ai-symbiote:update
 이 문서들은 `dev-docs` 스킬이 코드를 스캔하여 자동 갱신합니다. 마커 블록(`<!-- AI-SYMBIOTE:START/END -->`) 안의 내용만 갱신되며, 그 밖의 수동 작성 섹션은 보존됩니다.
 <!-- AI-SYMBIOTE:END readme:docs-map -->
 
-## 스킬 목록 (27개)
+## 스킬 목록 (28개)
 
 `/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
 
@@ -213,6 +214,7 @@ Codex:  $ai-symbiote:update
 |------|------|
 | `review` | 현재 변경사항에 대해 코드 리뷰 실행 |
 | `code-accuracy` | 심볼 존재 확인, import 검증, 환각 코드 방지 가드레일 |
+| `security` | 프로젝트 보안 baseline 생성, `/security scan|status` 실행, 최근 보안 이벤트 요약 표시, 외부 보안 도구 추천 |
 | `verify-loop` | 자율 루프의 4-Level 완료 기준과 재시도 전략 |
 
 ### Git 및 협업
@@ -243,7 +245,7 @@ Codex:  $ai-symbiote:update
 | `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
 | `cli-store` | 프로젝트 스택에 맞는 CLI 도구 추천/설치. MCP보다 가벼운 대안 우선 |
 | `mcp-store` | MCP 서버 카탈로그(530+개)에서 프로젝트에 맞는 서버 추천/설치 |
-| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 + 규칙 효과 대시보드 |
+| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 + 규칙 효과 + 보안 이벤트 텔레메트리 |
 | `contribute` | 플러그인의 버그/개선점 발견 시 GitHub 이슈 등록. 환경 정보 자동 수집 |
 
 ### 내부 스킬 (synapse가 자동 참조)
@@ -326,7 +328,7 @@ flowchart LR
 ```text
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   27개 스킬
+│   ├── skills/                #   28개 스킬
 │   ├── hooks/scripts/         #   8개 훅 스크립트
 │   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
 │   │   ├── guard-shell.sh     #     위험 명령 차단 + 보안 패턴 16개 실시간 차단
@@ -394,6 +396,7 @@ slug는 <b>git 루트 디렉터리의 basename</b>을 소문자로 변환하여 
 ├── manifest.json       # 프로젝트 스택, 설정, 경로, 연동 플러그인 상태
 ├── context.md          # 동적 컨텍스트 (스택, 컨벤션, 하네스 규칙)
 ├── harness-log.jsonl   # 에이전트 실수 로그 (자동 관리)
+├── security-baseline.json # baseline 점수, severity 요약, top risks
 ├── security-log.jsonl  # 보안 이벤트 로그 (차단/경고, 최대 10,000줄 rotation)
 ├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
 ├── taskmaster/         # PRD, task graph

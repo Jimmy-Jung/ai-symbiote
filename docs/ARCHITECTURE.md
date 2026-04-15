@@ -9,7 +9,7 @@
 
 | 디렉터리 | 내용 | 수량 |
 |-----------|------|------|
-| `skills/` | 27개 스킬 정의 (SKILL.md + 보조 스크립트) | 27 |
+| `skills/` | 28개 스킬 정의 (SKILL.md + 보조 스크립트) | 28 |
 | `hooks/scripts/` | 훅 스크립트 + `lib/common.sh` 공용 라이브러리 | 8개 |
 | `harness-seeds/` | 스택별 초기 규칙 시드 (generic, swift, nextjs, python, security) | 5개 |
 | `taskmaster/` | PRD/task JSON 스키마 및 템플릿 | — |
@@ -29,7 +29,7 @@
 ```mermaid
 flowchart TD
     subgraph "shared/ (원본)"
-        SK["skills/ (27)"]
+        SK["skills/ (28)"]
         HK["hooks/scripts/ (8)"]
         HS["harness-seeds/ (5)"]
         TM["taskmaster/"]
@@ -89,9 +89,20 @@ build-watcher.sh 는 Bash 매처만 사용하므로 Claude와 Codex 양쪽에서
 - guard-shell.sh 보안 차단: `{"v":2,"ts":"...","type":"security","category":"secret_exposure|dangerous_execution|data_exfiltration","rule_id":"SEC-NNN","risk":"CRITICAL|HIGH|MEDIUM","action":"blocked"}`
 - security-guard.sh 파일 스캔 경고: `{"v":2,"ts":"...","type":"security","category":"file_scan","file":"...","warn_count":N,"action":"warned"}`
 
+### Security Baseline State
+
+`security-baseline.json`은 setup 자동 스캔과 `/security scan`이 갱신하는 Phase 2 공개 상태 파일입니다.
+
+- 저장 위치: `~/ai-symbiote/{slug}/security-baseline.json`
+- 주요 필드: `scan_date`, `score`, `summary`, `top_findings`, `findings`, `tools`
+- `context.md`의 `Security Baseline` 블록은 이 파일을 기준으로 동기화됩니다.
+- 동기화 시 `security-log.jsonl`의 최근 blocked/warned 집계와 최신 이벤트 3개도 함께 반영됩니다.
+- `~/ai-symbiote/{slug}/state/security-tool-recommendations.json`에는 설치 대기 중인 보안 CLI 추천이 저장됩니다.
+- `setup-check.sh`는 SessionStart 때 baseline 점수, 최근 보안 활동, 설치 대기 중인 보안 추천 도구를 우선순위 기반의 한 줄 요약으로 압축해 systemMessage에 추가하며, `manifest.json`의 `security.sessionSummaryLevel` (`auto|quiet|verbose`)로 노출 민감도를 조절할 수 있습니다. `auto`에서는 `critical/high/blocked`가 없으면 activity/pending 세부를 숨깁니다.
+
 v2 실패 이벤트는 공통적으로 `error_type`, `error_category`, `file`, `description`, `rule_candidate`, `session_pid`를 포함하고, build-watcher 이벤트는 `command`, `error_summary`를 추가로 기록합니다.
 
-파서(gc, stats)는 알 수 없는 이벤트 타입을 gracefully skip합니다.
+파서(gc, stats)는 알 수 없는 이벤트 타입을 gracefully skip합니다. `stats`는 `security-log.jsonl`도 읽어 blocked/warned 보안 이벤트 집계를 함께 표시합니다.
 
 ### Harness Seed Templates
 

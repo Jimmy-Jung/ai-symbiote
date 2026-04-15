@@ -30,11 +30,12 @@ flowchart TD
 <!-- AI-SYMBIOTE:START flows:data-flow -->
 ```mermaid
 flowchart TD
-    A["프로젝트 코드 변경"] --> B["setup / evolve 스킬"]
+    A["프로젝트 코드 변경"] --> B["setup / evolve / security 스킬"]
     B --> C["manifest.json<br/>(스택, 설정, 플러그인 상태)"]
-    B --> D["context.md<br/>(컨벤션, 하네스 규칙, 시드)"]
+    B --> D["context.md<br/>(컨벤션, 하네스 규칙, 시드,<br/>Security Baseline 요약)"]
+    B --> D2["security-baseline.json<br/>(점수, top risks, tools)"]
 
-    E["SessionStart"] -->|"setup-check.sh"| F["context.md →<br/>systemMessage 주입"]
+    E["SessionStart"] -->|"setup-check.sh"| F["context.md + prioritized security summary →<br/>systemMessage 주입"]
     E -->|"이전 세션 분석"| G["rule_prevented 카운터"]
 
     H["에이전트 작업"] -->|"PreToolUse"| I["guard-shell.sh<br/>위험 명령 + 보안 패턴 차단"]
@@ -47,9 +48,12 @@ flowchart TD
     J -->|"7일 내 2회+ 반복"| M["context.md에<br/>규칙 자동 추가"]
     J -->|"동일 확장자 3개+"| N["패턴 규칙 일반화"]
 
-    L --> O["stats 스킬<br/>(진화 지표)"]
-    L --> P["gc 스킬<br/>(30일+ 미사용 정리)"]
-    L --> Q["다음 세션<br/>rule_prevented 분석"]
+    D2 --> O["/security status<br/>빠른 상태 조회"]
+    L2 --> O["최근 blocked/warned<br/>활동 요약"]
+    D2 --> O2["state/security-tool-<br/>recommendations.json"]
+    L & L2 --> P["stats 스킬<br/>(진화 지표 + 보안 텔레메트리)"]
+    L --> Q["gc 스킬<br/>(30일+ 미사용 정리)"]
+    L --> R["다음 세션<br/>rule_prevented 분석"]
 ```
 <!-- AI-SYMBIOTE:END flows:data-flow -->
 
@@ -63,10 +67,17 @@ sequenceDiagram
     participant Hook as Hooks
     participant State as ~/ai-symbiote/{slug}/
 
-    Dev->>CLI: 스킬 호출 (/ai-symbiote:plan 등)
+    Dev->>CLI: 스킬 호출 (/ai-symbiote:setup, /ai-symbiote:security 등)
     CLI->>Hook: SessionStart → setup-check.sh
     Hook->>State: context.md 로드 → systemMessage 주입
     CLI->>CLI: Synapse가 의도 분석 → 팀 구성
+
+    rect rgb(245, 250, 255)
+        Dev->>CLI: /ai-symbiote:security scan
+        CLI->>State: security-baseline.json 갱신
+        CLI->>State: context.md Security Baseline 블록 동기화
+        CLI-->>Dev: 점수 + 상위 위험 3개 + 선택 도구 추천
+    end
 
     rect rgb(240, 240, 255)
         Note over CLI,Hook: 작업 루프
