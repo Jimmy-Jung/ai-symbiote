@@ -10,13 +10,13 @@ ai-symbiote는 이 관계를 코드 위에 구현합니다.
 AI 에이전트에 달라붙어 하나가 되고, 에이전트가 실수하면 하네스가 자동으로 강해지고, 개발자가 규칙을 다듬으면 에이전트가 더 정확해집니다.
 베놈이 에디 브록과 함께 강해지듯, <b>ai-symbiote는 쓰면 쓸수록 개발자와 에이전트가 함께 강해지는 공생 시스템</b>입니다.
 
-Claude Code와 Codex CLI에서 동일한 스킬, 훅, 태스크 매니저를 공유하는
+Claude Code, Codex CLI, Cursor에서 동일한 스킬, 훅, 태스크 매니저를 공유하는
 AI 에이전트 오케스트레이션 플러그인입니다.
 
 ## Overview
 
 <!-- AI-SYMBIOTE:START readme:overview -->
-이 저장소는 `shared/`에 공용 코어를 두고, `platforms/` 오버레이로 Claude Code와 Codex CLI 번들을 조립하는 AI 에이전트 오케스트레이션 플러그인입니다. 사용자는 스킬을 직접 호출할 수도 있고, `synapse`가 의도를 분류해 팀 템플릿과 역할 정의를 묶어 자동으로 실행 흐름을 조합할 수도 있습니다. 하네스는 `context.md`, 훅 스크립트, 로그 상태를 연결해 반복 실수를 줄이는 쪽으로 설계되어 있습니다.
+이 저장소는 `shared/`에 공용 코어를 두고, `platforms/` 오버레이로 Claude Code, Codex CLI, Cursor 번들을 조립하는 AI 에이전트 오케스트레이션 플러그인입니다. 사용자는 스킬을 직접 호출할 수도 있고, `synapse`가 의도를 분류해 팀 템플릿과 역할 정의를 묶어 자동으로 실행 흐름을 조합할 수도 있습니다. 하네스는 `context.md`, 훅 스크립트, 로그 상태를 연결해 반복 실수를 줄이는 쪽으로 설계되어 있습니다.
 
 ```mermaid
 flowchart LR
@@ -27,24 +27,25 @@ flowchart LR
     D --> E
     E --> F["~/ai-symbiote/{slug}\ncontext·manifest·logs"]
     C --> G["platforms/*/overlay"]
-    G --> H["Claude / Codex 번들"]
+    G --> H["Claude / Codex / Cursor 번들"]
 ```
 
 - 소스 오브 트루스: `shared/`, `platforms/*/overlay/`, `scripts/`, `tests/`
-- 주요 출력: `plugins/ai-symbiote/`, `dist/claude-symbiote/`, `dist/codex-symbiote/`
+- 주요 출력: `plugins/ai-symbiote/`, `dist/claude-symbiote/`, `dist/codex-symbiote/`, `dist/cursor-symbiote/`
 - 런타임 상태: `~/ai-symbiote/{slug}/manifest.json`, `context.md`, `harness-log.jsonl`, `security-log.jsonl`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
 ## Quick Start
 
 <!-- AI-SYMBIOTE:START readme:quick-start -->
-가장 짧은 로컬 진입 경로는 빌드, 설치, 초기화, 검증 순서입니다. Claude와 Codex는 같은 공용 코어를 쓰지만 설치 스크립트와 플러그인 메타데이터 오버레이가 다르므로, 자신의 실행 환경에 맞는 설치 경로를 고르면 됩니다.
+가장 짧은 로컬 진입 경로는 빌드, 설치, 초기화, 검증 순서입니다. Claude, Codex, Cursor는 같은 공용 코어를 쓰지만 설치 스크립트와 플러그인 메타데이터 오버레이가 다르므로, 자신의 실행 환경에 맞는 설치 경로를 고르면 됩니다.
 
 1. 저장소 검증: `python3 scripts/version_sync.py --check`
 2. 번들 생성: `bash scripts/build-all.sh`
 3. 플랫폼 설치
    - Claude: `bash platforms/claude/install.sh`
    - Codex: `bash platforms/codex/install.sh`
+   - Cursor: `bash platforms/cursor/install.sh`
 4. 프로젝트 초기화: `/ai-symbiote:setup` 또는 `$ai-symbiote:setup`
 5. 문서/업데이터 확인: `bash tests/test-dev-docs-skill.sh && bash tests/test-dev-docs-updater.sh`
 
@@ -83,7 +84,7 @@ flowchart LR
 | Hook | Event | Action |
 |------|-------|--------|
 | `guard-shell.sh` | PreToolUse(Bash) | 위험 명령 차단 + 보안 패턴 16개(SEC-001~016) 실시간 차단 + 안전한 우회 경로 제시 |
-| `security-guard.sh` | PostToolUse(Write\|Edit) | 파일 작성 후 보안 스캔: 하드코딩 시크릿, SQL injection, XSS, 디버그 모드 감지 (Claude 전용) |
+| `security-guard.sh` | PostToolUse(Write\|Edit) | 파일 작성 후 보안 스캔: 하드코딩 시크릿, SQL injection, XSS, 디버그 모드 감지 (Codex 미지원) |
 | `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 + auto-loop FAIL 연동 + 확장자 패턴 학습 → 자동 규칙 생성 |
 | `comment-checker.sh` | PostToolUse(Write\|Edit) | 자명한 주석, 주석 처리된 코드 경고 |
 
@@ -157,10 +158,10 @@ ai-symbiote 플러그인을 설치하고 프로젝트 초기 설정을 해줘.
 3. /ai-symbiote:setup 실행
 ```
 
-Claude Code + Codex CLI 양쪽 모두 설치:
+Claude Code + Codex CLI + Cursor를 함께 설치:
 
 ```text
-ai-symbiote 플러그인을 Claude Code와 Codex CLI 양쪽에 모두 설치해줘.
+ai-symbiote 플러그인을 Claude Code, Codex CLI, Cursor에 모두 설치해줘.
 
 1. Claude Code 플러그인 설치:
    /plugin marketplace add Jimmy-Jung/ai-symbiote
@@ -170,7 +171,10 @@ ai-symbiote 플러그인을 Claude Code와 Codex CLI 양쪽에 모두 설치해�
    git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
    cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 
-3. /ai-symbiote:setup 실행
+3. Cursor 설치:
+   cd ~/ai-symbiote-repo && bash platforms/cursor/install.sh
+
+4. /ai-symbiote:setup 실행
 ```
 
 ### Claude Code
@@ -202,11 +206,21 @@ cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
 
 `install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true`)을 한 번에 처리합니다.
 
+### Cursor
+
+```bash
+git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
+cd ~/ai-symbiote-repo && bash platforms/cursor/install.sh
+```
+
+`install.sh`가 `dist/cursor-symbiote/`를 다시 만들고, `~/.cursor/plugins/local/ai-symbiote`에 번들을 동기화합니다. 설치 후에는 Cursor 재시작 또는 `Developer: Reload Window`가 필요합니다.
+
 ### 업데이트
 
 ```
 Claude: /ai-symbiote:update
 Codex:  $ai-symbiote:update
+Cursor: bundle 재설치 후 Reload Window
 ```
 
 ## 개발자 문서
@@ -370,25 +384,28 @@ flowchart LR
 ai-symbiote/
 ├── shared/                    # 공용 원본 (여기만 편집)
 │   ├── skills/                #   28개 스킬
-│   ├── hooks/scripts/         #   8개 훅 스크립트
+│   ├── hooks/scripts/         #   10개 파일 (훅 8 + 유틸리티 1 + 공용 lib 1)
 │   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
 │   │   ├── guard-shell.sh     #     위험 명령 차단 + 보안 패턴 16개 실시간 차단
-│   │   ├── security-guard.sh  #     파일 보안 스캔 (시크릿/SQLi/XSS 감지, Claude 전용)
+│   │   ├── build-watcher.sh   #     build/test 실패 분류 및 기록
+│   │   ├── security-guard.sh  #     파일 보안 스캔 (시크릿/SQLi/XSS 감지, Codex 미지원)
 │   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
 │   │   ├── harness-learn.sh   #     실수 감지 + auto-loop 연동 + 패턴 학습
 │   │   ├── comment-checker.sh #     코드 주석 품질 검사
 │   │   ├── messenger-notify.sh#     메신저 알림 전송
+│   │   ├── feedback-logger.sh #     사용자 거부 피드백 기록 (유틸리티, 에이전트가 Bash로 호출)
 │   │   └── lib/common.sh      #     훅 공용 라이브러리
 │   ├── harness-seeds/         #   스택별 초기 하네스 규칙 시드
 │   ├── taskmaster/            #   PRD/task/state 스키마 및 템플릿
 │   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지 (TypeScript)
 ├── platforms/
 │   ├── claude/overlay/        #   .claude-plugin/plugin.json, hooks/hooks.json
-│   └── codex/overlay/         #   .codex-plugin/plugin.json, hooks/hooks.json
+│   ├── codex/overlay/         #   .codex-plugin/plugin.json, hooks/hooks.json
+│   └── cursor/overlay/        #   .cursor-plugin/plugin.json, hooks/hooks.json
 ├── plugins/ai-symbiote/       # Claude marketplace용 번들 (빌드 생성물)
 ├── dist/                      # 빌드 출력
-├── scripts/                   # build-claude.sh, build-codex.sh, build-all.sh
-└── docs/                      # ARCHITECTURE, CONVENTIONS, ONBOARDING, DEPENDENCIES, FLOWS, MESSENGER
+├── scripts/                   # build-all.sh + 플랫폼별 build-*.sh
+└── docs/                      # 00~08 번호형 개발자 문서
 ```
 
 ### 빌드 흐름
@@ -397,29 +414,33 @@ ai-symbiote/
 flowchart LR
     S["shared/"] --> C["claude/overlay/"]
     S --> X["codex/overlay/"]
+    S --> R["cursor/overlay/"]
     C -->|rsync| P["plugins/ai-symbiote/<br/>dist/claude-symbiote/"]
     X -->|rsync| D["dist/codex-symbiote/"]
+    R -->|rsync| E["dist/cursor-symbiote/"]
 ```
 
 ```bash
-bash scripts/build-all.sh      # 양쪽 모두
+bash scripts/build-all.sh      # 세 플랫폼 모두
 bash scripts/build-claude.sh   # Claude만
 bash scripts/build-codex.sh    # Codex만
+bash scripts/build-cursor.sh   # Cursor만
 ```
 
 ## 플랫폼 차이
 
-| 항목 | Claude Code | Codex CLI |
-|------|-------------|-----------|
-| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `~/plugins/ai-symbiote` |
-| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse, PostToolUse |
-| PostToolUse 매처 | Read\|Skill, Write\|Edit, Bash | Bash만 지원 |
-| Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 |
-| 기본 모델 | — | gpt-5.4 |
+| 항목 | Claude Code | Codex CLI | Cursor |
+|------|-------------|-----------|--------|
+| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `~/plugins/ai-symbiote` | `~/.cursor/plugins/local/ai-symbiote` |
+| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse, PostToolUse | `sessionStart`, `preToolUse`, `postToolUse` |
+| PostToolUse 매처 | Read\|Skill, Write\|Edit, Bash | Bash만 지원 | Shell, Read, Write |
+| Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 | 플러그인 동기화 후 Reload Window |
+| 기본 모델 | — | gpt-5.4 | 사용자 선택 |
 
 Codex에서 PostToolUse는 Bash 매처만 지원하므로,
-usage-tracker, harness-learn, comment-checker, messenger-notify, security-guard 훅은 Claude 전용입니다.
-대신 build-watcher 훅과 guard-shell.sh의 보안 패턴(SEC-001~016)은 Claude와 Codex 모두에서 동작합니다.
+usage-tracker, harness-learn, comment-checker, messenger-notify, security-guard 훅은 Codex에서 미지원입니다.
+대신 build-watcher 훅과 guard-shell.sh의 보안 패턴(SEC-001~016)은 세 플랫폼 모두에서 동작합니다.
+Cursor는 `Shell`, `Read`, `Write` 매처를 모두 사용하므로 Claude와 동일하게 build-watcher, usage-tracker, harness-learn, security-guard, comment-checker, messenger-notify를 함께 연결합니다.
 
 ## 상태 관리
 
@@ -456,14 +477,14 @@ setup 시 자동으로 설치/확인되는 외부 플러그인:
 
 ## 메신저 브릿지
 
-Telegram, Slack, Discord를 통해 Claude/Codex CLI를 원격으로 사용할 수 있습니다.
+Telegram, Slack, Discord를 통해 Claude/Codex 백엔드를 원격으로 사용할 수 있습니다.
 자세한 설정 및 사용법은 [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md)를 참조하세요.
 
-- <b>AI 챗봇</b>: Telegram에서 질문하면 Claude/Codex가 직접 답변 (세션 유지)
+- <b>AI 챗봇</b>: Telegram에서 질문하면 Claude/Codex가 직접 답변
 - <b>세션 연동</b>: 맥 터미널의 Claude Code 세션을 Telegram에서 이어감
 - <b>실시간 모니터링</b>: macOS 알림 + 봇 로그로 CLI 실행 과정 확인
 - <b>보안</b>: 사용자 인증 (allowedUserIds) + CLI 권한 제한 (permissionLevel)
-- <b>루프 제어</b>: auto-loop/autopilot 세션의 원격 모니터링, 중지, 재개
+- <b>루프 제어</b>: auto-loop/autopilot 세션의 원격 모니터링, 중지, 재개, 지시 주입
 
 ## 유지보수 원칙
 
