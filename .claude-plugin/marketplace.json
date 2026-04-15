@@ -8,7 +8,7 @@
       "name": "ai-symbiote",
       "source": "./plugins/ai-symbiote",
       "description": "AI Symbiote 오케스트레이션 플러그인",
-      "version": "0.9.0",
+      "version": "0.10.0",
       "author": {
         "name": "JunyoungJung"
       }

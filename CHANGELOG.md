@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2026-04-15
+
+### Fixed
+- **문서 정확성 보정** — README/docs 전체에 Cursor 플랫폼 설치·훅·매처 정보 반영, feedback-logger.sh 누락으로 인한 훅 파일 수(9→10) 보정, "Claude 전용" 오표기를 "Codex 미지원"으로 정정, 메신저 브릿지 문서 현행화
+
 ## [0.9.0] - 2026-04-15
 
 ### Added
