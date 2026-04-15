@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2026-04-15
+
+### Added
+- **하네스 관측/학습 강화 묶음** — build-watcher 훅, feedback-logger, manifest context 주입, harness-rules 요약 모드, MCP Store 스킬과 카탈로그를 포함한 최근 운영 자동화 기능을 마이너 릴리즈로 통합
+- **보안 가드레일 확장** — guard-shell의 SEC-001~SEC-016 실시간 차단, `security-guard.sh` 파일 보안 스캔, `security-log.jsonl` 기반 이벤트 추적을 기본 배포 라인에 포함
+
+### Changed
+- **문서/오케스트레이션 흐름 정리** — dev-docs 워크플로우 전환, Intent Contract 기반 Synapse 라우팅, ADK 패턴 매핑, 버전 동기화/릴리즈 흐름 문서를 현재 번들 기준으로 정렬
+
+### Fixed
+- **운영 안정성 보강** — build/test 실패 분류, 최근 7일 집계, jq 없는 환경 JSON 파싱, 메신저 watcher 신규 파일 감지, setup/harness 경로 기록 이슈를 포함한 0.8.x 안정화 수정 사항을 반영
+
 ## [0.8.4] - 2026-04-14
 
 ### Added
