@@ -15,10 +15,41 @@ cat > /dev/null
 
 STATE_DIR=$(get_state_dir)
 CONTEXT_PARTS=()
+SECURITY_SESSION_SUMMARY_LEVEL="auto"
+MANIFEST_HELPER="$SCRIPT_DIR/../../skills/setup/scripts/manifest-defaults.sh"
 
 if [ ! -f "$STATE_DIR/manifest.json" ]; then
   CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup to initialize the project.")
 else
+  if [ -f "$MANIFEST_HELPER" ] && command -v python3 >/dev/null 2>&1; then
+    NEEDS_MANIFEST_DEFAULTS=$(python3 - "$STATE_DIR/manifest.json" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+try:
+    data = json.loads(manifest_path.read_text())
+except Exception:
+    print("no")
+    raise SystemExit(0)
+
+agent_platforms = data.get("agentPlatforms")
+security = data.get("security")
+needs_defaults = (
+    not isinstance(agent_platforms, list)
+    or "claude" not in agent_platforms
+    or "codex" not in agent_platforms
+    or not isinstance(security, dict)
+    or not security.get("sessionSummaryLevel")
+)
+print("yes" if needs_defaults else "no")
+PY
+)
+    if [ "$NEEDS_MANIFEST_DEFAULTS" = "yes" ]; then
+      bash "$MANIFEST_HELPER" --manifest "$STATE_DIR/manifest.json" >/dev/null 2>&1 || true
+    fi
+  fi
   # Inject project and stack summary from manifest.json into context
   MANIFEST_JSON=$(cat "$STATE_DIR/manifest.json" 2>/dev/null)
   if [ -n "$MANIFEST_JSON" ]; then
@@ -31,6 +62,8 @@ else
     STACK_ARCH=$(json_nested_field "$MANIFEST_JSON" "stack" "architecture")
     STACK_TEST=$(json_nested_field "$MANIFEST_JSON" "stack" "testFramework")
     STACK_CICD=$(json_nested_field "$MANIFEST_JSON" "stack" "cicd")
+    SECURITY_SESSION_SUMMARY_LEVEL=$(json_nested_field "$MANIFEST_JSON" "security" "sessionSummaryLevel")
+    [ -z "$SECURITY_SESSION_SUMMARY_LEVEL" ] && SECURITY_SESSION_SUMMARY_LEVEL="auto"
 
     MANIFEST_SUMMARY=""
     [ -n "$PROJ_NAME" ] && MANIFEST_SUMMARY="project: ${PROJ_NAME}"
@@ -150,6 +183,112 @@ if [ -f "$STATE_DIR/harness-log.jsonl" ]; then
   if [ "$LOG_LINES" -ge 100 ]; then
     CONTEXT_PARTS+=("[Harness] harness-log.jsonl has ${LOG_LINES} lines. Run gc skill to prune unused rules and old logs.")
   fi
+fi
+
+# Security: inject a prioritized, compact summary at SessionStart
+if command -v python3 >/dev/null 2>&1; then
+  SECURITY_SESSION_SUMMARY=$(python3 - "$STATE_DIR/security-baseline.json" "$STATE_DIR/security-log.jsonl" "$STATE_DIR/state/security-tool-recommendations.json" "$SECURITY_SESSION_SUMMARY_LEVEL" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+baseline_path = Path(sys.argv[1])
+log_path = Path(sys.argv[2])
+recommendation_path = Path(sys.argv[3])
+summary_level = (sys.argv[4] or "auto").strip().lower()
+
+score = None
+critical = high = medium = info = 0
+scan_date = "unknown"
+if baseline_path.exists():
+    try:
+        baseline = json.loads(baseline_path.read_text())
+        summary = baseline.get("summary", {})
+        score = baseline.get("score", 0)
+        critical = summary.get("critical", 0)
+        high = summary.get("high", 0)
+        medium = summary.get("medium", 0)
+        info = summary.get("info", 0)
+        scan_date = baseline.get("scan_date", "unknown")
+    except Exception:
+        pass
+
+blocked = 0
+warned = 0
+latest = None
+if log_path.exists():
+    import subprocess
+    try:
+        tail = subprocess.run(
+            ["tail", "-200", str(log_path)],
+            capture_output=True, text=True, timeout=5,
+        )
+        lines = tail.stdout.splitlines()
+    except Exception:
+        lines = []
+    for raw in lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            item = json.loads(raw)
+        except Exception:
+            continue
+        if item.get("type") != "security":
+            continue
+        action = item.get("action")
+        if action == "blocked":
+            blocked += 1
+        elif action == "warned":
+            warned += 1
+        detail = item.get("category") or "unknown"
+        source = item.get("file") or item.get("command") or item.get("rule_id") or "n/a"
+        latest = f"{detail} @ {source}"
+
+pending_preview = ""
+pending_count = 0
+if recommendation_path.exists():
+    try:
+        recommendation_data = json.loads(recommendation_path.read_text())
+        items = recommendation_data.get("recommendations", [])
+        names = [item.get("tool") or item.get("name") or "unknown" for item in items]
+        pending_count = len(names)
+        if names:
+            pending_preview = ", ".join(names[:2])
+            if len(names) > 2:
+                pending_preview = f"{pending_preview} +{len(names) - 2} more"
+    except Exception:
+        pass
+
+parts = []
+if score is not None:
+    parts.append(f"score={score}/100")
+    parts.append(f"C:{critical} H:{high} M:{medium} I:{info}")
+
+show_details = False
+if summary_level == "verbose":
+    show_details = True
+elif summary_level == "quiet":
+    show_details = False
+else:
+    show_details = bool(blocked or critical or high)
+
+if show_details:
+    if blocked or warned:
+        activity = f"activity b={blocked} w={warned}"
+        if latest:
+            activity = f"{activity} latest={latest}"
+        parts.append(activity)
+    if pending_preview:
+        parts.append(f"pending={pending_preview}")
+elif score is not None:
+    parts.append(f"last_scan={scan_date}")
+
+if parts:
+    print("[Security] " + " | ".join(parts) + ". Run /security status for details.")
+PY
+)
+  [ -n "$SECURITY_SESSION_SUMMARY" ] && CONTEXT_PARTS+=("$SECURITY_SESSION_SUMMARY")
 fi
 
 if [ -d "$STATE_DIR/state" ]; then
