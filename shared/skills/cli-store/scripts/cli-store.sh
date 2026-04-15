@@ -14,6 +14,8 @@ STATE_DIR="${CLI_STORE_STATE_DIR:-$(ensure_state_dir)}"
 MANIFEST_PATH="$STATE_DIR/manifest.json"
 STATE_SUBDIR="$STATE_DIR/state"
 COVERED_MCP_PATH="$STATE_SUBDIR/cli-covered-mcps.json"
+RECOMMENDATION_PATH="$STATE_SUBDIR/cli-store-recommendations.json"
+PROJECT_ROOT_OVERRIDE="${CLI_STORE_PROJECT_ROOT:-}"
 
 mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
 
@@ -94,15 +96,75 @@ tool_forced_install_command() {
 }
 
 query_catalog() {
-  local mode="$1" arg="$2"
-  python3 - "$CATALOG" "$mode" "$arg" <<'PY'
+  local mode="$1" arg="$2" project_root="$3"
+  python3 - "$CATALOG" "$mode" "$arg" "$project_root" <<'PY'
 import json, sys
 from pathlib import Path
-from datetime import datetime, UTC
 
 catalog = json.loads(Path(sys.argv[1]).read_text())
 mode = sys.argv[2]
 arg = sys.argv[3].strip().lower()
+project_root_arg = sys.argv[4].strip()
+
+SERVICE_PATTERNS = {
+    "supabase": ["@supabase/supabase-js", "supabase"],
+    "neon": ["@neondatabase/", "neon"],
+    "stripe": ["stripe"],
+    "cloudflare": ["@cloudflare/", "wrangler"],
+    "sentry": ["@sentry/", "sentry-sdk"],
+    "github": ["github", "@octokit/"],
+    "postgres": ["pg", "postgres"],
+    "sqlite": ["sqlite", "better-sqlite3"],
+    "mongodb": ["mongodb", "mongoose"],
+    "docker": ["docker"],
+    "terraform": [".tf"],
+}
+
+def detect_project_root(manifest_path):
+    if project_root_arg:
+        return Path(project_root_arg)
+    if manifest_path.exists():
+        try:
+            manifest = json.loads(manifest_path.read_text())
+        except Exception:
+            manifest = {}
+        for key in ("projectPath", "path"):
+            value = manifest.get(key)
+            if isinstance(value, str) and value:
+                return Path(value)
+    return manifest_path.parent if manifest_path.parent.exists() else None
+
+def scan_services(project_root):
+    if project_root is None or not project_root.exists():
+        return []
+    candidate_files = [
+        project_root / "package.json",
+        project_root / "requirements.txt",
+        project_root / "pyproject.toml",
+        project_root / "Cargo.toml",
+        project_root / "go.mod",
+        project_root / "Package.swift",
+        project_root / "Dockerfile",
+        project_root / "wrangler.toml",
+    ]
+    haystacks = []
+    for path in candidate_files:
+        if path.is_file():
+            try:
+                haystacks.append(path.read_text(encoding="utf-8", errors="ignore").lower())
+            except Exception:
+                pass
+    try:
+        if any(project_root.rglob("*.tf")):
+            haystacks.append(".tf")
+    except Exception:
+        pass
+
+    matches = []
+    for service, patterns in SERVICE_PATTERNS.items():
+        if any(pattern.lower() in hay for hay in haystacks for pattern in patterns):
+            matches.append(service)
+    return matches
 
 def all_entries():
     items = []
@@ -137,6 +199,11 @@ if mode == "auto":
     seen = set()
     for key in languages + frameworks:
         for entry in catalog.get("stacks", {}).get(key, []):
+            if entry["id"] not in seen:
+                seen.add(entry["id"])
+                matched.append(entry)
+    for key in scan_services(detect_project_root(manifest_path)):
+        for entry in catalog.get("services", {}).get(key, []):
             if entry["id"] not in seen:
                 seen.add(entry["id"])
                 matched.append(entry)
@@ -244,6 +311,39 @@ covered_path.write_text(json.dumps(covered, indent=2, ensure_ascii=False) + "\n"
 PY
 }
 
+overwrite_covered_mcp_state() {
+  local covered_ids_json="$1"
+  python3 - "$COVERED_MCP_PATH" "$covered_ids_json" <<'PY'
+import json, sys
+from datetime import datetime, UTC
+from pathlib import Path
+
+path = Path(sys.argv[1])
+covered_ids = sorted(set(json.loads(sys.argv[2])))
+payload = {
+    "coveredMcpIds": covered_ids,
+    "generatedAt": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+}
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+PY
+}
+
+write_auto_recommendations() {
+  local payload_json="$1"
+  python3 - "$RECOMMENDATION_PATH" "$payload_json" <<'PY'
+import json, sys
+from datetime import datetime, UTC
+from pathlib import Path
+
+path = Path(sys.argv[1])
+payload = json.loads(sys.argv[2])
+payload["generatedAt"] = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+path.parent.mkdir(parents=True, exist_ok=True)
+path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+PY
+}
+
 print_match_list() {
   local matches_json="$1"
   python3 - "$matches_json" <<'PY'
@@ -261,7 +361,7 @@ PY
 run_query_mode() {
   local manager matches_json count
   manager=$(detect_package_manager)
-  matches_json=$(query_catalog query "$QUERY")
+  matches_json=$(query_catalog query "$QUERY" "$PROJECT_ROOT_OVERRIDE")
   count=$(python3 - "$matches_json" <<'PY'
 import json, sys
 print(len(json.loads(sys.argv[1])))
@@ -365,20 +465,117 @@ run_auto_mode() {
   local manifest matches_json
   manifest="$MANIFEST_PATH"
   if [ ! -f "$manifest" ]; then
-    echo "[CLI Store] manifest.json not found. Run setup first."
+    echo "[CLI Store] manifest.json not found. Run setup in plan mode first."
     exit 0
   fi
-  matches_json=$(query_catalog auto "$manifest")
-  python3 - "$matches_json" <<'PY'
+  matches_json=$(query_catalog auto "$manifest" "$PROJECT_ROOT_OVERRIDE")
+  local count manager
+  count=$(python3 - "$matches_json" <<'PY'
 import json, sys
-items = json.loads(sys.argv[1])
-if not items:
-    print("[CLI Store] No automatic CLI recommendations.")
-    raise SystemExit(0)
-print("[CLI Store] Automatic CLI recommendations:")
-for item in items:
-    print(f"  - {item['id']} — {item.get('description','')}")
+print(len(json.loads(sys.argv[1])))
 PY
+)
+  if [ "$count" -eq 0 ]; then
+    python3 - "$COVERED_MCP_PATH" <<'PY'
+import json, sys
+from datetime import datetime, UTC
+from pathlib import Path
+
+path = Path(sys.argv[1])
+path.parent.mkdir(parents=True, exist_ok=True)
+payload = {
+    "coveredMcpIds": [],
+    "generatedAt": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+}
+path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+print("[CLI Store] No automatic CLI recommendations.")
+PY
+    exit 0
+  fi
+
+  manager=$(detect_package_manager)
+  local ready_lines="" install_lines="" ready_ids_json="[]"
+  local recommendations_json='{"ready":[],"installable":[]}'
+  while IFS= read -r entry_json; do
+    [ -z "$entry_json" ] && continue
+    local tool_id tool_name description check_cmd status install_cmd line
+    tool_id=$(python3 - "$entry_json" <<'PY'
+import json, sys
+print(json.loads(sys.argv[1])["id"])
+PY
+)
+    tool_name=$(python3 - "$entry_json" <<'PY'
+import json, sys
+print(json.loads(sys.argv[1])["name"])
+PY
+)
+    description=$(python3 - "$entry_json" <<'PY'
+import json, sys
+print(json.loads(sys.argv[1]).get("description", ""))
+PY
+)
+    check_cmd=$(python3 - "$entry_json" <<'PY'
+import json, sys
+print(json.loads(sys.argv[1])["checkCmd"])
+PY
+)
+    status=$(get_tool_status "$tool_id" "$check_cmd")
+    install_cmd=$(pick_install_command "$manager" "$entry_json")
+    if [ "$status" = "ready" ]; then
+      update_manifest_and_state "$entry_json" "ready"
+      ready_ids_json=$(python3 - "$ready_ids_json" "$entry_json" <<'PY'
+import json, sys
+ready_ids = json.loads(sys.argv[1])
+entry = json.loads(sys.argv[2])
+mcp_id = entry.get("mcpEquivalent")
+if mcp_id and mcp_id not in ready_ids:
+    ready_ids.append(mcp_id)
+print(json.dumps(ready_ids, separators=(",", ":")))
+PY
+)
+      recommendations_json=$(python3 - "$recommendations_json" "$entry_json" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+entry = json.loads(sys.argv[2])
+payload["ready"].append(entry)
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)
+      line="  ✓ $tool_id ($tool_name) — $description"
+      ready_lines="${ready_lines}${line}\n"
+    else
+      line="  - $tool_id ($tool_name) — $description"
+      if [ -n "$install_cmd" ]; then
+        line="${line}\n    Install: $install_cmd"
+      fi
+      install_lines="${install_lines}${line}\n"
+      recommendations_json=$(python3 - "$recommendations_json" "$entry_json" <<'PY'
+import json, sys
+payload = json.loads(sys.argv[1])
+entry = json.loads(sys.argv[2])
+payload["installable"].append(entry)
+print(json.dumps(payload, separators=(",", ":")))
+PY
+)
+    fi
+  done < <(python3 - "$matches_json" <<'PY'
+import json, sys
+for item in json.loads(sys.argv[1]):
+    print(json.dumps(item, separators=(",", ":")))
+PY
+)
+
+  echo "[CLI Store] Automatic CLI recommendations:"
+  if [ -n "$ready_lines" ]; then
+    echo "Ready (will skip equivalent MCP servers):"
+    printf "%b" "$ready_lines"
+  fi
+  if [ -n "$install_lines" ]; then
+    echo "Recommended to install:"
+    printf "%b" "$install_lines"
+  fi
+  overwrite_covered_mcp_state "$ready_ids_json"
+  write_auto_recommendations "$recommendations_json"
 }
 
 case "$MODE" in
