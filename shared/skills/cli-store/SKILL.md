@@ -56,6 +56,15 @@ Each catalog entry contains:
 - `installCmd`: Platform-specific install commands. Detect the user's platform and pick the appropriate one.
 - `mcpEquivalent`: The MCP server ID from `mcp-store/catalog.json` that this CLI replaces. When non-null, the mcp-store should skip recommending that MCP server.
 
+## Execution
+
+Run the bundled script below via Bash:
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" "$@"
+```
+
 ## Usage Modes
 
 ### Mode 1: Auto Recommend (`--auto`)

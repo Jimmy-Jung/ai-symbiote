@@ -1,6 +1,6 @@
 {
   "_note": "CLI tools that can replace or complement MCP servers. When a CLI is installed and authenticated, it is preferred over the equivalent MCP server.",
-  "_updated": "2026-04-12",
+  "_updated": "2026-04-14",
   "stacks": {
     "nextjs": [
       { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh", "npm": "npm install -g @github/cli" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
@@ -93,6 +93,10 @@
       { "id": "wrangler", "name": "Wrangler CLI", "cmd": "wrangler", "checkCmd": "wrangler --version", "installCmd": { "npm": "npm install -g wrangler" }, "mcpEquivalent": "cloudflare", "category": "cloud", "description": "Workers, Pages, KV, D1, R2 management" },
       { "id": "gcloud", "name": "Google Cloud CLI", "cmd": "gcloud", "checkCmd": "gcloud --version", "installCmd": { "brew": "brew install google-cloud-sdk" }, "mcpEquivalent": null, "category": "cloud", "description": "All GCP services via command line" },
       { "id": "az", "name": "Azure CLI", "cmd": "az", "checkCmd": "az --version", "installCmd": { "brew": "brew install azure-cli" }, "mcpEquivalent": null, "category": "cloud", "description": "All Azure services via command line" }
+    ],
+    "security": [
+      { "id": "gitleaks", "name": "Gitleaks", "cmd": "gitleaks", "checkCmd": "gitleaks version", "installCmd": { "brew": "brew install gitleaks" }, "mcpEquivalent": null, "category": "security", "description": "Entropy-based secret scanning for repositories and local files" },
+      { "id": "semgrep", "name": "Semgrep CLI", "cmd": "semgrep", "checkCmd": "semgrep --version", "installCmd": { "brew": "brew install semgrep", "pip": "python3 -m pip install semgrep" }, "mcpEquivalent": "semgrep", "category": "security", "description": "Static analysis for secure code, rules, and policy enforcement" }
     ]
   }
 }
