@@ -195,4 +195,4 @@ Messenger bridge is supported identically in team-based execution:
 5. Handle simple tasks directly without team composition
 6. Sub-agent results are delivered via the filesystem
 7. Always reference roles/team-templates when composing teams
-8. `agentPlatforms` in manifest.json must always remain `["claude", "codex"]` (do not overwrite with a single platform)
+8. `agentPlatforms` in manifest.json must always remain `["claude", "codex", "cursor"]` (do not overwrite with a single platform)

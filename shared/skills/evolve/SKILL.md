@@ -26,7 +26,7 @@ Read the current manifest.json to establish the existing state as a baseline.
 Baseline items:
 - project.languages
 - project.platforms (project target platforms: iOS, web, etc.)
-- agentPlatforms (always keep ["claude", "codex"], not a change target)
+- agentPlatforms (always keep ["claude", "codex", "cursor"], not a change target)
 - stack.packageManager
 - stack.buildTool
 - stack.frameworks

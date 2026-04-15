@@ -317,7 +317,7 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
   "created": "ISO8601",
   "lastEvolved": "ISO8601",
   "path": "/absolute/path/to/project",
-  "agentPlatforms": ["claude", "codex"],
+  "agentPlatforms": ["claude", "codex", "cursor"],
   "defaults": {
     "completionLevel": 2,
     "maxRalphIterations": 10,
@@ -373,10 +373,10 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
 `path` is the project's absolute path and is used for slug collision detection. It must be included.
 
 **agentPlatforms rules:**
-- ai-symbiote is a multi-platform plugin that uses Claude and Codex **simultaneously**.
-- Do not record only a single platform (`"claude"` or `"codex"`).
+- ai-symbiote is a multi-platform plugin that uses Claude, Codex, and Cursor together.
+- Do not record only a single platform (`"claude"`, `"codex"`, or `"cursor"`).
 - If `agentPlatforms` already exists in the manifest, merge rather than overwrite.
-- Always maintain `["claude", "codex"]` regardless of which platform the current session is running on.
+- Always maintain `["claude", "codex", "cursor"]` regardless of which platform the current session is running on.
 
 ### Step 6: Generate context.md
 
