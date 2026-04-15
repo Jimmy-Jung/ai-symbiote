@@ -65,7 +65,7 @@ result = deep_merge(base, patch)
 existing_platforms = base.get("agentPlatforms")
 incoming_platforms = result.get("agentPlatforms")
 platforms = []
-for source in (existing_platforms, incoming_platforms, ["claude", "codex"]):
+for source in (existing_platforms, incoming_platforms, ["claude", "codex", "cursor"]):
     if not isinstance(source, list):
         continue
     for platform in source:

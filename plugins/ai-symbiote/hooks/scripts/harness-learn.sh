@@ -136,7 +136,7 @@ case "$FILE_PATH" in
             printf '\n[Harness #%d] %s (auto-generated %s)\n' "$NEXT_ID" "$RULE_CAND" "$TODAY" >> "$RULES_FILE" 2>/dev/null
             printf '{"v":2,"ts":"%s","type":"rule_created","rule_id":%d,"description":"%s"}\n' \
               "$NOW" "$NEXT_ID" "$ESC_REASONS" >> "$HARNESS_LOG" 2>/dev/null
-            printf '{"continue":true,"systemMessage":"[Harness] Repeated auto failure in %s — auto-added Harness #%d rule."}\n' "$ESC_TASK" "$NEXT_ID"
+            emit_hook_notice "[Harness] Repeated auto failure in ${LOOP_TASK} - auto-added Harness #${NEXT_ID} rule."
             exit 0
           fi
         fi
@@ -263,7 +263,7 @@ if [ -n "$FAILURE_DETECTED" ]; then
 
         if [ "$LINE_COUNT" -ge 300 ]; then
           # Context too large — recommend gc instead
-          printf '{"continue":true,"systemMessage":"[Harness] harness-rules.md reached %d lines (limit 300). Run gc skill to prune unused rules."}\n' "$LINE_COUNT"
+          emit_hook_notice "[Harness] harness-rules.md reached ${LINE_COUNT} lines (limit 300). Run gc skill to prune unused rules."
           exit 0
         fi
 
@@ -290,7 +290,7 @@ if [ -n "$FAILURE_DETECTED" ]; then
             "$NOW" "$NEXT_ID" "$ESC_DESC" >> "$HARNESS_LOG" 2>/dev/null
         fi
 
-        printf '{"continue":true,"systemMessage":"[Harness] Repeated mistake detected: %s — auto-added Harness #%d rule to harness-rules.md."}\n' "$ESC_DESC" "$NEXT_ID"
+        emit_hook_notice "[Harness] Repeated mistake detected: ${DESCRIPTION} - auto-added Harness #${NEXT_ID} rule to harness-rules.md."
         exit 0
       fi
     fi

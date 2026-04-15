@@ -59,7 +59,7 @@ case "$COMMAND" in
       printf '{"v":2,"ts":"%s","error_type":"guard_warned","command":"%s","workaround":"git clean -fdn (dry-run first)","session_pid":"%s"}\n' \
         "$NOW" "$ESC_CMD" "$PPID" >> "$STATE_DIR/harness-log.jsonl" 2>/dev/null
     fi
-    printf '{"continue":true,"systemMessage":"[Guard] Warning: git clean -fd permanently deletes untracked files. Consider git clean -fdn (dry-run) first."}\n'
+    emit_hook_notice "[Guard] Warning: git clean -fd permanently deletes untracked files. Consider git clean -fdn (dry-run) first."
     exit 0
     ;;
   *"git rebase -i"*|*"git rebase --interactive"*)
@@ -270,13 +270,13 @@ if [ -z "$BLOCKED" ] && [ "${SEC_WARN:-}" = "yes" ]; then
     WARN_MSG="Environment dump may contain secrets. Delete the file after debugging."
   fi
   if [ -n "$WARN_MSG" ]; then
-    ESCAPED_WARN=$(json_escape "$WARN_MSG")
-    printf '{"continue":true,"systemMessage":"[Guard] Warning: %s"}\n' "$ESCAPED_WARN"
+    emit_hook_notice "[Guard] Warning: ${WARN_MSG}"
     # Record warning event
     STATE_DIR=$(get_state_dir)
     if [ -d "$STATE_DIR" ]; then
       NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
       ESC_CMD=$(json_escape "$COMMAND")
+      ESCAPED_WARN=$(json_escape "$WARN_MSG")
       printf '{"v":2,"ts":"%s","error_type":"guard_warned","command":"%s","warning":"%s","session_pid":"%s"}\n' \
         "$NOW" "$ESC_CMD" "$ESCAPED_WARN" "$PPID" >> "$STATE_DIR/harness-log.jsonl" 2>/dev/null
     fi
@@ -302,8 +302,7 @@ if [ -n "$BLOCKED" ]; then
       MSG="Blocked: ${BLOCKED}"
     fi
   fi
-  ESCAPED=$(json_escape "$MSG")
-  printf '{"continue":false,"permissionDecision":"deny","systemMessage":"[Guard] %s"}\n' "$ESCAPED"
+  emit_hook_block "[Guard] ${MSG}"
 
   # Record blocked event
   STATE_DIR=$(get_state_dir)

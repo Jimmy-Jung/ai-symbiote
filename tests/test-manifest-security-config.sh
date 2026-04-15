@@ -50,6 +50,7 @@ echo ""
 
 bash "$SETUP_HELPER" --manifest "$MANIFEST_PATH" >/dev/null
 assert_file_contains "setup helper adds codex platform" "\"codex\"" "$MANIFEST_PATH"
+assert_file_contains "setup helper adds cursor platform" "\"cursor\"" "$MANIFEST_PATH"
 assert_file_contains "setup helper adds security block" "\"security\"" "$MANIFEST_PATH"
 assert_file_contains "setup helper sets sessionSummaryLevel auto" "\"sessionSummaryLevel\": \"auto\"" "$MANIFEST_PATH"
 
@@ -65,6 +66,7 @@ assert_file_contains "evolve helper merges new stack fields" "\"frameworks\": ["
 assert_file_contains "evolve helper preserves security sessionSummaryLevel" "\"sessionSummaryLevel\": \"auto\"" "$MANIFEST_PATH"
 assert_file_contains "evolve helper preserves both agent platforms" "\"claude\"" "$MANIFEST_PATH"
 assert_file_contains "evolve helper preserves both agent platforms codex" "\"codex\"" "$MANIFEST_PATH"
+assert_file_contains "evolve helper preserves cursor platform" "\"cursor\"" "$MANIFEST_PATH"
 
 cat > "$PATCH_PATH" <<'EOF'
 {

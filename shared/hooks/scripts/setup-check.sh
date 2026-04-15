@@ -40,6 +40,7 @@ needs_defaults = (
     not isinstance(agent_platforms, list)
     or "claude" not in agent_platforms
     or "codex" not in agent_platforms
+    or "cursor" not in agent_platforms
     or not isinstance(security, dict)
     or not security.get("sessionSummaryLevel")
 )
@@ -445,10 +446,9 @@ if [ ${#CONTEXT_PARTS[@]} -gt 0 ]; then
       JOINED="$part"
     fi
   done
-  ESCAPED=$(json_escape "$JOINED")
-  printf '{"continue":true,"systemMessage":"%s"}\n' "$ESCAPED"
+  emit_hook_context "$JOINED"
 else
-  printf '{"continue":true}\n'
+  emit_hook_continue
 fi
 
 exit 0

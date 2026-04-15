@@ -275,7 +275,7 @@ if [ -f "$HARNESS_LOG" ] && [ -f "$RULES_FILE" ]; then
 
     LINE_COUNT=$(wc -l < "$RULES_FILE" | tr -d ' ')
     if [ "$LINE_COUNT" -ge 300 ]; then
-      printf '{"continue":true,"systemMessage":"[Harness] harness-rules.md reached %d lines. Run gc skill to prune."}\n' "$LINE_COUNT"
+      emit_hook_notice "[Harness] harness-rules.md reached ${LINE_COUNT} lines. Run gc skill to prune."
       exit 0
     fi
 
@@ -287,8 +287,7 @@ if [ -f "$HARNESS_LOG" ] && [ -f "$RULES_FILE" ]; then
     printf '{"v":2,"ts":"%s","type":"rule_created","rule_id":%d,"description":"%s","source":"build_watcher"}\n' \
       "$NOW" "$NEXT_ID" "$ESC_DESC" >> "$HARNESS_LOG" 2>/dev/null
 
-    printf '{"continue":true,"systemMessage":"[Harness] Repeated %s in %s — auto-added Harness #%d rule."}\n' \
-      "$ERROR_CATEGORY" "${BASENAME:-$BUILD_TYPE}" "$NEXT_ID"
+    emit_hook_notice "[Harness] Repeated ${ERROR_CATEGORY} in ${BASENAME:-$BUILD_TYPE} - auto-added Harness #${NEXT_ID} rule."
     exit 0
   fi
 fi

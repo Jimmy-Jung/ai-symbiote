@@ -162,8 +162,7 @@ if [ "$WARN_COUNT" -gt 0 ]; then
   fi
 
   MSG=$(printf '%b' "$WARNINGS" | tr '\n' ' ' | sed 's/  */ /g; s/ $//')
-  ESCAPED_MSG=$(json_escape "$MSG")
-  printf '{"continue":true,"systemMessage":"[Security] %s"}\n' "$ESCAPED_MSG"
+  emit_hook_notice "[Security] ${MSG}"
   exit 0
 fi
 

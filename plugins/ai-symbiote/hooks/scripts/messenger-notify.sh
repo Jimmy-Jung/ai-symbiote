@@ -117,5 +117,5 @@ cat > "$NOTIFY_DIR/${TS}_${EVENT}.json" <<ENDJSON
 ENDJSON
 
 # Claude Code hook protocol: continue
-printf '{"continue":true}\n'
+emit_hook_continue
 exit 0

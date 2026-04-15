@@ -174,6 +174,51 @@ json_escape() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | tr '\n' ' '
 }
 
+hook_uses_cursor_protocol() {
+  [ -n "${CURSOR_PLUGIN_ROOT:-}" ]
+}
+
+emit_hook_continue() {
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":true,"permission":"allow"}\n'
+  else
+    printf '{"continue":true}\n'
+  fi
+}
+
+emit_hook_context() {
+  local message="$1"
+  local escaped
+  escaped=$(json_escape "$message")
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":true,"permission":"allow","agent_message":"%s","additional_context":"%s"}\n' "$escaped" "$escaped"
+  else
+    printf '{"continue":true,"systemMessage":"%s"}\n' "$escaped"
+  fi
+}
+
+emit_hook_notice() {
+  local message="$1"
+  local escaped
+  escaped=$(json_escape "$message")
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":true,"permission":"allow","user_message":"%s","agent_message":"%s","additional_context":"%s"}\n' "$escaped" "$escaped" "$escaped"
+  else
+    printf '{"continue":true,"systemMessage":"%s"}\n' "$escaped"
+  fi
+}
+
+emit_hook_block() {
+  local message="$1"
+  local escaped
+  escaped=$(json_escape "$message")
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":false,"permission":"deny","user_message":"%s","agent_message":"%s"}\n' "$escaped" "$escaped"
+  else
+    printf '{"continue":false,"permissionDecision":"deny","systemMessage":"%s"}\n' "$escaped"
+  fi
+}
+
 # ISO-8601 UTC cutoff timestamp helper for recent-event filtering.
 recent_cutoff_ts() {
   local days="${1:-7}"

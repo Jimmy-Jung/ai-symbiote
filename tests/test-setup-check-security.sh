@@ -98,7 +98,13 @@ assert_contains "keeps symbiote context injection" "[Symbiote Context] ## Projec
 assert_file_contains "setup-check self-heals agentPlatforms" "\"agentPlatforms\": [" "$STATE_DIR/manifest.json"
 assert_file_contains "setup-check adds claude platform" "\"claude\"" "$STATE_DIR/manifest.json"
 assert_file_contains "setup-check adds codex platform" "\"codex\"" "$STATE_DIR/manifest.json"
+assert_file_contains "setup-check adds cursor platform" "\"cursor\"" "$STATE_DIR/manifest.json"
 assert_file_contains "setup-check defaults security summary level" "\"sessionSummaryLevel\": \"auto\"" "$STATE_DIR/manifest.json"
+
+CURSOR_OUTPUT=$(HARNESS_TEST_STATE_DIR="$STATE_DIR" CURSOR_PLUGIN_ROOT="/tmp/cursor-plugin" bash "$SETUP_CHECK_SCRIPT")
+assert_contains "cursor setup-check returns permission allow" "\"permission\":\"allow\"" "$CURSOR_OUTPUT"
+assert_contains "cursor setup-check returns additional_context" "\"additional_context\":\"" "$CURSOR_OUTPUT"
+assert_contains "cursor setup-check returns agent_message" "\"agent_message\":\"" "$CURSOR_OUTPUT"
 
 cat > "$STATE_DIR/security-baseline.json" <<'EOF'
 {

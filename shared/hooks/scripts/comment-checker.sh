@@ -33,8 +33,7 @@ P3=$(grep -cE '^\s*(//|#)\s*(TODO|FIXME|HACK|XXX)\s*$' "$FILE_PATH" 2>/dev/null)
 COMMENT_COUNT=$((P1 + P2 + P3))
 
 if [ "$COMMENT_COUNT" -gt 3 ]; then
-  ESCAPED_PATH=$(json_escape "$FILE_PATH")
-  printf '{"continue":true,"systemMessage":"[Comment Checker] %d suspicious comments in %s: trivial(%d), commented-out code(%d), empty TODO(%d)."}\n' "$COMMENT_COUNT" "$ESCAPED_PATH" "$P1" "$P2" "$P3"
+  emit_hook_notice "[Comment Checker] ${COMMENT_COUNT} suspicious comments in ${FILE_PATH}: trivial(${P1}), commented-out code(${P2}), empty TODO(${P3})."
 fi
 
 exit 0

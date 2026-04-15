@@ -42,7 +42,7 @@ data = json.loads(manifest_path.read_text())
 agent_platforms = data.get("agentPlatforms")
 if not isinstance(agent_platforms, list):
     agent_platforms = []
-for platform in ("claude", "codex"):
+for platform in ("claude", "codex", "cursor"):
     if platform not in agent_platforms:
         agent_platforms.append(platform)
 data["agentPlatforms"] = agent_platforms
