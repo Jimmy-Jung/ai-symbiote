@@ -19,7 +19,7 @@ SECURITY_SESSION_SUMMARY_LEVEL="auto"
 MANIFEST_HELPER="$SCRIPT_DIR/../../skills/setup/scripts/manifest-defaults.sh"
 
 if [ ! -f "$STATE_DIR/manifest.json" ]; then
-  CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup to initialize the project.")
+  CONTEXT_PARTS+=("[Symbiote] manifest.json not found. Run setup in plan mode first to initialize the project. Use shared/skills/setup/scripts/begin-setup.sh for the entrypoint; without --approve it prints the Setup Plan via render-setup-plan.sh and setup-plan.md before any execution.")
 else
   if [ -f "$MANIFEST_HELPER" ] && command -v python3 >/dev/null 2>&1; then
     NEEDS_MANIFEST_DEFAULTS=$(python3 - "$STATE_DIR/manifest.json" <<'PY'

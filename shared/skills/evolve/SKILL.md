@@ -14,7 +14,7 @@ If setup is a one-time initial snapshot, evolve is periodic synchronization.
 ## Entry Condition
 
 `~/ai-symbiote/{slug}/manifest.json` must exist.
-If it does not exist: guide with "Please initialize the project with the setup workflow first."
+If it does not exist: guide with "Please run setup in plan mode first to initialize the project."
 
 ## Workflow
 

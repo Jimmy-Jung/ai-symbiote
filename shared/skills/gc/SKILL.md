@@ -15,7 +15,7 @@ Over time, obsolete rules accumulate. gc periodically cleans them up.
 ## Entry Conditions
 
 `~/ai-symbiote/{slug}/harness-rules.md` must exist.
-If not found: display "harness-rules.md not found. Please initialize the project with the setup workflow."
+If not found: display "harness-rules.md not found. Please run setup in plan mode first to initialize the project."
 
 ## Workflow
 

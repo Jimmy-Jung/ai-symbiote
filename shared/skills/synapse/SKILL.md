@@ -14,7 +14,7 @@ It analyzes tasks, assembles teams, dispatches sub-agents, and synthesizes resul
 Checks project state at session start.
 State directory: `~/ai-symbiote/{project-slug}/`
 
-- If manifest.json is missing, guide to setup workflow
+- If manifest.json is missing, guide to setup workflow (plan-first)
 - If manifest.json exists, read `~/ai-symbiote/{slug}/context.md` to load project context
 - If a task-folder with `active: true` exists in `~/ai-symbiote/{slug}/state/*/ralph-state.md`, determine whether to resume
 
@@ -35,13 +35,42 @@ Dynamically loaded from `~/ai-symbiote/{slug}/context.md`:
 | Pattern | Action |
 |---------|--------|
 | "skill recommend", "skill install", "skill store" | Run skill-store skill |
+| "cli recommend", "cli install", "cli store" | Run cli-store skill |
 | "mcp recommend", "mcp install", "mcp store" | Run mcp-store skill |
+| "setup", "initialize project", "bootstrap project", "프로젝트 설정", "초기 설정" | Run setup skill in plan mode |
 | "messenger", "notification setup" | Run messenger skill |
 | "security scan", "security audit", "security status", "보안 점검", "보안 상태" | Run security skill |
 | "project update", "sync state", "stack change", "evolve" | Run evolve skill |
 | "requirements", "PRD", "feature planning" | Run PRD workflow |
 | "cancel", "abort" | Abort current loop |
 | "help", "usage" | Show available skills/commands |
+
+### Setup First Response Contract
+
+When the request is routed to `setup`, the first response must be a **Setup Plan** summary, not execution.
+Use [setup-plan.md](shared/skills/setup/templates/setup-plan.md) as the source-of-truth template, and fill it via [render-setup-plan.sh](shared/skills/setup/scripts/render-setup-plan.sh).
+The concrete entrypoint is [begin-setup.sh](shared/skills/setup/scripts/begin-setup.sh): without `--approve` it only prints the plan.
+
+Required shape:
+
+```text
+[Setup Plan]
+1. Prepare state/config directories
+2. Check optional platform integrations
+3. Detect project stack
+4. Recommend/apply skills, CLI tools, and MCP servers
+5. Generate or normalize manifest/context defaults
+
+Optional items needing approval:
+- ...
+
+Reply with approval before execution.
+```
+
+Rules:
+- Do not start with Bash commands in the first response.
+- Do not create files or install tools before the user approves.
+- If setup was triggered because `manifest.json` or `context.md` is missing, explicitly say that setup will begin in plan mode first.
 
 ### Intent-Based Team Selection
 
@@ -369,7 +398,7 @@ Messenger bridge is supported identically in team-based execution:
 
 1. Maintain the order: situation assessment -> team composition -> dispatch -> result report
 2. Load project-specific context if context.md exists
-3. Guide to setup workflow if context.md is missing
+3. Guide to setup workflow in plan mode if context.md is missing
 4. Always converse in Korean
 5. Handle simple tasks directly without team composition
 6. Sub-agent results are delivered via the filesystem

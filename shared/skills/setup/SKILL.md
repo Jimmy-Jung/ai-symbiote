@@ -4,11 +4,25 @@ description: Project bootstrap. Analyzes the codebase to detect the project stac
 argument-hint:
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Agent]
+default-mode: plan
 ---
 
 # Setup Skill
 
 Analyzes the project and prepares the shared state directory under `~/ai-symbiote/{slug}/`.
+
+## Default Execution Mode
+
+`setup` always starts in **plan mode** by default.
+
+Before any file creation, installation, or shell execution:
+
+1. Inspect the repository and current state
+2. Present the setup plan/checklist to the user
+3. Clarify optional choices that affect installation or configuration
+4. Only execute the setup steps after the user confirms to proceed
+
+Do not start with immediate Bash execution unless the user has already approved execution in the current turn.
 
 ## State Directory
 
@@ -54,6 +68,33 @@ Subsequent steps branch based on platform-specific commands.
 
 ## Workflow
 
+**Plan-first rule:** treat the steps below as an execution checklist, not an immediate script.
+When `setup` is invoked, summarize the relevant steps first, ask for confirmation on optional installs/config changes, then execute in order.
+
+### Standard Plan Output
+
+At the start of `setup`, use [setup-plan.md](shared/skills/setup/templates/setup-plan.md) as the source-of-truth template before executing.
+Render it with [render-setup-plan.sh](shared/skills/setup/scripts/render-setup-plan.sh) so the placeholders are filled from the current project state.
+Use [begin-setup.sh](shared/skills/setup/scripts/begin-setup.sh) as the actual entrypoint: default output is plan-only, and `--approve` starts execution.
+
+Base shape:
+
+```text
+[Setup Plan]
+1. Prepare state/config directories
+2. Check optional platform integrations
+3. Detect project stack
+4. Recommend/apply skills, CLI tools, and MCP servers
+5. Generate or normalize manifest/context defaults
+
+Optional items needing approval:
+- ralph plugin install
+- codex plugin install or integration check
+- guided store selections (skill / cli / mcp)
+
+Reply with approval before execution.
+```
+
 ### Step 0: Environment Preparation
 
 - Generate slug and create state directories:
@@ -69,11 +110,11 @@ Subsequent steps branch based on platform-specific commands.
 
 ### Step 0.1: Create Platform-Specific Project Config Directories and Register in `.gitignore`
 
-**Warning: Required step -- must be executed.**
+**Warning: Required step after approval.**
 Without this directory, hooks cannot inject project context and plugin skills will not be utilized.
 Since ai-symbiote is multi-platform, **both** directories are created regardless of the current execution platform.
 
-#### Execution (Run the script below using the Bash tool)
+#### Execution (run this Bash block only after the user approves the setup plan)
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -143,11 +184,11 @@ add_to_gitignore '.codex/'
 echo "[Step 0.1] Complete"
 ```
 
-**Execute this entire script as a single Bash tool call.** This is not illustrative code.
+**After approval, execute this entire script as a single Bash tool call.** This is not illustrative code.
 
 ### Step 0.5: Integration Plugin Installation -- snarktank/ralph
 
-Check if the snarktank/ralph plugin is installed, and auto-install if missing.
+Check if the snarktank/ralph plugin is installed, and propose installation if missing.
 
 #### Claude Environment
 
@@ -156,7 +197,7 @@ Check if the snarktank/ralph plugin is installed, and auto-install if missing.
    claude plugin list 2>/dev/null | grep -q "ralph" && echo "installed" || echo "not-installed"
    ```
 
-2. Install from marketplace if missing:
+2. If missing and the user approved optional installs, install from marketplace:
    ```bash
    claude plugin marketplace add snarktank/ralph 2>/dev/null
    claude plugin install ralph-skills@ralph-marketplace
@@ -169,7 +210,7 @@ Check if the snarktank/ralph plugin is installed, and auto-install if missing.
    [ -d "$HOME/plugins/ralph-skills" ] && echo "installed" || echo "not-installed"
    ```
 
-2. Clone and register locally if missing:
+2. If missing and the user approved optional installs, clone and register locally:
    ```bash
    git clone https://github.com/snarktank/ralph.git "$HOME/plugins/ralph-skills" 2>/dev/null
    ```
@@ -179,7 +220,7 @@ Check if the snarktank/ralph plugin is installed, and auto-install if missing.
 #### Common -- Failure Message
 
 ```
-snarktank/ralph auto-installation failed.
+snarktank/ralph installation failed.
 To install manually:
   [Claude] claude plugin marketplace add snarktank/ralph && claude plugin install ralph-skills@ralph-marketplace
   [Codex]  git clone https://github.com/snarktank/ralph.git ~/plugins/ralph-skills
@@ -207,7 +248,7 @@ Codex is an optional enhancement, so setup continues even if not installed.
    codex --version 2>/dev/null && echo "cli-ready" || echo "cli-not-ready"
    ```
 
-3. If not installed, prompt user for choice:
+3. If not installed, include this choice in the plan confirmation step:
    ```
    [Optional] Would you like to install the Codex plugin?
    Codex (GPT-5.4) can be used as a sub-agent for second opinions, adversarial reviews, and root cause analysis.
@@ -281,7 +322,7 @@ Runs CLI Store's `--auto` mode.
 2. Match against `stacks` and `services` in `skills/cli-store/catalog.json`
 3. Run `checkCmd` for each matched CLI to detect install/auth status
 4. Display CLI list grouped by status (Ready / Installable / Needs auth)
-5. Install selected CLIs via platform package manager (brew/apt/npm/pip)
+5. After user approval, install selected CLIs via platform package manager (brew/apt/npm/pip)
 6. Record in manifest.json `cliTools` section
 7. Export CLI-covered MCP IDs to `~/ai-symbiote/{slug}/state/cli-covered-mcps.json`
 
@@ -297,8 +338,40 @@ Runs MCP Store's `--auto` mode.
 4. Remove entries whose `id` is in the CLI-covered list
 5. Check already installed MCPs via `claude mcp list`
 6. Display recommended MCPs with required environment variables (only those NOT covered by CLIs)
-7. Install selected MCPs via `claude mcp add -s local`
+7. After user approval, apply selected MCP configuration
 8. Record in manifest.json `mcpServers` section
+
+#### Execution (run this Bash block only after the user approves the setup plan)
+
+```bash
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+STATE_DIR=~/ai-symbiote/{slug}
+
+bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
+  --state-dir "$STATE_DIR" \
+  --project-root "$PROJECT_ROOT" \
+  --mode guided
+```
+
+**After approval, execute this script as a single Bash tool call.** This is the concrete Step 2-4 runner.
+If `manifest.json` does not exist yet, the runner creates a minimal bootstrap manifest first and continues.
+
+#### Runner Modes
+
+- `--mode guided` (default): recommendation files를 만든 뒤 사용자 선택을 받습니다.
+- `--mode fast`: 질문 없이 recommendation/state만 기록합니다.
+- `--mode dry-run`: recommendation summary만 출력하고 적용하지 않습니다.
+
+#### Guided Setup Rules
+
+- 사용자가 직접 고를 수 있도록 **skill / cli / mcp**를 묶음 질문으로 나눕니다.
+- 선택지는 `all`, 번호 목록(`1,2`), `skip`, `later` 중 하나를 기본으로 사용합니다.
+- 비대화형 실행이라 질문을 받을 수 없으면 기본값은 `later`입니다.
+- 응답 결과는 `~/ai-symbiote/{slug}/state/setup-store-preferences.json`과 `manifest.json`의 `setupSelections`에 기록합니다.
+- 선택된 CLI는 즉시 설치를 시도합니다.
+- 선택된 skill은 `manifest.plugins`와 state에 즉시 반영합니다.
+- 선택된 MCP는 `manifest.mcpServers`와 state에 즉시 반영합니다.
 
 ### Step 5: Generate manifest.json
 
@@ -462,7 +535,7 @@ Output: `[Setup] Loaded {N} harness seed rules for {stack} stack.`
 
 ### Step 8: Generate Project CLAUDE.md
 
-**Warning: Required step -- must be executed.**
+**Warning: Required step after approval.**
 Without `CLAUDE.md` at the project root, Claude Code cannot recognize the project context and ai-symbiote skills.
 
 #### Condition

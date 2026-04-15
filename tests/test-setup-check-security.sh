@@ -179,6 +179,11 @@ else
   printf "${GREEN}  PASS${NC} quiet summary hides activity details\n"
 fi
 
+rm -f "$STATE_DIR/manifest.json"
+NO_MANIFEST_OUTPUT=$(HARNESS_TEST_STATE_DIR="$STATE_DIR" bash "$SETUP_CHECK_SCRIPT")
+assert_contains "missing manifest guides setup in plan mode" "[Symbiote] manifest.json not found. Run setup in plan mode first to initialize the project." "$NO_MANIFEST_OUTPUT"
+assert_contains "missing manifest points to setup entrypoint" "Use shared/skills/setup/scripts/begin-setup.sh for the entrypoint; without --approve it prints the Setup Plan via render-setup-plan.sh and setup-plan.md before any execution." "$NO_MANIFEST_OUTPUT"
+
 echo ""
 echo "=== Results ==="
 printf "Passed: %d / %d\n" "$PASSED" "$TOTAL"
