@@ -1,7 +1,7 @@
 #!/bin/bash
-# ai-symbiote PostToolUse hook: Track skill/command usage.
-# Monitors Read tool calls to detect skill/command file reads,
-# and Skill tool calls to directly capture skill invocations.
+# ai-symbiote usage tracker hook: Track skill/command usage.
+# Monitors Claude UserPromptSubmit command-message events, Read tool calls,
+# and Skill tool calls to capture skill invocations across platforms.
 #
 # Principle: Silence on success — never outputs to stdout (writes to files only).
 #
@@ -12,6 +12,66 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
 PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}}}"
+
+sanitize_name() {
+  printf '%s' "$1" | tr -cd 'a-zA-Z0-9_-'
+}
+
+recent_skill_marker_file() {
+  local state_dir
+  state_dir=$(get_state_dir)
+  mkdir -p "$state_dir/state" 2>/dev/null
+  printf '%s' "$state_dir/state/.usage-tracker-recent-skill"
+}
+
+remember_recent_skill() {
+  local name="$1"
+  local marker
+  local now_epoch
+  marker=$(recent_skill_marker_file)
+  now_epoch=$(date +%s 2>/dev/null || echo 0)
+  printf '%s|%s\n' "$name" "$now_epoch" > "$marker" 2>/dev/null || true
+}
+
+recent_skill_matches() {
+  local name="$1" window="${2:-15}"
+  local marker
+  marker=$(recent_skill_marker_file)
+  [ -f "$marker" ] || return 1
+
+  local marker_name marker_ts now_epoch
+  marker_name=$(cut -d'|' -f1 "$marker" 2>/dev/null)
+  marker_ts=$(cut -d'|' -f2 "$marker" 2>/dev/null)
+  [ "$marker_name" = "$name" ] || return 1
+
+  case "$marker_ts" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+
+  now_epoch=$(date +%s 2>/dev/null || echo 0)
+  case "$now_epoch" in
+    ''|*[!0-9]*) return 1 ;;
+  esac
+
+  [ $((now_epoch - marker_ts)) -le "$window" ]
+}
+
+track_skill_usage() {
+  local name="$1" source="${2:-generic}"
+  [ -n "$name" ] || return 0
+  [ "$name" = "stats" ] && return 0
+
+  case "$source" in
+    read)
+      if recent_skill_matches "$name" 15; then
+        return 0
+      fi
+      ;;
+  esac
+
+  increment_counter "skills" "$name"
+  remember_recent_skill "$name"
+}
 
 increment_counter() {
   local category="$1" name="$2"
@@ -55,7 +115,7 @@ if [ $# -ge 2 ]; then
       ;;
   esac
 
-  NAME=$(printf '%s' "$NAME" | tr -cd 'a-zA-Z0-9_-')
+  NAME=$(sanitize_name "$NAME")
   if [ -z "$NAME" ]; then
     echo "error: invalid name" >&2
     exit 1
@@ -69,8 +129,29 @@ if [ $# -ge 2 ]; then
   exit 0
 fi
 
-# Hook mode: PostToolUse(Read|Skill)
+# Hook mode: UserPromptSubmit or PostToolUse(Read|Skill)
 INPUT=$(cat)
+
+# --- Claude slash-command detection ---
+# UserPromptSubmit provides prompt with:
+# <command-message>ai-symbiote:setup</command-message>
+PROMPT=$(json_field "$INPUT" "prompt")
+if [ -n "$PROMPT" ]; then
+  COMMAND_MESSAGE=$(printf '%s' "$PROMPT" | sed -n 's:.*<command-message>\([^<]*\)</command-message>.*:\1:p' | head -1)
+  if [ -n "$COMMAND_MESSAGE" ]; then
+    case "$COMMAND_MESSAGE" in
+      ai-symbiote:*)
+        NAME="${COMMAND_MESSAGE##*:}"
+        NAME=$(sanitize_name "$NAME")
+        if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
+          increment_counter "commands" "$NAME"
+          track_skill_usage "$NAME" "command"
+        fi
+        exit 0
+        ;;
+    esac
+  fi
+fi
 
 # --- Skill tool detection ---
 # Skill tool provides: tool_input.skill (e.g. "ai-symbiote:setup", "commit")
@@ -82,10 +163,8 @@ fi
 if [ -n "$SKILL_NAME" ]; then
   # Strip plugin prefix if present (e.g. "ai-symbiote:setup" -> "setup")
   NAME="${SKILL_NAME##*:}"
-  NAME=$(printf '%s' "$NAME" | tr -cd 'a-zA-Z0-9_-')
-  if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
-    increment_counter "skills" "$NAME"
-  fi
+  NAME=$(sanitize_name "$NAME")
+  track_skill_usage "$NAME" "skill"
   exit 0
 fi
 
@@ -124,6 +203,10 @@ if [ "$CATEGORY" = "commands" ] && [ "$NAME" = "stats" ]; then
   exit 0
 fi
 
-increment_counter "$CATEGORY" "$NAME"
+if [ "$CATEGORY" = "skills" ]; then
+  track_skill_usage "$NAME" "read"
+else
+  increment_counter "$CATEGORY" "$NAME"
+fi
 
 exit 0
