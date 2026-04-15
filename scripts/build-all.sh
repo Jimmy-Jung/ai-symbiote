@@ -10,3 +10,4 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 bash "$REPO_ROOT/scripts/build-claude.sh"
 bash "$REPO_ROOT/scripts/build-codex.sh"
+bash "$REPO_ROOT/scripts/build-cursor.sh"
