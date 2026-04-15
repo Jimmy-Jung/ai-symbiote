@@ -47,8 +47,21 @@ If conflicts occur, report to the user and abort.
 
 Detects which platform the current session is running on:
 
+- If `CURSOR_PLUGIN_ROOT` environment variable exists -> Cursor
 - If `CLAUDE_PLUGIN_ROOT` environment variable exists -> Claude
 - Otherwise -> Codex
+
+**Cursor:**
+
+```bash
+bash <repo-path>/platforms/cursor/install.sh
+```
+
+After install, inform the user:
+
+```text
+Install complete. Restart Cursor or run Developer: Reload Window.
+```
 
 **Claude:**
 
@@ -73,6 +86,8 @@ bash <repo-path>/platforms/codex/install.sh
 
 ```bash
 # Check installed version
+cat <repo-path>/platforms/cursor/overlay/.cursor-plugin/plugin.json | grep version
+# or
 cat <repo-path>/platforms/codex/overlay/.codex-plugin/plugin.json | grep version
 # or
 cat <repo-path>/platforms/claude/overlay/.claude-plugin/plugin.json | grep version

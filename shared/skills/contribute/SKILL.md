@@ -41,6 +41,7 @@ VERSION=$(grep '"version"' ~/ai-symbiote/{slug}/manifest.json 2>/dev/null | head
 
 # Platform
 PLATFORM="unknown"
+[ -n "$CURSOR_PLUGIN_ROOT" ] && PLATFORM="cursor"
 [ -n "$CLAUDE_PLUGIN_ROOT" ] && PLATFORM="claude"
 [ -n "$CODEX_PROJECT_DIR" ] && PLATFORM="codex"
 

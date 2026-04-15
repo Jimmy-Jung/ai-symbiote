@@ -305,7 +305,7 @@ Runs MCP Store's `--auto` mode.
 Run the bundled helper after writing the manifest to ensure ai-symbiote defaults are present:
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
 bash "$PLUGIN_ROOT/skills/setup/scripts/manifest-defaults.sh" --manifest "$STATE_DIR/manifest.json"
 ```
 
@@ -399,7 +399,7 @@ This is required for the Phase 2 public UX:
 Run:
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 STATE_DIR=~/ai-symbiote/{slug}
 
@@ -435,7 +435,7 @@ Match the detected stack (from Step 1) to seed files in the plugin's `harness-se
 #### Execution
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
 SEEDS_DIR="$PLUGIN_ROOT/harness-seeds"
 STATE_DIR=~/ai-symbiote/{slug}
 RULES_FILE="$STATE_DIR/harness-rules.md"

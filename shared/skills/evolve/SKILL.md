@@ -126,12 +126,12 @@ Apply these changes to manifest.json and context.md? (yes/no):
    - Update only changed fields
    - Set `lastEvolved` timestamp to current time
    - Preserve `security.sessionSummaryLevel` unless the evolve patch explicitly changes it
-   - Preserve `agentPlatforms` as the union of existing values and `["claude", "codex"]`
+   - Preserve `agentPlatforms` as the union of existing values and `["claude", "codex", "cursor"]`
 
    Use the bundled helper to merge detected changes safely:
 
    ```bash
-   PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+   PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
    bash "$PLUGIN_ROOT/skills/evolve/scripts/manifest-merge.sh" \
      --manifest "$STATE_DIR/manifest.json" \
      --patch "$STATE_DIR/state/evolve-manifest-patch.json"

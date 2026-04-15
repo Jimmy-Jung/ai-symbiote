@@ -29,7 +29,7 @@ Initializes the Task Master global task graph state.
 
 1. Checks whether the `~/ai-symbiote/{slug}/taskmaster/` directory exists.
 2. Creates the directory if it does not exist.
-3. Generates `state.json` based on `${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/taskmaster/state.template.json` and config.
+3. Generates `state.json` based on `${CURSOR_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}}/taskmaster/state.template.json` and config.
 4. If the directory already exists, displays the current state and asks whether to reinitialize.
 
 ### Initialization Script
@@ -83,7 +83,7 @@ Reads prd.json and generates or updates per-task task.json drafts.
 ### Behavior
 
 1. Locates the target `prd.json` (`~/ai-symbiote/{slug}/taskmaster/prd.json`).
-2. Prepares task.json based on `${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}/taskmaster/tasks.template.json`.
+2. Prepares task.json based on `${CURSOR_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$CLAUDE_PLUGIN_ROOT}}/taskmaster/tasks.template.json`.
 3. Interprets `userStories[]` as top-level task or subtask candidates.
 4. Converts `dependsOn[]` to `dependencies[]`.
 5. Converts `acceptanceCriteria[]` to `testStrategy` or subtask verification items.

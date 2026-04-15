@@ -32,7 +32,7 @@ Default to `status` when no argument is provided.
 Run the bundled script below via Bash:
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 source "$PLUGIN_ROOT/hooks/scripts/lib/common.sh"
 STATE_DIR=$(ensure_state_dir)

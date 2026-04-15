@@ -5,11 +5,11 @@
 # Generate project slug from git root basename.
 # Algorithm:
 #   1. git rev-parse --show-toplevel → basename → lowercase → sanitize
-#   2. No git? Use basename of CODEX_PROJECT_DIR / CLAUDE_PROJECT_DIR / pwd
+#   2. No git? Use basename of CURSOR_PROJECT_DIR / CODEX_PROJECT_DIR / CLAUDE_PROJECT_DIR / pwd
 #   3. Collision guard: if ~/ai-symbiote/{slug}/ already exists and belongs to
 #      a different project, prepend the parent directory name.
 get_project_slug() {
-  local dir="${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}}"
+  local dir="${CURSOR_PROJECT_DIR:-${CODEX_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-$(pwd)}}}"
   local git_root
   git_root=$(cd "$dir" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null) || git_root=""
 

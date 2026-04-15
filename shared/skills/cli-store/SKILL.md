@@ -61,7 +61,7 @@ Each catalog entry contains:
 Run the bundled script below via Bash:
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
 bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" "$@"
 ```
 
