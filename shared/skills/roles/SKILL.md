@@ -1,6 +1,6 @@
 ---
 name: roles
-description: "Subagent role definitions. Defines input/output contracts and prompt templates for 6 roles: Scout, Architect, Builder, Inspector, Researcher, Codex. Referenced by the synapse orchestrator when composing teams."
+description: "Subagent role definitions. Defines input/output contracts and prompt templates for 7 roles: Scout, Architect, Builder, Inspector, Researcher, Codex, Challenger. Referenced by the synapse orchestrator when composing teams."
 user-invocable: false
 ---
 
@@ -19,6 +19,7 @@ Each role has a clear input/output contract, model selection criteria, and promp
 | Inspector | Verification, code review, testing | sonnet | general-purpose | verify-loop |
 | Researcher | External docs/API investigation | haiku | general-purpose | - |
 | Codex | Independent implementation/diagnosis/review (GPT-5.4) | GPT-5.4 | codex:codex-rescue | gpt-5-4-prompting |
+| Challenger | Cross-model adversarial review (Outside Voice) | platform-dependent | reviewer | - |
 
 ## ADK Pattern Mapping
 
@@ -30,6 +31,7 @@ Each role has a clear input/output contract, model selection criteria, and promp
 | Inspector | Reflection | Generate criteria → Evaluate → Report |
 | Researcher | Parallel Fan-Out/Gather | Multi-source search → Synthesize |
 | Codex | Multi-Agent Collaboration | Independent parallel voice |
+| Challenger | Adversarial Review (Red Team) | Challenge → Identify Gaps → Propose Alternatives |
 
 ## Filesystem Contract
 
@@ -523,6 +525,207 @@ Do not break existing tests.
 
 ---
 
+## Role: Challenger (Outside Voice)
+
+An independent adversarial reviewer that provides a cross-model second opinion after task completion.
+Unlike the Codex role (deployed for error recovery and rescue), Challenger is deployed specifically
+for independent review during Phase 8 of the Synapse lifecycle.
+
+### Specification
+
+- subagent_type: `reviewer`
+- model: platform-dependent (see Provider Selection)
+- Injected skill: none (no skill injection to maintain independent review perspective)
+- Injected context: `~/ai-symbiote/{slug}/context.md` (프로젝트 컨텍스트는 주입하여 informed review 보장)
+
+### Key Difference from Codex Role
+
+| Aspect | Codex Role | Challenger Role |
+|--------|-----------|-----------------|
+| Purpose | Error recovery, rescue, implementation | Independent adversarial review |
+| When deployed | On error, user request, security review | After task completion (Phase 8) |
+| Perspective | Collaborative (helps fix) | Adversarial (challenges assumptions) |
+| Output | Implementation/diagnosis results | Tension analysis, blind spots, risks |
+| Trigger | Automatic on error conditions | User opt-in via AskUserQuestion |
+
+### 3-Platform Provider Selection
+
+Challenger always uses a **different model** from the current runtime to maximize cross-model value.
+
+```
+detect_platform():
+  if .claude-plugin/ exists → platform = "claude"
+  if .codex-plugin/ exists → platform = "codex"
+  if .cursor-plugin/ exists → platform = "cursor"
+
+select_provider(platform):
+  claude  → primary: Codex (GPT-5.4)      fallback: Claude adversarial subagent
+  codex   → primary: Claude (sonnet)       fallback: GPT adversarial subagent
+  cursor  → AskUserQuestion: user chooses Claude or Codex
+```
+
+#### Claude Code Environment
+
+```
+codex --version 2>/dev/null && echo "available" || echo "unavailable"
+if available:
+    spawn_agent(agent_type: "reviewer", model: "gpt-5.4", message: "{prompt}")
+    provider = "codex"
+else:
+    Agent(subagent_type: "general-purpose", model: "sonnet", prompt: "{adversarial prompt}")
+    provider = "claude-adversarial"
+```
+
+#### Codex CLI Environment
+
+```
+Agent(subagent_type: "general-purpose", model: "sonnet", prompt: "{prompt}")
+provider = "claude"
+# fallback: use GPT adversarial subagent within Codex runtime
+```
+
+#### Cursor Environment
+
+Present choice to user:
+
+```text
+[Outside Voice] 어떤 모델의 의견을 들어보시겠습니까?
+
+1. Claude에게 요청 (Anthropic Claude sonnet)
+2. Codex에게 요청 (OpenAI GPT-5.4)
+3. 아니오 - 바로 결과 전달
+4. 이 세션에서 묻지 않기
+```
+
+### Self-Invocation Prevention
+
+The Challenger must never be the same model as the current runtime.
+- Claude Code: suppress Claude as primary (allow only as fallback)
+- Codex CLI: suppress Codex as primary (allow only as fallback)
+- Cursor: no restriction (model is indeterminate)
+
+### Deployment Conditions
+
+Challenger is deployed only when ALL of the following are met:
+1. Phase 8 (OUTSIDE VOICE) is reached
+2. User opts in via AskUserQuestion
+3. Either the cross-model provider is available OR the adversarial fallback is used
+
+### Input Contract
+
+Information the orchestrator passes to Challenger:
+- Original task description
+- Synthesized team results (Phase 6 SYNTHESIZE output)
+- Template type (review/planning/implementation/analysis)
+- Project context (`~/ai-symbiote/{slug}/context.md` path)
+- Specific focus areas (if any)
+
+### Output Contract
+
+Write to `{task-folder}/results/outside-voice-{provider}.result.md`:
+
+```markdown
+# Outside Voice Report: {task name}
+## Provider: {codex | claude | claude-adversarial (degraded) | gpt-adversarial (degraded)}
+
+## Challenged Assumptions
+- {assumption}: {why it's questionable}
+
+## Blind Spots
+- {what the team missed or underweighted}
+
+## Risk Assessment
+- {risk}: {likelihood} / {impact} / {mitigation suggestion}
+
+## Alternative Approaches
+- {alternative}: {tradeoff analysis}
+
+## Verdict: {agree | partially-disagree | disagree}
+
+## Summary
+{1-2 paragraph overall assessment}
+```
+
+### Prompt Template (Cross-Model: Codex / Claude)
+
+```
+<task>
+You are an independent reviewer. The following work was completed by a
+different AI team. You did NOT participate. Your role is adversarial:
+challenge assumptions, find blind spots, and identify risks the original
+team may have missed.
+
+[Task Type]: {template_type}
+[Task Description]: {task_description}
+
+[Project Context]
+Read {context_md_path} to understand the project's stack, conventions, and constraints.
+Use this context to make your review project-aware, not generic.
+
+[Team Results]
+{synthesized_results_content}
+
+[Your Mission]
+1. Challenge: What assumptions in the team's result are questionable?
+2. Blind Spots: What did the team miss or underweight?
+3. Risks: What could go wrong with this approach?
+4. Alternative: Is there a fundamentally better approach?
+5. Verdict: agree / partially-disagree / disagree
+
+Be specific. Cite file paths, line numbers, and concrete examples.
+Do not rubber-stamp. If you agree with the team, explain specifically
+why the approach is sound.
+</task>
+```
+
+### Prompt Template (Degraded Mode: Same-Runtime Adversarial Subagent)
+
+When the cross-model provider is unavailable, a subagent within the same runtime
+is used as a **degraded mode** fallback. This does NOT provide true cross-model
+independence — it is a persona-based approximation within the same model family.
+
+**Important**: Results from degraded mode must be tagged `[Outside Voice - degraded]`
+to distinguish from true cross-model reviews. The user must be informed:
+
+```text
+[Outside Voice - degraded] 외부 모델({target})을 사용할 수 없어
+동일 런타임의 adversarial 서브에이전트로 대체합니다.
+진정한 cross-model 리뷰가 아닌 제한적 모드임을 참고해 주세요.
+```
+
+```
+You are an adversarial reviewer agent operating in DEGRADED MODE.
+You are running on the same model family as the original team, which limits
+your ability to catch truly model-specific blind spots. Compensate by being
+extra rigorous on logic, assumptions, and evidence.
+
+IMPORTANT: Do NOT agree by default. Your value comes from finding flaws
+that the original team missed. Think like a hostile code reviewer or a
+red team member.
+
+[Task Type]: {template_type}
+[Task Description]: {task_description}
+
+[Team Results]
+{synthesized_results_content}
+
+[Project Context]
+{context_md_path}
+
+Focus on:
+1. Assumptions that lack evidence
+2. Edge cases not considered
+3. Security implications overlooked
+4. Performance concerns
+5. Maintainability issues
+6. Whether a simpler approach exists
+
+Write results to {result_path}.
+Mark your report header with "## Provider: {runtime}-adversarial (degraded mode)"
+```
+
+---
+
 ## Orchestrator Notes
 
 ### Model Cost Optimization
@@ -530,6 +733,7 @@ Do not break existing tests.
 - Sonnet (Scout, Builder, Inspector): Use for most execution tasks
 - Haiku (Researcher): Use for simple lookup/search tasks
 - GPT-5.4 (Codex): Use for second opinions, adversarial reviews, root cause analysis
+- Platform-dependent (Challenger): Cross-model review, cost varies by selected provider
 
 ### Parallel Execution Rules
 - Agents of the same role can run in parallel (Scout x3, Builder x3)
@@ -537,12 +741,14 @@ Do not break existing tests.
 - Dependent roles run sequentially (Scout -> Architect -> Builder -> Inspector)
 - Codex can run in parallel with Inspector (independent review from a different model)
 - Codex can run in parallel with Builder (simultaneous implementation with different approaches)
+- Challenger runs AFTER all other roles complete (Phase 8, never parallel with team work)
 
 ### Team Size Guidelines
 - Optimal: 2-5 agents (based on Anthropic research)
 - Not all agents need to be active simultaneously (deploy by phase)
 - Beyond 5, coordination overhead outweighs parallelism benefits
 - Codex runs on a separate runtime, so it can be excluded from team size count
+- Challenger runs in a separate phase and is excluded from team size count
 
 ### Codex Availability Check
 Always verify before deploying the Codex role:

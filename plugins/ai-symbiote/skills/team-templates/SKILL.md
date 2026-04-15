@@ -29,8 +29,18 @@ Deep analysis team. Explores the codebase from multiple angles and produces stru
   - Scout-003: subagent(explorer)-based deep exploration (optional, for complex analysis)
 - Wave 2: Architect runs after all Scouts complete
 
+### Outside Voice Wave (Optional)
+
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 3 | Challenger | 1 | Sequential | Challenge analysis conclusions and assumptions |
+
+- Trigger: Wave 2 (Architect synthesis) 완료 후, Synapse Phase 8에 따라 사용자에게 제안
+- Focus: 분석 결론의 근거 충분성, 놓친 코드 패턴/의존성, 대안적 해석
+
 ### Result Synthesis
 The orchestrator reads the Architect's result file and reports to the user.
+If Outside Voice was executed, Challenger's findings are appended as a separate section.
 
 ### Applicable Skills
 - analyze workflow
@@ -72,6 +82,16 @@ When Codex is available, the implementation team utilizes it as follows:
 | Security review needed (Level 4) | Add Codex adversarial-review |
 
 If Codex is unavailable, skip this section and proceed with Claude agents only.
+
+### Outside Voice Phase (Optional)
+
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Phase 4 | Challenger | 1 | Sequential | Independent review of completed implementation |
+
+- Trigger: Phase 3 (Inspector) PASS 후, Synapse Phase 8에 따라 사용자에게 제안
+- Focus: 구현 접근법의 대안, 성능/보안/유지보수성 우려, 놓친 엣지 케이스, 아키텍처 일관성
+- Note: 기존 Codex Integration의 에러 복구 배포와 구분된다. Outside Voice는 PASS된 완성된 작업에 대한 독립 리뷰이다.
 
 ### Mode Variants
 
@@ -130,10 +150,21 @@ When Codex is available, the review team utilizes it as follows:
 
 If Codex is unavailable, review with Inspectors only.
 
+### Outside Voice Wave (Optional)
+
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 3 | Challenger | 1 | Sequential | Cross-model adversarial review of completed review |
+
+- Trigger: Wave 2 (Inspectors) 완료 및 결과 합산 후, Synapse Phase 8에 따라 사용자에게 제안
+- Focus: Inspector들이 동의한 "pass" 항목에 대한 재검증, 리뷰 관점의 사각지대, cross-cutting concerns
+- Note: 기존 Codex Integration의 병렬 dual review와 구분된다. Codex review는 Wave 2에서 Inspector와 병렬 실행되지만, Outside Voice는 모든 리뷰 완료 후 독립적으로 실행된다.
+
 ### Result Synthesis
 The orchestrator aggregates all Inspector + Codex results into a unified review report.
 Sort by severity: critical > warning > suggestion.
 Mark Codex findings with "[Codex]" source tag for distinction.
+If Outside Voice was executed, Challenger's findings are appended with "[Outside Voice]" source tag.
 
 ### Applicable Skills
 - review workflow
@@ -157,8 +188,18 @@ Planning team. Creates actionable plans before implementation.
 - Wave 1: Scouts run in parallel (structure exploration + similar pattern search)
 - Wave 2: Architect runs after collecting Scout results
 
+### Outside Voice Wave (Optional)
+
+| Order | Role | Count | Execution | Purpose |
+|-------|------|-------|-----------|---------|
+| Wave 3 | Challenger | 1 | Sequential | Challenge plan assumptions and propose alternatives |
+
+- Trigger: Wave 2 (Architect plan) 완료 후, 사용자에게 계획 제시 전에 Outside Voice 제안
+- Focus: 계획의 전제 조건 유효성, 더 단순한 접근법 존재 여부, 리스크 평가 충분성, 누락된 구현 단계, 대안 아키텍처
+
 ### Result Synthesis
 The orchestrator presents the Architect's result to the user via EnterPlanMode.
+If Outside Voice was executed, Challenger's findings are included alongside the plan.
 Can transition to the implementation team after user approval.
 
 ### Applicable Skills
@@ -182,6 +223,9 @@ Research team. Combines external information with internal codebase information.
 ### Parallelization Rules
 - Wave 1: Scout (codebase) and Researcher (external docs/APIs) run in parallel
 - Wave 2: Architect synthesizes after all results are collected
+
+### Outside Voice
+Outside Voice는 research 템플릿에서 기본 비활성이다. 사용자가 명시적으로 요청한 경우에만 실행한다.
 
 ### Applicable Skills
 - "investigate", "research", "migration" natural language triggers
@@ -210,6 +254,9 @@ Scout result analysis
 └─ Further exploration needed → Deploy additional Scout
 ```
 
+### Outside Voice
+Outside Voice는 dynamic 템플릿에서 기본 비활성이다. 사용자가 명시적으로 요청한 경우에만 실행한다.
+
 ---
 
 ## Common Protocols
@@ -232,6 +279,21 @@ All teams create `team-manifest.json` in the task-folder to track team state.
       "resultPath": "results/scout-001.result.md"
     }
   ],
+  "outsideVoice": {
+    "offered": false,
+    "accepted": false,
+    "platform": null,
+    "provider": null,
+    "degraded": false,
+    "status": "not-applicable",
+    "resultPath": null,
+    "tensionReportPath": null,
+    "verdict": null,
+    "tensionCount": 0,
+    "adoptedCount": 0,
+    "rejectedCount": 0,
+    "reworkTriggered": false
+  },
   "decisions": [
     {
       "timestamp": "ISO8601",
