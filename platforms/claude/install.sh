@@ -15,7 +15,8 @@ mkdir -p "$(dirname "$TARGET_DIR")"
 rsync -a --delete "$REPO_ROOT/plugins/ai-symbiote/" "$TARGET_DIR/"
 
 echo "bundle: $TARGET_DIR"
+echo "marketplace root: $REPO_ROOT"
 echo
 echo "next:"
-echo "  1. Claude에서 /plugin marketplace add /Users/jimmy/Documents/GitHub/ai-symbiote"
+echo "  1. Claude에서 /plugin marketplace add $REPO_ROOT"
 echo "  2. /plugin install ai-symbiote@ai-symbiote"
