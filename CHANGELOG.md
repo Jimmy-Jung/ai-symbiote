@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.1] - 2026-04-15
+
+### Fixed
+- **Cursor 플러그인 중복 감지 해결** — `plugins/ai-symbiote/` 빌드 산출물을 Git 추적에서 제거하여 Cursor의 서드파티 플러그인 자동 임포트가 `.claude-plugin`을 중복 로드하는 문제 수정. `version_sync.py` 및 릴리스 규칙에서 해당 경로 제거
+
 ## [0.10.0] - 2026-04-15
 
 ### Fixed
