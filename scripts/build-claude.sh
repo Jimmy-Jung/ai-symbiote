@@ -18,7 +18,7 @@ build_bundle() {
   rm -rf "$target_dir"
   mkdir -p "$target_dir"
 
-  for entry in skills hooks taskmaster messenger-bridge harness-seeds; do
+  for entry in skills hooks lib taskmaster messenger-bridge harness-seeds; do
     if [ -e "$SHARED_DIR/$entry" ]; then
       rsync -a --exclude '.gitkeep' "$SHARED_DIR/$entry/" "$target_dir/$entry/"
     fi

@@ -14,7 +14,7 @@ OVERLAY_DIR="$REPO_ROOT/platforms/codex/overlay"
 rm -rf "$DIST_DIR"
 mkdir -p "$DIST_DIR"
 
-for entry in skills hooks taskmaster messenger-bridge harness-seeds; do
+for entry in skills hooks lib taskmaster messenger-bridge harness-seeds; do
   if [ -e "$SHARED_DIR/$entry" ]; then
     rsync -a --exclude '.gitkeep' "$SHARED_DIR/$entry/" "$DIST_DIR/$entry/"
   fi
