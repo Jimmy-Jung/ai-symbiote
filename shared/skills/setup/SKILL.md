@@ -302,6 +302,13 @@ Runs MCP Store's `--auto` mode.
 
 ### Step 5: Generate manifest.json
 
+Run the bundled helper after writing the manifest to ensure ai-symbiote defaults are present:
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+bash "$PLUGIN_ROOT/skills/setup/scripts/manifest-defaults.sh" --manifest "$STATE_DIR/manifest.json"
+```
+
 Write to `~/ai-symbiote/{slug}/manifest.json`:
 
 ```json
@@ -316,6 +323,9 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
     "maxRalphIterations": 10,
     "enableSecurityReview": false,
     "enableQA": true
+  },
+  "security": {
+    "sessionSummaryLevel": "auto"
   },
   "project": {
     "name": "auto-detected",
@@ -376,6 +386,34 @@ Write to `~/ai-symbiote/{slug}/context.md`:
 - Coding conventions (extracted from existing code)
 - File naming patterns
 - Architecture patterns
+
+### Step 6.5: Generate Security Baseline Automatically
+
+Immediately after `context.md` is created, run the Security OS baseline scan once.
+
+This is required for the Phase 2 public UX:
+- setup should finish with a visible security score
+- `security-baseline.json` should exist before the first `/security status`
+- `context.md` should gain a synchronized `Security Baseline` block
+
+Run:
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+STATE_DIR=~/ai-symbiote/{slug}
+
+bash "$PLUGIN_ROOT/skills/security/scripts/security-scan.sh" scan \
+  --project-root "$PROJECT_ROOT" \
+  --state-dir "$STATE_DIR" \
+  --context-file "$STATE_DIR/context.md" \
+  --install-hints passive
+```
+
+Rules:
+- Do not fail setup if the baseline scan fails
+- Show only the score, severity counts, and top 3 risks in setup output
+- If `gitleaks` / `semgrep` are missing, setup should recommend them but must not install them automatically
 
 ### Step 7: Load Harness Seed Rules
 
@@ -487,4 +525,5 @@ Output setup summary to the user:
   - In-session autonomous execution: `/auto <task description>`
   - Maximum parallel performance: `/auto <task description> --mode parallel-max`
   - PRD-based headless execution: `/prd` -> `/ralph` -> `ralph.sh`
+  - Security baseline and audit: `/security status`, `/security scan`
 - Recommended next steps
