@@ -13,7 +13,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERSION_FILE = REPO_ROOT / "VERSION"
-ARCHITECTURE_PATH = REPO_ROOT / "docs/ARCHITECTURE.md"
+ARCHITECTURE_PATH = REPO_ROOT / "docs/02-아키텍처.md"
 PLUGIN_NAME = "ai-symbiote"
 
 JSON_TARGETS = {
@@ -62,7 +62,7 @@ def normalize_architecture(version: str) -> str:
         flags=re.MULTILINE,
     )
     if count != 1:
-        raise ValueError("docs/ARCHITECTURE.md current version line was not found exactly once")
+        raise ValueError("docs/02-아키텍처.md current version line was not found exactly once")
     return updated
 
 

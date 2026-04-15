@@ -13,6 +13,44 @@ AI 에이전트에 달라붙어 하나가 되고, 에이전트가 실수하면 �
 Claude Code와 Codex CLI에서 동일한 스킬, 훅, 태스크 매니저를 공유하는
 AI 에이전트 오케스트레이션 플러그인입니다.
 
+## Overview
+
+<!-- AI-SYMBIOTE:START readme:overview -->
+이 저장소는 `shared/`에 공용 코어를 두고, `platforms/` 오버레이로 Claude Code와 Codex CLI 번들을 조립하는 AI 에이전트 오케스트레이션 플러그인입니다. 사용자는 스킬을 직접 호출할 수도 있고, `synapse`가 의도를 분류해 팀 템플릿과 역할 정의를 묶어 자동으로 실행 흐름을 조합할 수도 있습니다. 하네스는 `context.md`, 훅 스크립트, 로그 상태를 연결해 반복 실수를 줄이는 쪽으로 설계되어 있습니다.
+
+```mermaid
+flowchart LR
+    A["사용자 요청"] --> B["synapse\n의도 분류"]
+    B --> C["shared/skills\n28개 스킬"]
+    B --> D["team-templates + roles\n팀 구성"]
+    C --> E["hooks/scripts\n실행 가드"]
+    D --> E
+    E --> F["~/ai-symbiote/{slug}\ncontext·manifest·logs"]
+    C --> G["platforms/*/overlay"]
+    G --> H["Claude / Codex 번들"]
+```
+
+- 소스 오브 트루스: `shared/`, `platforms/*/overlay/`, `scripts/`, `tests/`
+- 주요 출력: `plugins/ai-symbiote/`, `dist/claude-symbiote/`, `dist/codex-symbiote/`
+- 런타임 상태: `~/ai-symbiote/{slug}/manifest.json`, `context.md`, `harness-log.jsonl`, `security-log.jsonl`
+<!-- AI-SYMBIOTE:END readme:overview -->
+
+## Quick Start
+
+<!-- AI-SYMBIOTE:START readme:quick-start -->
+가장 짧은 로컬 진입 경로는 빌드, 설치, 초기화, 검증 순서입니다. Claude와 Codex는 같은 공용 코어를 쓰지만 설치 스크립트와 플러그인 메타데이터 오버레이가 다르므로, 자신의 실행 환경에 맞는 설치 경로를 고르면 됩니다.
+
+1. 저장소 검증: `python3 scripts/version_sync.py --check`
+2. 번들 생성: `bash scripts/build-all.sh`
+3. 플랫폼 설치
+   - Claude: `bash platforms/claude/install.sh`
+   - Codex: `bash platforms/codex/install.sh`
+4. 프로젝트 초기화: `/ai-symbiote:setup` 또는 `$ai-symbiote:setup`
+5. 문서/업데이터 확인: `bash tests/test-dev-docs-skill.sh && bash tests/test-dev-docs-updater.sh`
+
+빠르게 문서만 갱신하려면 `/ai-symbiote:dev-docs` 또는 `$ai-symbiote:dev-docs`를 실행하면 됩니다.
+<!-- AI-SYMBIOTE:END readme:quick-start -->
+
 ## Harness Engineering
 
 AI 모델이 아무리 똑똑해도 혼자 두면 같은 실수를 반복합니다.
@@ -174,18 +212,21 @@ Codex:  $ai-symbiote:update
 ## 개발자 문서
 
 <!-- AI-SYMBIOTE:START readme:docs-map -->
-프로젝트를 빠르게 파악하려면 아래 문서부터 보는 게 가장 빠릅니다.
+README는 허브입니다. 실제 온보딩은 아래 번호형 문서 순서로 진행하면 됩니다.
 
-| 문서 | 내용 |
-|------|------|
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | shared/ 하위 서브시스템, 빌드 파이프라인, 플랫폼 오버레이, 상태 전략 |
-| [docs/CONVENTIONS.md](docs/CONVENTIONS.md) | 수정 위치 결정 트리, 편집 규칙, 네이밍/배치, 생성물 경계 |
-| [docs/ONBOARDING.md](docs/ONBOARDING.md) | 첫날 경로, 읽기 순서, 로컬 환경 검증, 자주 하는 작업 |
-| [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md) | 필수/선택 외부 도구, 런타임 의존성, 플랫폼별 차이 |
-| [docs/FLOWS.md](docs/FLOWS.md) | Intent Contract 라우팅, 데이터 흐름, 개발자 워크플로우, CI/CD·릴리즈 파이프라인 |
-| [docs/MESSENGER.md](docs/MESSENGER.md) | Telegram/Slack/Discord 브릿지 설정, 보안, 원격 세션 제어 |
+| 순서 | 문서 | 목적 |
+|------|------|------|
+| 00 | [docs/00-시작하기.md](docs/00-시작하기.md) | 첫날 경로 |
+| 01 | [docs/01-프로젝트-개요.md](docs/01-프로젝트-개요.md) | 프로젝트 맥락 |
+| 02 | [docs/02-아키텍처.md](docs/02-아키텍처.md) | 시스템 구조 |
+| 03 | [docs/03-빌드-및-실행.md](docs/03-빌드-및-실행.md) | 빌드와 설치 경로 |
+| 04 | [docs/04-주요-기능.md](docs/04-주요-기능.md) | 핵심 기능 |
+| 05 | [docs/05-코딩-컨벤션.md](docs/05-코딩-컨벤션.md) | 수정 경계 |
+| 06 | [docs/06-문제해결-가이드.md](docs/06-문제해결-가이드.md) | 복구 경로 |
+| 07 | [docs/07-운영-흐름-및-배포.md](docs/07-운영-흐름-및-배포.md) | 릴리즈 흐름 |
+| 08 | [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md) | 원격 운영 |
 
-이 문서들은 `dev-docs` 스킬이 코드를 스캔하여 자동 갱신합니다. 마커 블록(`<!-- AI-SYMBIOTE:START/END -->`) 안의 내용만 갱신되며, 그 밖의 수동 작성 섹션은 보존됩니다.
+이 문서 세트는 `dev-docs` 스킬이 마커 블록 기준으로 갱신합니다.
 <!-- AI-SYMBIOTE:END readme:docs-map -->
 
 ## 스킬 목록 (28개)
@@ -223,7 +264,7 @@ Codex:  $ai-symbiote:update
 |------|------|
 | `git-commit` | git diff를 분석하여 Conventional Commits 형식으로 커밋 메시지 생성 |
 | `pr` | 현재 브랜치의 변경사항을 분석하고 Pull Request 생성 |
-| `messenger` | Slack, Discord, Telegram 연동으로 원격 모니터링 및 제어 ([상세](docs/MESSENGER.md)) |
+| `messenger` | Slack, Discord, Telegram 연동으로 원격 모니터링 및 제어 ([상세](docs/08-메신저-브릿지.md)) |
 
 ### 태스크 관리
 
@@ -416,7 +457,7 @@ setup 시 자동으로 설치/확인되는 외부 플러그인:
 ## 메신저 브릿지
 
 Telegram, Slack, Discord를 통해 Claude/Codex CLI를 원격으로 사용할 수 있습니다.
-자세한 설정 및 사용법은 [docs/MESSENGER.md](docs/MESSENGER.md)를 참조하세요.
+자세한 설정 및 사용법은 [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md)를 참조하세요.
 
 - <b>AI 챗봇</b>: Telegram에서 질문하면 Claude/Codex가 직접 답변 (세션 유지)
 - <b>세션 연동</b>: 맥 터미널의 Claude Code 세션을 Telegram에서 이어감
@@ -429,4 +470,4 @@ Telegram, Slack, Discord를 통해 Claude/Codex CLI를 원격으로 사용할 �
 - <b>공용 변경</b>: `shared/`만 수정 → `build-all.sh`로 양쪽 번들 갱신
 - <b>플랫폼 차이</b>: `platforms/<name>/overlay/`만 수정
 - <b>빌드 생성물</b>: `plugins/ai-symbiote/`와 `dist/`는 직접 편집 금지
-- <b>상세 구조</b>: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 참조
+- <b>상세 구조</b>: [docs/02-아키텍처.md](docs/02-아키텍처.md) 참조

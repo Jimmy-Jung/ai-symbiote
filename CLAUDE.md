@@ -9,7 +9,7 @@ When bumping version, ALL of the following must be updated in a single commit:
 3. `platforms/codex/overlay/.codex-plugin/plugin.json` — `"version"` field
 4. `plugins/ai-symbiote/.claude-plugin/plugin.json` — `"version"` field
 5. `.claude-plugin/marketplace.json` — `"version"` field
-6. `docs/ARCHITECTURE.md` — `현재 버전:` line
+6. `docs/02-아키텍처.md` — `현재 버전:` line
 7. `CHANGELOG.md` — add `## [x.y.z] - YYYY-MM-DD` section with release notes
 
 CI (`scripts/version_sync.py --check`) will fail if any of these are out of sync.
