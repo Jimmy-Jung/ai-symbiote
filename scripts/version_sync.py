@@ -19,6 +19,7 @@ PLUGIN_NAME = "ai-symbiote"
 JSON_TARGETS = {
     REPO_ROOT / "platforms/codex/overlay/.codex-plugin/plugin.json": "plugin_manifest",
     REPO_ROOT / "platforms/claude/overlay/.claude-plugin/plugin.json": "plugin_manifest",
+    REPO_ROOT / "platforms/cursor/overlay/.cursor-plugin/plugin.json": "plugin_manifest",
     REPO_ROOT / "plugins/ai-symbiote/.claude-plugin/plugin.json": "plugin_manifest",
     REPO_ROOT / ".claude-plugin/marketplace.json": "claude_marketplace",
 }
