@@ -1,12 +1,21 @@
 ---
 name: stats
 description: Analyzes usage frequency of skills and commands.
-argument-hint: [--reset]
+argument-hint: [--baseline | --reset]
 user-invocable: true
 allowed-tools: [Read, Glob, Grep, Bash]
 ---
 
 # Stats -- Usage Statistics
+
+## Execution
+
+Run the bundled script below via Bash:
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}"
+bash "$PLUGIN_ROOT/skills/stats/scripts/stats-report.sh" "$@"
+```
 
 ## Workflow
 
@@ -95,6 +104,20 @@ context.md: {line count} lines ({harness rules} + {seed rules})
 harness-log.jsonl: {line count} lines
 ```
 
+### Step 5.25: Security Telemetry
+
+Reads `~/ai-symbiote/{slug}/security-log.jsonl` and reports recent blocked/warned activity.
+
+```
+[Security Telemetry]
+
+Events: {N}  |  Blocked: {B}  |  Warned: {W}
+Top categories: {category} x{count}, ...
+Risk breakdown: {risk} x{count}, ...
+Recent security events:
+  - {ts} | {action} | {category} | {file or command}
+```
+
 Analysis method:
 1. Count `[Harness #` prefixed lines in context.md -> active harness rule count
 2. Count `[Seed #` prefixed lines in context.md -> active seed rule count
@@ -104,7 +127,8 @@ Analysis method:
 6. Check recurrence of same {error_type, file} after rule_created -> recurrence rate
 7. Count `rule_prevented` events per rule_id -> prevention stats (v2 events)
 8. Count `guard_blocked` events -> guard stats (v2 events)
-9. Gracefully skip unknown event types (forward-compatible with future schema versions)
+9. Read `security-log.jsonl` and aggregate `blocked`/`warned` security events
+10. Gracefully skip unknown event types (forward-compatible with future schema versions)
 
 ### Step 5.5: Baseline Measurement (--baseline)
 
