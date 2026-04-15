@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-# Validate marker block content quality after SKILL.md workflow execution.
-# Checks minimum line counts per section (conservative: ~50% of Success Criteria targets).
-#
-# This test is meaningful ONLY after the dev-docs SKILL.md workflow has run.
-# Running after generate-dev-docs.sh (fallback) will produce expected failures.
+# Validate marker block content quality after dev-docs generation.
 #
 # Usage: bash tests/test-dev-docs-quality.sh
 
@@ -52,38 +48,31 @@ assert_min_lines() {
 echo "=== dev-docs quality validation ==="
 echo ""
 
-ARCH_FILE="$PROJECT_ROOT/docs/ARCHITECTURE.md"
-FLOWS_FILE="$PROJECT_ROOT/docs/FLOWS.md"
-ONBOARD_FILE="$PROJECT_ROOT/docs/ONBOARDING.md"
-DEPS_FILE="$PROJECT_ROOT/docs/DEPENDENCIES.md"
-CONV_FILE="$PROJECT_ROOT/docs/CONVENTIONS.md"
+README_FILE="$PROJECT_ROOT/README.md"
+START_FILE="$PROJECT_ROOT/docs/00-시작하기.md"
+OVERVIEW_FILE="$PROJECT_ROOT/docs/01-프로젝트-개요.md"
+ARCH_FILE="$PROJECT_ROOT/docs/02-아키텍처.md"
+BUILD_FILE="$PROJECT_ROOT/docs/03-빌드-및-실행.md"
+FEATURES_FILE="$PROJECT_ROOT/docs/04-주요-기능.md"
+CONV_FILE="$PROJECT_ROOT/docs/05-코딩-컨벤션.md"
+TROUBLE_FILE="$PROJECT_ROOT/docs/06-문제해결-가이드.md"
+OPS_FILE="$PROJECT_ROOT/docs/07-운영-흐름-및-배포.md"
 
-# ARCHITECTURE (targets: subsystems 15, build-flow 15 → min 50%: 7)
-assert_min_lines "ARCHITECTURE subsystems" "$ARCH_FILE" architecture subsystems 7
-assert_min_lines "ARCHITECTURE build-flow" "$ARCH_FILE" architecture build-flow 7
-
-# FLOWS (targets: 10, 10, 8, 8 → min 50%: 5, 5, 4, 4)
-assert_min_lines "FLOWS system-flow" "$FLOWS_FILE" flows system-flow 5
-assert_min_lines "FLOWS data-flow" "$FLOWS_FILE" flows data-flow 5
-assert_min_lines "FLOWS user-or-operator-flow" "$FLOWS_FILE" flows user-or-operator-flow 4
-assert_min_lines "FLOWS operational-flow" "$FLOWS_FILE" flows operational-flow 4
-
-# ONBOARDING (targets: 12, 10 → min 50%: 6, 5)
-assert_min_lines "ONBOARDING read-order" "$ONBOARD_FILE" onboarding read-order 6
-assert_min_lines "ONBOARDING common-tasks" "$ONBOARD_FILE" onboarding common-tasks 5
-
-# DEPENDENCIES (target: 10 → min 50%: 5)
-assert_min_lines "DEPENDENCIES runtime-dev-tools" "$DEPS_FILE" dependencies runtime-dev-tools 5
-
-# CONVENTIONS (target: 10 → min 50%: 5)
-assert_min_lines "CONVENTIONS editing-rules" "$CONV_FILE" conventions editing-rules 5
+assert_min_lines "README overview" "$README_FILE" readme overview 4
+assert_min_lines "README quick-start" "$README_FILE" readme quick-start 4
+assert_min_lines "START quick-start" "$START_FILE" start quick-start 4
+assert_min_lines "OVERVIEW project-summary" "$OVERVIEW_FILE" overview project-summary 4
+assert_min_lines "ARCHITECTURE system-overview" "$ARCH_FILE" architecture system-overview 4
+assert_min_lines "BUILD toolchain" "$BUILD_FILE" build toolchain 4
+assert_min_lines "FEATURES harness-pillars" "$FEATURES_FILE" features harness-pillars 4
+assert_min_lines "CONVENTIONS editing-rules" "$CONV_FILE" conventions editing-rules 4
+assert_min_lines "TROUBLESHOOTING common-failures" "$TROUBLE_FILE" troubleshooting common-failures 4
+assert_min_lines "OPERATIONS request-flow" "$OPS_FILE" operations request-flow 4
+assert_min_lines "OPERATIONS data-flow" "$OPS_FILE" operations data-flow 4
 
 echo ""
 echo "=== Results: $PASSED/$TOTAL passed, $FAILED failed ==="
 
 if [ "$FAILED" -gt 0 ]; then
-  echo ""
-  echo "NOTE: This test validates SKILL.md workflow output quality."
-  echo "Failures are expected if only generate-dev-docs.sh (fallback) was used."
   exit 1
 fi

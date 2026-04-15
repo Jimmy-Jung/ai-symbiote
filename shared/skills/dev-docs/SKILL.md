@@ -1,7 +1,7 @@
 ---
 name: dev-docs
-description: "Generates and updates Mermaid-heavy developer docs from code."
-argument-hint: "[all|readme|architecture|conventions|onboarding|dependencies|flows]"
+description: "Generates and updates numbered, Mermaid-heavy developer docs from code."
+argument-hint: "[all|readme|start|overview|architecture|build|features|conventions|troubleshooting|operations]"
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash]
 ---
@@ -15,10 +15,27 @@ Primary users:
 - contributor-facing explanations live in manually written sections
 
 Output style:
-- Korean by default
+- skill source (`SKILL.md`, tests, helper contracts) stays in English for token efficiency
+- generated docs must follow the user's language
+- if the user's language is unclear, fall back to the repo's existing dominant doc language
 - Mermaid-heavy across all generated docs
 - code is the source of truth
 - manually written prose is preserved
+
+Language resolution order:
+1. explicit user request about output language
+2. the current conversation language
+3. the repo's existing dominant documentation language
+
+Fallback generator contract:
+- `generate-dev-docs.sh` may receive `AI_SYMBIOTE_DOC_LANG=ko|en`
+- if that variable is unset, it should infer the dominant doc language from existing docs
+- if inference is still ambiguous, default to Korean for this repo
+
+Language enforcement contract:
+- headings, prose, tables, Mermaid labels, and fallback blocks must follow the resolved user language
+- file paths and numbered filenames stay stable to match repo conventions
+- do not translate marker ids, doc ids, or filesystem paths
 
 ## Workflow Ownership
 
@@ -34,21 +51,29 @@ Managed documents:
 
 | id | path | purpose |
 |----|------|---------|
-| `readme` | `README.md` | Thin project hub, quick start, links to deeper docs |
-| `architecture` | `docs/ARCHITECTURE.md` | System structure, subsystem boundaries, build path |
-| `conventions` | `docs/CONVENTIONS.md` | Editing rules, naming, generated-output boundaries |
-| `onboarding` | `docs/ONBOARDING.md` | First-day reading order and local workflow |
-| `dependencies` | `docs/DEPENDENCIES.md` | External tools, plugins, platform-specific dependencies |
-| `flows` | `docs/FLOWS.md` | Data flow, user flow, and operational flow |
+| `readme` | `README.md` | Thin project hub, quick start, links to numbered docs |
+| `start` | `docs/00-시작하기.md` | First-day entry path, minimum local checks |
+| `overview` | `docs/01-프로젝트-개요.md` | Product purpose, repo map, recommended reading order |
+| `architecture` | `docs/02-아키텍처.md` | System structure, subsystem boundaries, platform differences |
+| `build` | `docs/03-빌드-및-실행.md` | Required tools, build flow, install/update path |
+| `features` | `docs/04-주요-기능.md` | Harness pillars, orchestration, key skills |
+| `conventions` | `docs/05-코딩-컨벤션.md` | Editing rules, naming, generated-output boundaries |
+| `troubleshooting` | `docs/06-문제해결-가이드.md` | Fast diagnosis, common failures, recovery steps |
+| `operations` | `docs/07-운영-흐름-및-배포.md` | Request flow, state/log flow, CI/release flow |
 
-Default invocation updates all six.
+Default invocation updates README + numbered docs 00-07.
 
 If the argument matches one or more ids above, update only those documents.
 
+Backward-compatible aliases:
+- `onboarding` -> `start`
+- `dependencies` -> `build`
+- `flows` -> `operations`
+
 Examples:
 - `dev-docs`
-- `dev-docs flows`
-- `dev-docs architecture onboarding`
+- `dev-docs operations`
+- `dev-docs architecture start`
 
 ## Ownership Contract
 
@@ -80,40 +105,53 @@ Each document has fixed generated slots. Do not invent new top-level sections un
 
 `README.md` must stay thin. It is a hub, not the full manual.
 
-### `docs/ARCHITECTURE.md`
+### `docs/00-시작하기.md`
+
+- `quick-start`
+- `first-day-path`
+- `local-checks`
+
+### `docs/01-프로젝트-개요.md`
+
+- `project-summary`
+- `repo-map`
+- `docs-journey`
+
+### `docs/02-아키텍처.md`
 
 - `system-overview`
 - `subsystems`
-- `build-flow`
 - `platform-differences`
 
-### `docs/CONVENTIONS.md`
+### `docs/03-빌드-및-실행.md`
+
+- `toolchain`
+- `build-run-flow`
+- `install-update-path`
+
+### `docs/04-주요-기능.md`
+
+- `harness-pillars`
+- `orchestration`
+- `key-skills`
+
+### `docs/05-코딩-컨벤션.md`
 
 - `editing-rules`
-- `naming-layout`
 - `generated-boundaries`
 - `decision-tree`
 
-### `docs/ONBOARDING.md`
+### `docs/06-문제해결-가이드.md`
 
-- `first-day-path`
-- `read-order`
-- `local-checks`
-- `common-tasks`
+- `quick-diagnosis`
+- `common-failures`
+- `recovery-commands`
 
-### `docs/DEPENDENCIES.md`
+### `docs/07-운영-흐름-및-배포.md`
 
-- `dependency-map`
-- `runtime-dev-tools`
-- `platform-dependencies`
-- `update-path`
-
-### `docs/FLOWS.md`
-
-- `system-flow`
+- `request-flow`
 - `data-flow`
-- `user-or-operator-flow`
-- `operational-flow`
+- `ci-release-flow`
 
 ## Mermaid Policy
 
@@ -131,11 +169,11 @@ Keep diagrams readable:
 
 Examples of where Mermaid belongs:
 - `README.md`: one high-level system overview
-- `ARCHITECTURE.md`: subsystem map, build flow
-- `CONVENTIONS.md`: "where should I edit?" decision tree
-- `ONBOARDING.md`: first-day path and local verification flow
-- `DEPENDENCIES.md`: dependency map and platform split
-- `FLOWS.md`: system/data/user/operational flows
+- `00-시작하기.md`: first-day path and local verification flow
+- `02-아키텍처.md`: subsystem map and platform differences
+- `03-빌드-및-실행.md`: build flow and install path
+- `05-코딩-컨벤션.md`: "where should I edit?" decision tree
+- `07-운영-흐름-및-배포.md`: request/data/CI flows
 
 ## Confidence-Based Fallback
 
@@ -221,40 +259,44 @@ For each section, determine:
 
 | Doc | Section ID | Primary sources | Diagram |
 |-----|-----------|----------------|---------|
-| README | overview | plugin.json, skill catalog summary | none |
+| README | overview | plugin.json, skill catalog summary | flowchart |
 | README | quick-start | setup skill, build scripts | none |
-| README | docs-map | docs/ listing | none |
-| ARCHITECTURE | system-overview | full directory structure, skill count, hook count | flowchart (system layers) |
-| ARCHITECTURE | subsystems | skill categories list, hook table | flowchart (category to skills) |
-| ARCHITECTURE | build-flow | build scripts, overlay structure | flowchart (shared to overlay to bundle) |
-| ARCHITECTURE | platform-differences | Claude hooks.json vs Codex hooks.json | none (comparison table) |
-| CONVENTIONS | decision-tree | directory structure, build artifact boundaries | flowchart (decision tree) |
+| README | docs-map | numbered docs listing | none |
+| START | quick-start | README quick start, test/build commands | none |
+| START | first-day-path | doc reading order, environment setup | flowchart |
+| START | local-checks | test and build commands | none |
+| OVERVIEW | project-summary | plugin.json, root docs, skill catalog summary | flowchart |
+| OVERVIEW | repo-map | directory structure, build artifacts | none |
+| OVERVIEW | docs-journey | numbered docs ordering | none |
+| ARCHITECTURE | system-overview | full directory structure, build pipeline | flowchart |
+| ARCHITECTURE | subsystems | skill categories list, hook table | flowchart |
+| ARCHITECTURE | platform-differences | Claude hooks.json vs Codex hooks.json | none |
+| BUILD | toolchain | external tool list | none |
+| BUILD | build-run-flow | build scripts, overlay structure | flowchart |
+| BUILD | install-update-path | install scripts, update skill | none |
+| FEATURES | harness-pillars | setup-check, guard-shell, harness-learn, stats | flowchart |
+| FEATURES | orchestration | synapse, team-templates, roles | none |
+| FEATURES | key-skills | user-facing core skill set | none |
+| CONVENTIONS | decision-tree | directory structure, build artifact boundaries | flowchart |
 | CONVENTIONS | editing-rules | shared/ vs plugins/ vs docs/ roles | none |
-| CONVENTIONS | naming-layout | SKILL.md frontmatter required fields, file patterns | none |
 | CONVENTIONS | generated-boundaries | marker system, build artifact boundaries | none |
-| ONBOARDING | first-day-path | doc reading order, environment setup | flowchart (read to setup to verify) |
-| ONBOARDING | read-order | each doc's role and what to look for | none |
-| ONBOARDING | local-checks | test and build commands | sequenceDiagram |
-| ONBOARDING | common-tasks | add skill, update docs, modify hooks procedures | none |
-| DEPENDENCIES | dependency-map | external tool list | flowchart (tool relationships) |
-| DEPENDENCIES | runtime-dev-tools | bash, rsync, grep/sed/awk, jq with usage context | none |
-| DEPENDENCIES | platform-dependencies | Claude vs Codex bundle differences | flowchart (shared to bundles) |
-| DEPENDENCIES | update-path | build-all.sh, platform-specific builds | none |
-| FLOWS | system-flow | synapse Intent Contract, team composition, role execution | flowchart (request to intent to team to roles) |
-| FLOWS | data-flow | manifest.json to context.md to harness-log flow | flowchart |
-| FLOWS | user-or-operator-flow | skill invocation to result verification experience | sequenceDiagram |
-| FLOWS | operational-flow | code change to build to install | flowchart |
+| TROUBLESHOOTING | quick-diagnosis | build/test/setup scripts | flowchart |
+| TROUBLESHOOTING | common-failures | version_sync, setup-check, hook limitations | none |
+| TROUBLESHOOTING | recovery-commands | common recovery sequence | none |
+| OPERATIONS | request-flow | synapse, hook lifecycle | flowchart |
+| OPERATIONS | data-flow | manifest.json to context.md to harness-log flow | flowchart |
+| OPERATIONS | ci-release-flow | CI and release workflows | flowchart |
 
 ### 3. Render
 
-Render all 23 sections in order.
+Render all numbered-doc sections in order.
 
 **New sections (no existing marker or heading) must place headings first:**
 
 1. Check if the heading exists in the file via Grep
 2. If missing, use the Edit tool to insert the heading at the correct position:
    - README: `## Overview` right after `# ` title line, `## Quick Start` after Overview
-   - ARCHITECTURE: `## System Overview` right after `# ` title line, `## Platform Differences` after Build Flow section
+   - Numbered docs: place generated headings directly under the title in reading order
 3. After placing the heading, call `update-doc-section.sh`
 
 **Existing sections (marker already present):**
@@ -280,9 +322,14 @@ rm -f "$TMP_CONTENT"
 **Content structure per section:**
 
 1. **Prose explanation** (2-5 sentences): what this section covers and why it matters. Written from the plugin user perspective.
-2. **Mermaid diagram** (when applicable): type determined in Model stage. 7-10 nodes. Korean labels in generated output.
+2. **Mermaid diagram** (when applicable): type determined in Model stage. 7-10 nodes. Labels must follow the resolved user language.
 3. **Detail table or list**: specific items (skill names+descriptions, hook events+behavior, dependencies+usage, etc.)
 4. **Context annotations** (when applicable): e.g. "Changed from keyword routing to Intent Contract in v0.8.0"
+
+**Language application during render:**
+- before writing each section, rewrite headings and prose into the resolved user language
+- localize table headers, list labels, fallback labels, and Mermaid node text
+- keep numbered doc file names and links unchanged even when the rendered language is English
 
 **When code-derived facts conflict with manual prose:**
 - Do not overwrite manual prose
@@ -301,7 +348,7 @@ rm -f "$TMP_CONTENT"
 For environments where the workflow is unavailable (Codex, CI/CD, standalone), use the existing `generate-dev-docs.sh`:
 
 ```bash
-bash shared/skills/dev-docs/scripts/generate-dev-docs.sh [repo-root] [all|readme|architecture|conventions|onboarding|dependencies|flows ...]
+bash shared/skills/dev-docs/scripts/generate-dev-docs.sh [repo-root] [all|readme|start|overview|architecture|build|features|conventions|troubleshooting|operations ...]
 ```
 
 This script covers only 19 of 23 sections and produces baseline heredoc content. It cannot replace the rich content generated by the workflow.
@@ -317,7 +364,7 @@ This script covers only 19 of 23 sections and produces baseline heredoc content.
 
 Do not duplicate the detailed content from `ARCHITECTURE`, `DEPENDENCIES`, `ONBOARDING`, or `FLOWS`.
 
-### ARCHITECTURE
+### 02-아키텍처
 
 Must explain:
 - what lives in `shared/`, `platforms/`, `plugins/`, `dist/`, `scripts/`, `docs/`
@@ -328,7 +375,7 @@ Include Mermaid:
 - subsystem overview
 - build/copy flow
 
-### CONVENTIONS
+### 05-코딩-컨벤션
 
 Must explain:
 - where to edit versus generated output
@@ -338,7 +385,7 @@ Must explain:
 Include Mermaid:
 - decision tree for "which directory should I touch?"
 
-### ONBOARDING
+### 00-시작하기
 
 Must optimize for a new developer.
 
@@ -351,7 +398,7 @@ Include:
 Include Mermaid:
 - first-day flow
 
-### DEPENDENCIES
+### 03-빌드-및-실행
 
 Explain:
 - external CLIs and platform tooling
@@ -362,7 +409,7 @@ Explain:
 Include Mermaid:
 - dependency map
 
-### FLOWS
+### 07-운영-흐름-및-배포
 
 This is the most diagram-heavy document.
 
@@ -382,11 +429,11 @@ Required test categories:
   - valid Mermaid block generation
   - fallback to `확인 필요` when confidence is insufficient
 - selective update isolation test:
-  - `dev-docs flows` only changes `docs/FLOWS.md`
-  - `dev-docs architecture` only changes `docs/ARCHITECTURE.md`
+  - `dev-docs operations` only changes `docs/07-운영-흐름-및-배포.md`
+  - `dev-docs architecture` only changes `docs/02-아키텍처.md`
 - updater integration test for replace / insert / append behavior
-- generator integration smoke test for all six docs on a temp repo fixture
-- selective update isolation test for `flows` and `architecture`
+- generator integration smoke test for README + numbered docs on a temp repo fixture
+- selective update isolation test for `operations` and `architecture`
 - low-confidence fallback test that emits `확인 필요` instead of Mermaid
 
 ## Completion Report
