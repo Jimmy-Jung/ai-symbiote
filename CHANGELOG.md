@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 ## [0.10.3] - 2026-04-16
 
 ### Added
-- **3-Tier Lazy Context** — SessionStart 훅의 컨텍스트 주입을 3단계 지연 로딩으로 전환. Tier 1(항상): manifest 요약 + context.md 5줄 발췌 + Seed 룰 + Synapse 키워드 맵. Tier 2(첫 코드 작업 시): AI가 pointer를 보고 context.md, harness-rules.md를 Read. 세션당 ~1,617 토큰 절감 (74%)
+- **3-Tier Lazy Context** — SessionStart 훅의 컨텍스트 주입을 3단계 지연 로딩으로 전환. 세션당 ~1,617 토큰 절감 (74%)
+- **Session Intelligence Suite** — 8개 기능 일괄 추가:
+  - **PreCompact 훅** — compaction 시 Tier 1 fingerprint 재주입으로 컨텍스트 유실 방지
+  - **Strategic Compaction 제안** — Edit/Write 50회 도달 시 `/compact` 제안 (COMPACT_THRESHOLD 설정 가능)
+  - **Config Protection** — 린터/포맷터 설정 파일 수정 차단 (SYMBIOTE_ALLOW_CONFIG_EDIT=1로 해제)
+  - **GateGuard** — 미읽은 파일 수정 차단으로 "읽지 않고 수정" 실수 원천 방지 (SYMBIOTE_GATEGUARD=0으로 해제)
+  - **MCP Health Check** — 3회 연속 실패 MCP 서버 차단, 5분 쿨다운 후 자동 재시도
+  - **Cost Tracker** — Stop 훅에서 세션 메트릭 기록 (sessions.jsonl, 100줄 자동 truncation)
+  - **Context Budget 스킬** — 토큰 소비 4단계 감사 (Inventory → Classify → Detect → Report)
+  - **Instinct 시스템** — 프로젝트별 성공/실패 패턴 학습, confidence 기반 자동 만료/승격
+- **Dispatcher 통합** — PreToolUse(Edit|Write) 훅 3개를 단일 dispatcher로 통합하여 hooks.json 비대화 방지
 
 ### Fixed
 - **마켓플레이스 플러그인 설치 실패** — `plugins/`가 `.gitignore`에 포함되어 클론 시 `source` 경로가 존재하지 않는 문제 수정. `plugins/ai-symbiote/` 빌드 산출물을 Git 추적에 포함
