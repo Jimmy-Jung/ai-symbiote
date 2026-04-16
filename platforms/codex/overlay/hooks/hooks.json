@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check, suggest-compact, config-protection. Note: Codex PostToolUse only supports Bash matcher, so usage-tracker(Read) and comment-checker/messenger-notify(Write|Edit) are omitted.",
+  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check, suggest-compact, config-protection. Note: Codex lacks PostToolUse(Read) and PostToolUseFailure, so gateguard (requires Read tracker) and mcp-health-check (requires failure tracking) are omitted.",
   "hooks": {
     "SessionStart": [
       {
@@ -42,7 +42,7 @@
             "timeout": 5
           }
         ]
-      }
+      },
     ],
     "PostToolUse": [
       {

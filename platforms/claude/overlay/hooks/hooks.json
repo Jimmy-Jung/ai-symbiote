@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, suggest-compact, config-protection",
+  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, suggest-compact, config-protection, gateguard, mcp-health-check, mcp-health-failure, mcp-health-success",
   "hooks": {
     "SessionStart": [
       {
@@ -53,6 +53,26 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/gateguard-gate.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/mcp-health-check.sh\"",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -63,6 +83,16 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/build-watcher.sh\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/gateguard-tracker.sh\"",
+            "timeout": 5
           }
         ]
       },
@@ -98,6 +128,28 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/messenger-notify.sh\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/mcp-health-success.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/mcp-health-failure.sh\"",
+            "timeout": 5
           }
         ]
       }

@@ -12,9 +12,8 @@ source "$SCRIPT_DIR/lib/common.sh"
 # Consume stdin (hook protocol requires reading it)
 cat > /dev/null
 
-# Session-scoped counter (fallback chain: CLAUDE > CURSOR > CODEX > default)
-SESSION_ID="${CLAUDE_SESSION_ID:-${CURSOR_SESSION_ID:-${CODEX_SESSION_ID:-default}}}"
-COUNTER_FILE="${TMPDIR:-/tmp}/symbiote-compact-${SESSION_ID}"
+# Session-scoped counter (sanitized, symlink-safe)
+COUNTER_FILE=$(safe_session_file "symbiote-compact")
 
 # Atomic read-increment-write inside lock to prevent race conditions
 if command -v flock >/dev/null 2>&1; then

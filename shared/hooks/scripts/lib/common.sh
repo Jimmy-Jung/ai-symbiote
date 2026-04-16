@@ -219,6 +219,22 @@ emit_hook_block() {
   fi
 }
 
+# Session-scoped temp file helper: sanitizes session ID and rejects symlinks.
+# Usage: safe_session_file "symbiote-compact" → returns sanitized path in $TMPDIR
+safe_session_file() {
+  local prefix="${1:-symbiote}"
+  local session_id="${CLAUDE_SESSION_ID:-${CURSOR_SESSION_ID:-${CODEX_SESSION_ID:-default}}}"
+  # Sanitize: keep only alphanumeric, dot, dash, underscore
+  session_id=$(printf '%s' "$session_id" | tr -cd 'A-Za-z0-9._-')
+  [ -z "$session_id" ] && session_id="default"
+  local filepath="${TMPDIR:-/tmp}/${prefix}-${session_id}"
+  # Reject symlinks
+  if [ -L "$filepath" ]; then
+    rm -f "$filepath" 2>/dev/null
+  fi
+  printf '%s' "$filepath"
+}
+
 # ISO-8601 UTC cutoff timestamp helper for recent-event filtering.
 recent_cutoff_ts() {
   local days="${1:-7}"
