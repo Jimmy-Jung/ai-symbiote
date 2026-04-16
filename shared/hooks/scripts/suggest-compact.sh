@@ -12,33 +12,30 @@ source "$SCRIPT_DIR/lib/common.sh"
 # Consume stdin (hook protocol requires reading it)
 cat > /dev/null
 
-# Session-scoped counter
-SESSION_ID="${CLAUDE_SESSION_ID:-default}"
+# Session-scoped counter (fallback chain: CLAUDE > CURSOR > CODEX > default)
+SESSION_ID="${CLAUDE_SESSION_ID:-${CURSOR_SESSION_ID:-${CODEX_SESSION_ID:-default}}}"
 COUNTER_FILE="${TMPDIR:-/tmp}/symbiote-compact-${SESSION_ID}"
 
-# Read current count (default 0)
-COUNT=0
-if [ -f "$COUNTER_FILE" ]; then
-  COUNT=$(cat "$COUNTER_FILE" 2>/dev/null)
-fi
-
-# Validate count is numeric (protect against corruption)
-case "$COUNT" in
-  ''|*[!0-9]*) COUNT=0 ;;
-esac
-
-# Increment
-COUNT=$((COUNT + 1))
-
-# Write back with fd-based lock for race safety
+# Atomic read-increment-write inside lock to prevent race conditions
 if command -v flock >/dev/null 2>&1; then
-  exec 9>"$COUNTER_FILE.lock"
-  flock -n 9 2>/dev/null || true
+  LOCK_FILE="$COUNTER_FILE.lock"
+  exec 9>"$LOCK_FILE"
+  flock 9 2>/dev/null || true
+  COUNT=0
+  [ -f "$COUNTER_FILE" ] && COUNT=$(cat "$COUNTER_FILE" 2>/dev/null)
+  case "$COUNT" in ''|*[!0-9]*) COUNT=0 ;; esac
+  COUNT=$((COUNT + 1))
   echo "$COUNT" > "$COUNTER_FILE"
   exec 9>&-
 else
-  # Fallback: simple write when flock is not available (e.g. macOS)
-  echo "$COUNT" > "$COUNTER_FILE"
+  # Fallback (macOS): atomic write via temp file + mv
+  COUNT=0
+  [ -f "$COUNTER_FILE" ] && COUNT=$(cat "$COUNTER_FILE" 2>/dev/null)
+  case "$COUNT" in ''|*[!0-9]*) COUNT=0 ;; esac
+  COUNT=$((COUNT + 1))
+  TMP_COUNTER=$(mktemp "${COUNTER_FILE}.XXXXXX" 2>/dev/null) || TMP_COUNTER="${COUNTER_FILE}.tmp.$$"
+  echo "$COUNT" > "$TMP_COUNTER"
+  mv -f "$TMP_COUNTER" "$COUNTER_FILE" 2>/dev/null || echo "$COUNT" > "$COUNTER_FILE"
 fi
 
 # Read threshold from env (default 50, clamp to 1-10000)
