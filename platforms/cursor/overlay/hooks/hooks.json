@@ -81,6 +81,12 @@
         "timeout": 5
       }
     ],
+    "stop": [
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/cost-tracker.sh\"",
+        "timeout": 10
+      }
+    ],
     "postToolUseFailure": [
       {
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/mcp-health-failure.sh\"",

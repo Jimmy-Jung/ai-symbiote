@@ -378,6 +378,25 @@ def print_harness_and_security():
     print(f"security-log.jsonl: {security_lines} lines")
 
 
+def print_session_metrics():
+    sessions_file = usage_dir / "sessions.jsonl"
+    print("")
+    print("[Session Metrics]")
+    print("")
+    if not sessions_file.exists():
+        print("No session data recorded yet.")
+        return
+    sessions = read_jsonl(sessions_file)
+    total = len(sessions)
+    cutoff_7d = now_utc() - timedelta(days=7)
+    cutoff_24h = now_utc() - timedelta(hours=24)
+    last_7d = sum(1 for s in sessions if parse_ts(s.get("ts")) and parse_ts(s.get("ts")) >= cutoff_7d)
+    last_24h = sum(1 for s in sessions if parse_ts(s.get("ts")) and parse_ts(s.get("ts")) >= cutoff_24h)
+    print(f"Recent sessions (max 100): {total}")
+    print(f"Sessions in last 7 days: {last_7d}")
+    print(f"Sessions in last 24 hours: {last_24h}")
+
+
 def run_baseline():
     harness_log = read_jsonl(state_dir / "harness-log.jsonl")
     mistake_events = [item for item in harness_log if item.get("error_type")]
@@ -426,4 +445,5 @@ elif mode == "reset":
 else:
     print_usage_stats()
     print_harness_and_security()
+    print_session_metrics()
 PY
