@@ -94,7 +94,8 @@ OUTPUT=$(HARNESS_TEST_STATE_DIR="$STATE_DIR" bash "$SETUP_CHECK_SCRIPT")
 
 assert_contains "setup-check returns continue json" "\"continue\":true" "$OUTPUT"
 assert_contains "injects compact security summary" "[Security] score=72/100 | C:1 H:2 M:1 I:0 | activity b=1 w=1 latest=secret_exposure @ cat .env | pending=gitleaks, semgrep +1 more. Run /security status for details." "$OUTPUT"
-assert_contains "keeps symbiote context injection" "[Symbiote Context] ## Project Summary" "$OUTPUT"
+assert_contains "injects context excerpt with pointer" "[Symbiote Context]" "$OUTPUT"
+assert_contains "context has file pointer" "Full details: Read" "$OUTPUT"
 assert_file_contains "setup-check self-heals agentPlatforms" "\"agentPlatforms\": [" "$STATE_DIR/manifest.json"
 assert_file_contains "setup-check adds claude platform" "\"claude\"" "$STATE_DIR/manifest.json"
 assert_file_contains "setup-check adds codex platform" "\"codex\"" "$STATE_DIR/manifest.json"

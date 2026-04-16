@@ -1,8 +1,10 @@
 #!/bin/bash
-# Integration tests for setup-check.sh harness-rules summary mode.
+# Integration tests for setup-check.sh 3-Tier Lazy Context injection.
 #
-# Tests the token optimization feature: when harness-rules.md exceeds 50 lines,
-# only the top 50 rules (ranked by prevented count) are injected.
+# Tests the tiered harness-rules injection:
+#   - Seed rules ([Seed #...]) are always injected (Tier 1)
+#   - Auto-generated Harness rules ([Harness #...]) are deferred with a file pointer
+#   - Synapse routing is injected as a compact 1-line keyword map
 #
 # Usage: bash tests/test-setup-check-summary.sh
 
@@ -68,93 +70,47 @@ setup_state() {
   echo "$state_dir"
 }
 
-# Generate N harness rules
-generate_rules() {
-  local file="$1" count="$2"
-  > "$file"
-  for i in $(seq 1 "$count"); do
-    printf '[Harness #%d] Test rule %d (auto-generated 2026-04-12)\n' "$i" "$i" >> "$file"
-  done
-}
-
-# Generate harness-log with prevented events
-generate_log() {
-  local file="$1"
-  shift
-  > "$file"
-  # Args: pairs of "rule_id count"
-  while [ $# -ge 2 ]; do
-    local rid="$1" cnt="$2"
-    shift 2
-    for i in $(seq 1 "$cnt"); do
-      printf '{"v":2,"ts":"2026-04-12T00:00:00Z","type":"rule_prevented","rule_id":%s,"file":"test.ts","session_pid":"1"}\n' "$rid" >> "$file"
-    done
-  done
-}
-
-# Run setup-check.sh with overridden state dir
+# Run the harness-rules + synapse section of setup-check.sh with overridden state dir
 run_setup_check() {
   local state_dir="$1"
-  # Override get_state_dir to return our test dir
   SYMBIOTE_HOME="$TMPDIR" \
   CLAUDE_PROJECT_DIR="/tmp/test" \
   echo '{}' | bash -c "
-    # Override slug to point to our state
     get_project_slug() { echo 'test-state'; }
     get_state_root() { echo '$TMPDIR'; }
     source '$PROJECT_ROOT/shared/hooks/scripts/lib/common.sh'
     get_state_dir() { echo '$state_dir'; }
     export -f get_state_dir get_state_root get_project_slug json_field json_nested_field json_escape
 
-    # Source the relevant section of setup-check.sh
     STATE_DIR='$state_dir'
     CONTEXT_PARTS=()
 
-    # Harness rules section (extracted logic)
+    # Harness rules: Tier 1 Seed + deferred Harness pointer
     if [ -f \"\$STATE_DIR/harness-rules.md\" ]; then
       RULES_CONTENT=\$(cat \"\$STATE_DIR/harness-rules.md\" 2>/dev/null)
       if [ -n \"\$RULES_CONTENT\" ]; then
+        SEED_RULES=\$(grep '^\[Seed #' \"\$STATE_DIR/harness-rules.md\" 2>/dev/null)
+        HARNESS_COUNT=\$(grep -c '^\[Harness #' \"\$STATE_DIR/harness-rules.md\" 2>/dev/null) || HARNESS_COUNT=0
+
+        if [ -n \"\$SEED_RULES\" ]; then
+          CONTEXT_PARTS+=(\"\$SEED_RULES\")
+        fi
+        if [ \"\$HARNESS_COUNT\" -gt 0 ]; then
+          CONTEXT_PARTS+=(\"\${HARNESS_COUNT} auto-generated rules active. Read \$STATE_DIR/harness-rules.md before editing files.\")
+        fi
+
         RULES_LINES=\$(echo \"\$RULES_CONTENT\" | wc -l | tr -d ' ')
-        if [ \"\$RULES_LINES\" -le 50 ]; then
-          CONTEXT_PARTS+=(\"\$RULES_CONTENT\")
-        else
-          HARNESS_LOG=\"\$STATE_DIR/harness-log.jsonl\"
-          if [ -f \"\$HARNESS_LOG\" ]; then
-            RANKED_IDS=\$(grep '\"type\":\"rule_prevented\"' \"\$HARNESS_LOG\" 2>/dev/null | \\
-              grep -o '\"rule_id\":[0-9]*' | sed 's/\"rule_id\"://' | \\
-              sort | uniq -c | sort -rn | awk '{print \$2}')
-            if [ -n \"\$RANKED_IDS\" ]; then
-              RANKED_RULES=\"\"
-              for rid in \$RANKED_IDS; do
-                RULE_LINE=\$(grep -m1 \"\\\\[Harness #\${rid}\\\\]\\\\|\\\\[Seed #\${rid}\\\\]\" \"\$STATE_DIR/harness-rules.md\" 2>/dev/null)
-                [ -n \"\$RULE_LINE\" ] && RANKED_RULES=\"\${RANKED_RULES}\${RULE_LINE}
-\"
-              done
-              while IFS= read -r line; do
-                case \"\$line\" in \\[Harness\\ \\#*\\]* | \\[Seed\\ \\#*\\]*)
-                  if ! echo \"\$RANKED_RULES\" | grep -qF \"\$line\" 2>/dev/null; then
-                    RANKED_RULES=\"\${RANKED_RULES}\${line}
-\"
-                  fi
-                  ;; esac
-              done < \"\$STATE_DIR/harness-rules.md\"
-              SUMMARY_CONTENT=\$(echo \"\$RANKED_RULES\" | head -50)
-            else
-              SUMMARY_CONTENT=\$(head -50 \"\$STATE_DIR/harness-rules.md\")
-            fi
-          else
-            SUMMARY_CONTENT=\$(head -50 \"\$STATE_DIR/harness-rules.md\")
-          fi
-          OMITTED=\$((\$RULES_LINES - 50))
-          CONTEXT_PARTS+=(\"\$SUMMARY_CONTENT [OMITTED:\$OMITTED]\")
-          if [ \"\$RULES_LINES\" -gt 300 ]; then
-            CONTEXT_PARTS+=(\"[GC_WARNING]\")
-          fi
+        if [ \"\$RULES_LINES\" -gt 300 ]; then
+          CONTEXT_PARTS+=(\"[GC_WARNING]\")
         fi
       fi
     fi
 
-    # Output result
+    # Synapse compact routing
+    if [ -f \"\$STATE_DIR/manifest.json\" ]; then
+      CONTEXT_PARTS+=('[Synapse] Keywords: \"until done/keep going\"->auto, \"deep analysis\"->analyze, \"code review\"->review, \"plan\"->plan, \"commit\"->git-commit. Medium+ tasks: form Scout/Architect/Builder/Inspector team.')
+    fi
+
     for part in \"\${CONTEXT_PARTS[@]}\"; do
       echo \"\$part\"
     done
@@ -162,73 +118,108 @@ run_setup_check() {
 }
 
 echo ""
-echo "=== setup-check.sh Summary Mode Tests ==="
+echo "=== setup-check.sh 3-Tier Lazy Context Tests ==="
 echo ""
 
-# Test 1: Rules <=50 lines → inject all (no summary)
-echo "--- Test 1: Rules under 50 lines (full injection) ---"
+# --- Harness Rules Tests ---
+
+# Test 1: Seed rules injected, Harness rules deferred
+echo "--- Test 1: Seed rules injected, Harness rules deferred ---"
 STATE=$(setup_state)
-generate_rules "$STATE/harness-rules.md" 30
+cat > "$STATE/harness-rules.md" <<'EOF'
+[Seed #G1] Always read the target file before editing
+[Seed #G2] When an edit fails with "not unique", include more context
+[Seed #S1] Never add @MainActor to a protocol without checking
+[Harness #1] Read Fastfile content before editing (auto-generated 2026-04-14)
+[Harness #2] Run build/test after each edit batch (auto-generated 2026-04-14)
+EOF
 OUTPUT=$(run_setup_check "$STATE")
-RULE30=$(echo "$OUTPUT" | grep -c '\[Harness #' 2>/dev/null) || RULE30=0
-assert_eq "30 rules: all injected" "30" "$RULE30"
-assert_not_contains "30 rules: no OMITTED marker" "OMITTED:" "$OUTPUT"
+assert_contains "Seed G1 is injected" "[Seed #G1]" "$OUTPUT"
+assert_contains "Seed G2 is injected" "[Seed #G2]" "$OUTPUT"
+assert_contains "Seed S1 is injected" "[Seed #S1]" "$OUTPUT"
+assert_not_contains "Harness #1 not directly injected" "[Harness #1]" "$OUTPUT"
+assert_not_contains "Harness #2 not directly injected" "[Harness #2]" "$OUTPUT"
+assert_contains "Harness pointer with count" "2 auto-generated rules active" "$OUTPUT"
+assert_contains "Harness pointer has Read instruction" "Read" "$OUTPUT"
 
-# Test 2: Rules >50 lines → summary mode
+# Test 2: Only Harness rules (no Seeds) → pointer only
 echo ""
-echo "--- Test 2: Rules over 50 lines (summary mode) ---"
+echo "--- Test 2: Only Harness rules (no Seeds) → pointer only ---"
 STATE=$(setup_state)
-generate_rules "$STATE/harness-rules.md" 80
+cat > "$STATE/harness-rules.md" <<'EOF'
+[Harness #1] Read Fastfile before editing (auto-generated 2026-04-14)
+[Harness #2] Run build after changes (auto-generated 2026-04-14)
+[Harness #3] Check imports (auto-generated 2026-04-14)
+EOF
 OUTPUT=$(run_setup_check "$STATE")
-INJECTED=$(echo "$OUTPUT" | grep -c '\[Harness #' 2>/dev/null) || INJECTED=0
-assert_eq "80 rules: only 50 injected" "50" "$INJECTED"
-assert_contains "80 rules: OMITTED marker present" "OMITTED:30" "$OUTPUT"
+assert_not_contains "No Seed in output" "[Seed #" "$OUTPUT"
+assert_contains "Harness pointer with count 3" "3 auto-generated rules active" "$OUTPUT"
 
-# Test 3: Rules >300 lines → GC warning
+# Test 3: Only Seed rules (no Harness) → seeds injected, no pointer
 echo ""
-echo "--- Test 3: Rules over 300 lines (GC warning) ---"
+echo "--- Test 3: Only Seed rules → seeds injected, no pointer ---"
 STATE=$(setup_state)
-generate_rules "$STATE/harness-rules.md" 310
+cat > "$STATE/harness-rules.md" <<'EOF'
+[Seed #G1] Always read the target file before editing
+[Seed #G2] When an edit fails, include more context
+EOF
 OUTPUT=$(run_setup_check "$STATE")
-assert_contains "310 rules: GC warning present" "[GC_WARNING]" "$OUTPUT"
+assert_contains "Seed G1 is injected" "[Seed #G1]" "$OUTPUT"
+assert_contains "Seed G2 is injected" "[Seed #G2]" "$OUTPUT"
+assert_not_contains "No harness pointer" "auto-generated rules active" "$OUTPUT"
 
-# Test 4: Prevented count ranking
+# Test 4: Empty rules file → no output
 echo ""
-echo "--- Test 4: Rules ranked by prevented count ---"
-STATE=$(setup_state)
-generate_rules "$STATE/harness-rules.md" 60
-# Rule #55 has 10 prevented events, rule #3 has 5 — #55 should appear before #3
-generate_log "$STATE/harness-log.jsonl" 55 10 3 5 1 1
-OUTPUT=$(run_setup_check "$STATE")
-# Check that rule #55 appears in output (it was the most prevented)
-assert_contains "Prevented ranking: rule #55 (most prevented) in output" "[Harness #55]" "$OUTPUT"
-
-# Test 5: No harness-log.jsonl → fallback to first 50
-echo ""
-echo "--- Test 5: No harness-log → fallback to first 50 ---"
-STATE=$(setup_state)
-generate_rules "$STATE/harness-rules.md" 70
-# No harness-log.jsonl created
-OUTPUT=$(run_setup_check "$STATE")
-assert_contains "No log: rule #1 present (first 50)" "[Harness #1]" "$OUTPUT"
-assert_not_contains "No log: rule #60 omitted (beyond 50)" "[Harness #60]" "$OUTPUT"
-
-# Test 6: Empty harness-rules.md → no output
-echo ""
-echo "--- Test 6: Empty rules file ---"
+echo "--- Test 4: Empty rules file ---"
 STATE=$(setup_state)
 touch "$STATE/harness-rules.md"
 OUTPUT=$(run_setup_check "$STATE")
-RULE_COUNT=$(echo "$OUTPUT" | grep -c '\[Harness #' 2>/dev/null) || RULE_COUNT=0
-assert_eq "Empty rules: no rules injected" "0" "$RULE_COUNT"
+assert_not_contains "Empty rules: no Seed output" "[Seed #" "$OUTPUT"
+assert_not_contains "Empty rules: no Harness pointer" "auto-generated" "$OUTPUT"
 
-# Test 7: No harness-rules.md → no output
+# Test 5: No rules file → no output
 echo ""
-echo "--- Test 7: No rules file ---"
+echo "--- Test 5: No rules file ---"
 STATE=$(setup_state)
 OUTPUT=$(run_setup_check "$STATE")
-RULE_COUNT=$(echo "$OUTPUT" | grep -c '\[Harness #' 2>/dev/null) || RULE_COUNT=0
-assert_eq "No rules file: no rules injected" "0" "$RULE_COUNT"
+assert_not_contains "No file: no Seed output" "[Seed #" "$OUTPUT"
+assert_not_contains "No file: no Harness pointer" "auto-generated" "$OUTPUT"
+
+# Test 6: 300+ lines → GC warning
+echo ""
+echo "--- Test 6: 300+ lines → GC warning ---"
+STATE=$(setup_state)
+{
+  echo "[Seed #G1] Always read the target file before editing"
+  for i in $(seq 1 310); do
+    printf '[Harness #%d] Test rule %d (auto-generated 2026-04-12)\n' "$i" "$i"
+  done
+} > "$STATE/harness-rules.md"
+OUTPUT=$(run_setup_check "$STATE")
+assert_contains "310 rules: GC warning present" "[GC_WARNING]" "$OUTPUT"
+assert_contains "Seed still injected with many rules" "[Seed #G1]" "$OUTPUT"
+
+# --- Synapse Routing Tests ---
+
+# Test 7: Synapse compact routing injected when manifest exists
+echo ""
+echo "--- Test 7: Synapse compact routing ---"
+STATE=$(setup_state)
+touch "$STATE/harness-rules.md"
+OUTPUT=$(run_setup_check "$STATE")
+assert_contains "Synapse compact present" "[Synapse]" "$OUTPUT"
+assert_contains "Synapse has keyword mapping" "auto" "$OUTPUT"
+assert_contains "Synapse has team composition" "Scout/Architect/Builder/Inspector" "$OUTPUT"
+
+# Test 8: Old Synapse full block is NOT present
+echo ""
+echo "--- Test 8: Old Synapse full block absent ---"
+STATE=$(setup_state)
+touch "$STATE/harness-rules.md"
+OUTPUT=$(run_setup_check "$STATE")
+assert_not_contains "No old Synapse header" "[Synapse Orchestrator]" "$OUTPUT"
+assert_not_contains "No Mode Detection section" "## Mode Detection" "$OUTPUT"
+assert_not_contains "No Team-based Execution section" "## Team-based Execution" "$OUTPUT"
 
 echo ""
 echo "=== Results ==="

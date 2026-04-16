@@ -305,103 +305,42 @@ if [ -d "$STATE_DIR/state" ]; then
   done
 fi
 
+# Tier 1: inject first 5 non-empty lines as excerpt + file pointer for full details
 if [ -f "$STATE_DIR/context.md" ]; then
-  CONTEXT_CONTENT=$(cat "$STATE_DIR/context.md" 2>/dev/null)
-  if [ -n "$CONTEXT_CONTENT" ]; then
-    CONTEXT_PARTS+=("[Symbiote Context] $CONTEXT_CONTENT")
+  CONTEXT_EXCERPT=$(grep -v '^$' "$STATE_DIR/context.md" 2>/dev/null | head -5 | tr '\n' ' ')
+  if [ -n "$CONTEXT_EXCERPT" ]; then
+    CONTEXT_PARTS+=("[Symbiote Context] ${CONTEXT_EXCERPT} | Full details: Read $STATE_DIR/context.md before making code changes.")
   fi
 fi
 
-# Harness rules: inject from separate file (Seed + Harness rules)
-# Token optimization: when rules exceed 50 lines, inject only the most effective
-# rules ranked by prevented count from harness-log.jsonl.
+# Harness rules: Tier 1 injects Seed rules (always needed for error prevention).
+# Auto-generated Harness rules are deferred — a file pointer tells the AI to Read them before editing.
 if [ -f "$STATE_DIR/harness-rules.md" ]; then
   RULES_CONTENT=$(cat "$STATE_DIR/harness-rules.md" 2>/dev/null)
   if [ -n "$RULES_CONTENT" ]; then
+    # Extract Seed rules (always needed for error prevention)
+    SEED_RULES=$(grep '^\[Seed #' "$STATE_DIR/harness-rules.md" 2>/dev/null)
+    # Count auto-generated Harness rules
+    HARNESS_COUNT=$(grep -c '^\[Harness #' "$STATE_DIR/harness-rules.md" 2>/dev/null) || HARNESS_COUNT=0
+
+    if [ -n "$SEED_RULES" ]; then
+      CONTEXT_PARTS+=("[Harness Seed Rules] $SEED_RULES")
+    fi
+    if [ "$HARNESS_COUNT" -gt 0 ]; then
+      CONTEXT_PARTS+=("[Harness] ${HARNESS_COUNT} auto-generated rules active. Read $STATE_DIR/harness-rules.md before editing files.")
+    fi
+
     RULES_LINES=$(echo "$RULES_CONTENT" | wc -l | tr -d ' ')
-    if [ "$RULES_LINES" -le 50 ]; then
-      CONTEXT_PARTS+=("[Harness Rules] $RULES_CONTENT")
-    else
-      # Summary mode: rank rules by prevented count and inject top 50 lines
-      HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
-      if [ -f "$HARNESS_LOG" ]; then
-        # Count prevented events per rule_id, sort descending
-        RANKED_IDS=$(grep '"type":"rule_prevented"' "$HARNESS_LOG" 2>/dev/null | \
-          grep -o '"rule_id":[0-9]*' | sed 's/"rule_id"://' | \
-          sort | uniq -c | sort -rn | awk '{print $2}')
-        if [ -n "$RANKED_IDS" ]; then
-          # Build ranked rules content: rules ordered by effectiveness
-          RANKED_RULES=""
-          for rid in $RANKED_IDS; do
-            RULE_LINE=$(grep -m1 "\\[Harness #${rid}\\]\\|\\[Seed #${rid}\\]" "$STATE_DIR/harness-rules.md" 2>/dev/null)
-            [ -n "$RULE_LINE" ] && RANKED_RULES="${RANKED_RULES}${RULE_LINE}
-"
-          done
-          # Append remaining rules not in prevented log
-          while IFS= read -r line; do
-            case "$line" in \[Harness\ \#*\]* | \[Seed\ \#*\]*)
-              if ! echo "$RANKED_RULES" | grep -qF "$line" 2>/dev/null; then
-                RANKED_RULES="${RANKED_RULES}${line}
-"
-              fi
-              ;; esac
-          done < "$STATE_DIR/harness-rules.md"
-          SUMMARY_CONTENT=$(echo "$RANKED_RULES" | head -50)
-        else
-          # No prevented data: fall back to first 50 lines
-          SUMMARY_CONTENT=$(head -50 "$STATE_DIR/harness-rules.md")
-        fi
-      else
-        SUMMARY_CONTENT=$(head -50 "$STATE_DIR/harness-rules.md")
-      fi
-      OMITTED=$((RULES_LINES - 50))
-      CONTEXT_PARTS+=("[Harness Rules (top 50 of ${RULES_LINES}, ranked by effectiveness)] $SUMMARY_CONTENT
-[${OMITTED} additional rules omitted. Run /gc to prune unused rules.]")
-      if [ "$RULES_LINES" -gt 300 ]; then
-        CONTEXT_PARTS+=("[Harness] harness-rules.md has ${RULES_LINES} lines (recommended max 300). Run gc skill to prune.")
-      fi
+    if [ "$RULES_LINES" -gt 300 ]; then
+      CONTEXT_PARTS+=("[Harness] harness-rules.md has ${RULES_LINES} lines (recommended max 300). Run gc skill to prune.")
     fi
   fi
 fi
 
-# Synapse orchestrator routing rules injection
+# Synapse orchestrator: compact keyword routing (Tier 1)
+# Full routing details are in synapse/SKILL.md and roles/SKILL.md (loaded on demand).
 if [ -f "$STATE_DIR/manifest.json" ]; then
-  SYNAPSE_ROUTING='[Synapse Orchestrator] You are the Synapse team leader of ai-symbiote. Analyze user requests and act according to the rules below.
-
-## Mode Detection (keyword matching from user message)
-- "until done","do not stop","keep going" → Skill(skill:"ai-symbiote:auto", args:"<task>")
-- "max performance","parallel","autopilot" → Skill(skill:"ai-symbiote:auto", args:"<task> --mode parallel-max")
-- "deep analysis","deep search","analyze deeply" → Skill(skill:"ai-symbiote:analyze", args:"<target>")
-- "code review","review this" → Skill(skill:"ai-symbiote:review")
-- "make a plan","plan" → Skill(skill:"ai-symbiote:plan", args:"<task>")
-- "research","investigate" → analysis team + Researcher
-- "requirements","PRD","feature spec" → Skill(skill:"ralph-skills:prd")
-- "update project","evolve" → Skill(skill:"ai-symbiote:evolve")
-- "commit" → Skill(skill:"ai-symbiote:git-commit")
-
-## Team-based Execution (medium+ tasks)
-Even without explicit keywords, form a team for medium+ scope:
-1. Scout(Explore, sonnet) x1-2 for codebase exploration
-2. Architect(Plan, opus) x1 for implementation planning
-3. Builder(general-purpose, sonnet) x1-3 for implementation
-4. Inspector(general-purpose, sonnet) x1 for verification
-Filesystem contract: ~/ai-symbiote/{slug}/state/{task-folder}/ stores ralph-state.md, team-manifest.json, results/*.result.md
-
-## Task Scope Assessment
-- simple: 1-2 files, single function change → handle directly (no team needed)
-- medium: 3-5 files, cross-module work → Scout + Builder + Inspector
-- large: 5+ files, architecture change → full team (Scout → Architect → Builder → Inspector)
-
-## Reference Skills
-When forming teams, Read roles/SKILL.md and team-templates/SKILL.md for prompt templates and output contracts.
-Inject code-accuracy, verify-loop, plan skills into each role.
-
-## Principles
-- Respond in the language the user uses
-- Handle simple tasks directly without team formation
-- Pass subagent results via filesystem
-- Escalate on: maxIterations reached, same error 3 times, destructive changes require user confirmation'
-  CONTEXT_PARTS+=("$SYNAPSE_ROUTING")
+  CONTEXT_PARTS+=('[Synapse] Keywords: "until done/keep going"->auto, "max performance/parallel"->auto --parallel-max, "deep analysis"->analyze, "code review"->review, "plan"->plan, "PRD"->prd, "evolve"->evolve, "commit"->git-commit. Medium+ tasks: form Scout/Architect/Builder/Inspector team. Simple tasks: handle directly. Read synapse/SKILL.md and roles/SKILL.md for team details.')
 fi
 
 # Messenger bridge: check pending commands
