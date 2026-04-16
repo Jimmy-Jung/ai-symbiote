@@ -1,0 +1,39 @@
+{
+  "_note": "Unified service detection patterns. Each store loads this file and filters by its own catalog services keys.",
+  "_updated": "2026-04-15",
+  "patterns": {
+    "aws": ["@aws-sdk/", "boto3", "aws-cdk"],
+    "cloudflare": ["@cloudflare/", "wrangler"],
+    "docker": ["docker"],
+    "figma": ["figma"],
+    "github": ["github", "@octokit/"],
+    "grafana": ["grafana"],
+    "kubernetes": ["@kubernetes/client-node", "kubernetes"],
+    "linear": ["@linear/sdk"],
+    "mongodb": ["mongodb", "mongoose"],
+    "neon": ["@neondatabase/", "neon"],
+    "netlify": ["@netlify/", "netlify"],
+    "notion": ["@notionhq/"],
+    "playwright": ["@playwright/test", "playwright"],
+    "postgres": ["pg", "postgres"],
+    "sanity": ["sanity"],
+    "sentry": ["@sentry/", "sentry-sdk"],
+    "slack": ["@slack/", "slack-sdk"],
+    "sqlite": ["sqlite", "better-sqlite3"],
+    "stripe": ["stripe"],
+    "supabase": ["@supabase/supabase-js", "supabase"],
+    "terraform": [".tf"],
+    "vercel": ["@vercel/", "vercel"],
+    "wordpress": ["wordpress", "@wordpress/"]
+  },
+  "candidateFiles": [
+    "package.json",
+    "requirements.txt",
+    "pyproject.toml",
+    "Cargo.toml",
+    "go.mod",
+    "Package.swift",
+    "Dockerfile",
+    "wrangler.toml"
+  ]
+}

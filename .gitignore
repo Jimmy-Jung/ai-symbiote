@@ -1,5 +1,4 @@
 dist/
-plugins/
 .DS_Store
 .gstack/
 # AI agent 프로젝트 설정 (ai-symbiote setup 자동 생성)
