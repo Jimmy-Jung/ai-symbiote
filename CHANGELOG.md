@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
   - **Context Budget 스킬** — 토큰 소비 4단계 감사 (Inventory → Classify → Detect → Report)
   - **Instinct 시스템** — 프로젝트별 성공/실패 패턴 학습, confidence 기반 자동 만료/승격
 - **Dispatcher 통합** — PreToolUse(Edit|Write) 훅 3개를 단일 dispatcher로 통합하여 hooks.json 비대화 방지
+- **Smart Skill Routing** — 자연어 의도 분류 기반 스킬 추천 (Intent Router) + 작업 완료 후 컨텍스트 인지 다음 단계 제안 (Next Action Recommender). 언어 독립적 시맨틱 힌트 기반
 
 ### Fixed
 - **마켓플레이스 플러그인 설치 실패** — `plugins/`가 `.gitignore`에 포함되어 클론 시 `source` 경로가 존재하지 않는 문제 수정. `plugins/ai-symbiote/` 빌드 산출물을 Git 추적에 포함
