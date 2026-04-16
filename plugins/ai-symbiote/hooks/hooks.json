@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success",
+  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success, intent-router, next-action",
   "hooks": {
     "SessionStart": [
       {
@@ -146,6 +146,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/instinct-observer.sh\"",
             "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/next-action.sh\"",
+            "timeout": 10
           }
         ]
       }
@@ -157,6 +162,11 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/usage-tracker.sh\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/intent-router.sh\"",
+            "timeout": 5
           }
         ]
       }

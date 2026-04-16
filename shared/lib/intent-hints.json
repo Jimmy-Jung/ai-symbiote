@@ -1,0 +1,108 @@
+{
+  "categories": {
+    "fix": {
+      "signals": [
+        "The user wants to fix, repair, debug, or correct a bug or error",
+        "The user reports something broken, crashing, failing, or not working as expected"
+      ],
+      "recommended_skills": ["investigate", "auto"],
+      "example_prompts": [
+        "이 버그 수정해줘",
+        "로그인이 안 돼, 원인 찾아줘",
+        "Fix this crash on startup",
+        "Debug why the API returns 500"
+      ]
+    },
+    "design": {
+      "signals": [
+        "The user wants to plan, architect, design, or structure a solution",
+        "The user is exploring how to approach a problem before implementing"
+      ],
+      "recommended_skills": ["plan"],
+      "example_prompts": [
+        "이 기능을 어떻게 설계하면 좋을까",
+        "아키텍처 구조를 잡아보자",
+        "How should we structure the auth system",
+        "Let's design the database schema"
+      ]
+    },
+    "implement": {
+      "signals": [
+        "The user wants to add, create, build, or implement a new feature or functionality",
+        "The user has a clear requirement and wants it coded"
+      ],
+      "recommended_skills": ["plan", "auto"],
+      "example_prompts": [
+        "다크모드 기능을 추가해줘",
+        "사용자 프로필 페이지 만들어줘",
+        "Add a logout button to the header",
+        "Implement the payment integration"
+      ]
+    },
+    "analyze": {
+      "signals": [
+        "The user wants to understand impact, side effects, dependencies, or code structure",
+        "The user is investigating 'what would happen if' or 'what does this affect'"
+      ],
+      "recommended_skills": ["analyze"],
+      "example_prompts": [
+        "이 변경의 사이드이펙트를 분석해줘",
+        "이 모듈이 어디에서 쓰이는지 알려줘",
+        "What would break if I change this API",
+        "Analyze the impact of removing this dependency"
+      ]
+    },
+    "review": {
+      "signals": [
+        "The user wants a quality check, code review, verification, or audit of existing code or changes",
+        "The user asks if something is correct, safe, or follows best practices"
+      ],
+      "recommended_skills": ["review"],
+      "example_prompts": [
+        "내가 수정한 코드 리뷰해줘",
+        "이 구현이 맞는지 확인해줘",
+        "Review my changes before I commit",
+        "Check if this follows our coding standards"
+      ]
+    },
+    "document": {
+      "signals": [
+        "The user wants to create, update, or improve documentation",
+        "The user mentions docs, README, changelogs, or API documentation"
+      ],
+      "recommended_skills": ["dev-docs"],
+      "example_prompts": [
+        "문서 업데이트해줘",
+        "README에 이 기능 설명 추가해줘",
+        "Update the docs after this change",
+        "Generate API documentation"
+      ]
+    },
+    "deploy": {
+      "signals": [
+        "The user wants to ship, release, deploy, create a PR, or push to production",
+        "The user is finishing up and wants to deliver the work"
+      ],
+      "recommended_skills": ["ship"],
+      "example_prompts": [
+        "PR 만들어줘",
+        "배포 준비해줘",
+        "Create a pull request for this branch",
+        "Ship this to production"
+      ]
+    },
+    "none": {
+      "signals": [
+        "Casual conversation, greeting, simple factual question, or clarification",
+        "The user is not requesting a specific development workflow"
+      ],
+      "recommended_skills": [],
+      "example_prompts": [
+        "안녕",
+        "이 함수가 뭐하는 거야?",
+        "Hello",
+        "What does this function do?"
+      ]
+    }
+  }
+}

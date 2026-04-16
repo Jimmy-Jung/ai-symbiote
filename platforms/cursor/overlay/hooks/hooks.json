@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success",
+  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success, intent-router, next-action",
   "version": 1,
   "hooks": {
     "sessionStart": [
@@ -79,11 +79,25 @@
       {
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/instinct-observer.sh\"",
         "timeout": 30
+      },
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/next-action.sh\"",
+        "timeout": 10
       }
     ],
     "postToolUseFailure": [
       {
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/mcp-health-failure.sh\"",
+        "timeout": 5
+      }
+    ],
+    "userPromptSubmit": [
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/usage-tracker.sh\"",
+        "timeout": 10
+      },
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/intent-router.sh\"",
         "timeout": 5
       }
     ]

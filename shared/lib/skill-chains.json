@@ -1,0 +1,51 @@
+{
+  "chains": {
+    "plan": {
+      "next": ["auto", "plan"],
+      "message": "Plan ready. Implement with /auto or refine with /plan"
+    },
+    "auto": {
+      "next": ["commit", "review", "ship"],
+      "message": "Implementation done. Next: /commit to save, /review to check quality, or /ship to create PR"
+    },
+    "review": {
+      "next": ["auto", "ship"],
+      "message": "Review complete. Fix issues with /auto or ship with /ship"
+    },
+    "commit": {
+      "next": ["review", "ship"],
+      "message": "Committed. Next: /review for quality check or /ship to create PR"
+    },
+    "prd": {
+      "next": ["ralph", "plan"],
+      "message": "PRD ready. Convert to tasks with /ralph or start implementing with /plan"
+    },
+    "investigate": {
+      "next": ["auto", "plan"],
+      "message": "Investigation done. Fix with /auto or plan the approach with /plan"
+    },
+    "security": {
+      "next": ["auto"],
+      "message": "Security scan done. Fix findings with /auto"
+    },
+    "analyze": {
+      "next": ["plan", "auto"],
+      "message": "Analysis complete. Design with /plan or implement with /auto"
+    },
+    "dev-docs": {
+      "next": ["commit"],
+      "message": "Documentation updated. Save with /commit"
+    },
+    "ship": {
+      "next": [],
+      "message": ""
+    }
+  },
+  "git_context_fallbacks": {
+    "modified_uncommitted": "Changes detected. Consider: /commit to save, /review to check quality",
+    "feature_branch_with_commits": "On feature branch with commits. Consider: /ship to create PR",
+    "new_files_added": "New files added. Consider: /review for quality check, /dev-docs to update documentation",
+    "tests_modified": "Tests modified. Consider running tests before committing",
+    "no_changes": ""
+  }
+}
