@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard",
+  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard, suggest-compact, config-protection",
   "version": 1,
   "hooks": {
     "sessionStart": [
@@ -8,11 +8,27 @@
         "timeout": 10
       }
     ],
+    "preCompact": [
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/pre-compact.sh\"",
+        "timeout": 10
+      }
+    ],
     "preToolUse": [
       {
         "matcher": "Shell",
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/guard-shell.sh\"",
         "timeout": 10
+      },
+      {
+        "matcher": "Write",
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
+        "timeout": 5
+      },
+      {
+        "matcher": "Write",
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/config-protection.sh\"",
+        "timeout": 5
       }
     ],
     "postToolUse": [

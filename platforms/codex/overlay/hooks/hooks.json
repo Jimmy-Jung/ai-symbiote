@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check. Note: Codex PostToolUse only supports Bash matcher, so usage-tracker(Read) and comment-checker/messenger-notify(Write|Edit) are omitted.",
+  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check, suggest-compact, config-protection. Note: Codex PostToolUse only supports Bash matcher, so usage-tracker(Read) and comment-checker/messenger-notify(Write|Edit) are omitted.",
   "hooks": {
     "SessionStart": [
       {
@@ -20,6 +20,26 @@
             "type": "command",
             "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/guard-shell.sh\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/suggest-compact.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/config-protection.sh\"",
+            "timeout": 5
           }
         ]
       }

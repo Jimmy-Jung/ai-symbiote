@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, usage-tracker, harness-learn, comment-checker, messenger-notify",
+  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, suggest-compact, config-protection",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,17 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/setup-check.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/pre-compact.sh\"",
             "timeout": 10
           }
         ]
@@ -20,6 +31,26 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/guard-shell.sh\"",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/config-protection.sh\"",
+            "timeout": 5
           }
         ]
       }
