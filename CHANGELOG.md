@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [0.10.3] - 2026-04-16
 
+### Added
+- **3-Tier Lazy Context** — SessionStart 훅의 컨텍스트 주입을 3단계 지연 로딩으로 전환. Tier 1(항상): manifest 요약 + context.md 5줄 발췌 + Seed 룰 + Synapse 키워드 맵. Tier 2(첫 코드 작업 시): AI가 pointer를 보고 context.md, harness-rules.md를 Read. 세션당 ~1,617 토큰 절감 (74%)
+
 ### Fixed
 - **마켓플레이스 플러그인 설치 실패** — `plugins/`가 `.gitignore`에 포함되어 클론 시 `source` 경로가 존재하지 않는 문제 수정. `plugins/ai-symbiote/` 빌드 산출물을 Git 추적에 포함
 
