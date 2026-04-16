@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard, suggest-compact, config-protection, gateguard, mcp-health-check, mcp-health-failure, mcp-health-success",
+  "description": "ai-symbiote hooks (Cursor): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, build-watcher, security-guard, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success",
   "version": 1,
   "hooks": {
     "sessionStart": [
@@ -22,18 +22,8 @@
       },
       {
         "matcher": "Write",
-        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
-        "timeout": 5
-      },
-      {
-        "matcher": "Write",
-        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/config-protection.sh\"",
-        "timeout": 5
-      },
-      {
-        "matcher": "Write",
-        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/gateguard-gate.sh\"",
-        "timeout": 5
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/pre-edit-write-dispatcher.sh\"",
+        "timeout": 10
       },
       {
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/mcp-health-check.sh\"",
@@ -85,6 +75,10 @@
       {
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/cost-tracker.sh\"",
         "timeout": 10
+      },
+      {
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/instinct-observer.sh\"",
+        "timeout": 30
       }
     ],
     "postToolUseFailure": [

@@ -343,6 +343,25 @@ if [ -f "$STATE_DIR/manifest.json" ]; then
   CONTEXT_PARTS+=('[Synapse] Keywords: "until done/keep going"->auto, "max performance/parallel"->auto --parallel-max, "deep analysis"->analyze, "code review"->review, "plan"->plan, "PRD"->prd, "evolve"->evolve, "commit"->git-commit. Medium+ tasks: form Scout/Architect/Builder/Inspector team. Simple tasks: handle directly. Read synapse/SKILL.md and roles/SKILL.md for team details.')
 fi
 
+# Instinct cleanup: remove expired instincts (confidence < 0.3)
+if [ -d "$STATE_DIR/instincts" ]; then
+  for instinct_file in "$STATE_DIR/instincts"/*.yaml; do
+    [ -f "$instinct_file" ] || continue
+    CONFIDENCE=$(grep -m1 '^confidence:' "$instinct_file" 2>/dev/null | awk '{print $2}')
+    if [ -n "$CONFIDENCE" ]; then
+      # Compare as string: "0.2" < "0.3" works with lexicographic compare for single-decimal floats
+      IS_EXPIRED=$(python3 -c "print('yes' if float('${CONFIDENCE}') < 0.3 else 'no')" 2>/dev/null || echo "no")
+      if [ "$IS_EXPIRED" = "yes" ]; then
+        INSTINCT_NAME=$(grep -m1 '^name:' "$instinct_file" 2>/dev/null | sed 's/^name:[[:space:]]*//')
+        ESCAPED_NAME=$(json_escape "$INSTINCT_NAME")
+        printf '{"v":2,"ts":"%s","type":"instinct_expired","name":"%s","confidence":%s}\n' \
+          "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ESCAPED_NAME" "$CONFIDENCE" >> "$STATE_DIR/harness-log.jsonl"
+        rm -f "$instinct_file"
+      fi
+    fi
+  done
+fi
+
 # Messenger bridge: check pending commands
 MESSENGER_CMD_DIR="$STATE_DIR/messenger/commands"
 if [ -d "$MESSENGER_CMD_DIR" ]; then

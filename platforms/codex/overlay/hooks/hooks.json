@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check, suggest-compact, config-protection. Note: Codex lacks PostToolUse(Read) and PostToolUseFailure, so gateguard (requires Read tracker) and mcp-health-check (requires failure tracking) are omitted.",
+  "description": "ai-symbiote hooks (Codex CLI): guard-shell, setup-check, pre-edit-write-dispatcher. Note: Codex lacks PostToolUse(Read) and PostToolUseFailure, so gateguard (requires Read tracker) and mcp-health-check (requires failure tracking) are omitted.",
   "hooks": {
     "SessionStart": [
       {
@@ -24,25 +24,15 @@
         ]
       },
       {
-        "matcher": "Edit|Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/suggest-compact.sh\"",
-            "timeout": 5
-          }
-        ]
-      },
-      {
         "matcher": "Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/config-protection.sh\"",
-            "timeout": 5
+            "command": "bash \"${AI_SYMBIOTE_ROOT:-$HOME/plugins/ai-symbiote}/hooks/scripts/pre-edit-write-dispatcher.sh\"",
+            "timeout": 10
           }
         ]
-      },
+      }
     ],
     "PostToolUse": [
       {
