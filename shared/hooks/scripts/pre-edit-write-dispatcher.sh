@@ -14,7 +14,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # --- 1. Read stdin into temp file (needs to be passed to each sub-handler) ---
 STDIN_TMP=$(mktemp "${TMPDIR:-/tmp}/symbiote-dispatcher.XXXXXX" 2>/dev/null)
-cat > "$STDIN_TMP"
+read_stdin_safe > "$STDIN_TMP"
 trap 'rm -f "$STDIN_TMP"' EXIT
 
 # --- 2. config-protection.sh (highest priority — blocking a config edit is more important) ---

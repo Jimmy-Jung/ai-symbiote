@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
 # --- 1. Read stdin JSON ---
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 # --- 2. Extract file_path from tool input (structured JSON parsing) ---
 FILE_PATH=""

@@ -8,7 +8,7 @@ source "$SCRIPT_DIR/lib/common.sh"
 
 # Capture stdin to temp file for byte-for-byte passthrough
 STDIN_TMP=$(mktemp "${TMPDIR:-/tmp}/symbiote-instinct-stdin.XXXXXX" 2>/dev/null) || STDIN_TMP="${TMPDIR:-/tmp}/symbiote-instinct-stdin.$$"
-cat > "$STDIN_TMP"
+read_stdin_safe > "$STDIN_TMP"
 
 STATE_DIR=$(get_state_dir)
 mkdir -p "$STATE_DIR/instincts"

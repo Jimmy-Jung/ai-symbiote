@@ -130,7 +130,7 @@ if [ $# -ge 2 ]; then
 fi
 
 # Hook mode: UserPromptSubmit or PostToolUse(Read|Skill)
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 # --- Claude slash-command detection ---
 # UserPromptSubmit provides prompt with:

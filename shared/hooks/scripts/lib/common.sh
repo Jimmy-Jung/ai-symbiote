@@ -259,3 +259,26 @@ filter_recent_jsonl() {
     }
   ' "$file" 2>/dev/null
 }
+
+# Bounded stdin read to prevent freezes when the harness fails to close stdin.
+# Emits whatever bytes arrived before the timeout. Default 2s.
+# Prefers GNU `timeout`, then `gtimeout` (brew coreutils), then perl, then raw cat.
+read_stdin_safe() {
+  local timeout_s="${1:-2}"
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$timeout_s" cat 2>/dev/null
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$timeout_s" cat 2>/dev/null
+  elif command -v perl >/dev/null 2>&1; then
+    perl -e '
+      eval {
+        local $SIG{ALRM} = sub { exit 0 };
+        alarm '"$timeout_s"';
+        while (sysread(STDIN, my $buf, 65536)) { syswrite(STDOUT, $buf) }
+      };
+    ' 2>/dev/null
+  else
+    cat 2>/dev/null
+  fi
+  return 0
+}

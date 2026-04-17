@@ -22,7 +22,7 @@ set +e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 # --- 1. Extract command and response ---
 COMMAND=""

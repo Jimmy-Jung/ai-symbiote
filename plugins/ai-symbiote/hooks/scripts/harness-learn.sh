@@ -24,7 +24,7 @@ set +e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 # --- 1. Extract file path ---
 FILE_PATH=$(json_nested_field "$INPUT" "tool_input" "file_path")

@@ -8,7 +8,7 @@
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 STATE_DIR=$(get_state_dir)
 MESSENGER_DIR="$STATE_DIR/messenger"

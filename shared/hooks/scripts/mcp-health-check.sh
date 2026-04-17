@@ -17,7 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 
 # --- 1. Read stdin JSON ---
-INPUT=$(cat)
+INPUT=$(read_stdin_safe)
 
 # --- 2. Extract tool_name ---
 TOOL_NAME=""

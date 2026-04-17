@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.4] - 2026-04-17
+
+### Fixed
+- **훅 stdin timeout 가드 (freeze 방지)** — harness가 stdin을 닫지 않을 때 `$(cat)`이 무한 대기하여 Claude Code가 간헐적으로 멈추는 문제 해결. 18개 훅 전체를 새 헬퍼 `read_stdin_safe`로 교체하여 2초 내 종료 보장 (timeout → gtimeout → perl → cat 순 fallback)
+- **`next-action.sh` 잠재적 query injection 제거** — `$LAST_SKILL`을 jq `--arg`와 python3 환경변수로 전달하도록 변경. 파일명에 특수문자가 포함되어도 안전
+- **`next-action.sh` stdin passthrough 단순화** — temp 파일 의존성 제거, 변수 기반으로 전환하여 I/O 실패 경로 자체를 제거
+- **Intent Router 정보 손실 수정** — compact hints가 `signals[0]`만 사용하던 것을 전체 `signals`를 `;`로 합쳐 주입하도록 변경. python3 fallback의 `$HINTS_FILE` 보간도 환경변수 전달로 전환
+- **`skill-chains.json` 죽은 키 정리** — 사용되지 않는 `new_files_added`, `tests_modified`, `no_changes` 제거. `feature_branch_with_commits`는 스크립트가 JSON에서 읽도록 일관성 확보
+
 ## [0.10.3] - 2026-04-16
 
 ### Added
