@@ -2,7 +2,7 @@
 name: security
 description: "Project security baseline and audit workflow. Generates a security baseline, shows current score, and recommends deeper secret/static-analysis tooling when useful."
 user-invocable: true
-argument-hint: [scan | status | install-tools [--execute]]
+argument-hint: "scan | status | install-tools [--execute]"
 allowed-tools: [Read, Bash, Glob, Grep]
 ---
 
