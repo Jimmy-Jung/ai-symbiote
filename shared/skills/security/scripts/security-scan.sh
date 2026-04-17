@@ -55,6 +55,8 @@ STATE_SUBDIR="$STATE_DIR/state"
 RECOMMENDATIONS_STATE_FILE="$STATE_SUBDIR/security-tool-recommendations.json"
 CLI_STORE_SCRIPT="$SCRIPT_DIR/../../cli-store/scripts/cli-store.sh"
 SECURITY_LOG_FILE="$STATE_DIR/security-log.jsonl"
+SCANNER_TIMEOUT_SECONDS="${SECURITY_SCAN_TIMEOUT_SECONDS:-45}"
+SCANNER_HEARTBEAT_SECONDS="${SECURITY_SCAN_HEARTBEAT_SECONDS:-5}"
 
 mkdir -p "$STATE_DIR"
 mkdir -p "$STATE_SUBDIR"
@@ -66,11 +68,30 @@ GITLEAKS_REPORT=$(mktemp)
 SEMGREP_REPORT=$(mktemp)
 TMP_JSON=$(mktemp)
 RECOMMENDATIONS_JSON=$(mktemp)
+GITLEAKS_CONFIG=$(mktemp)
 
 cleanup() {
-  rm -f "$RAW_FINDINGS" "$SORTED_FINDINGS" "$TOP_FINDINGS" "$GITLEAKS_REPORT" "$SEMGREP_REPORT" "$TMP_JSON" "$RECOMMENDATIONS_JSON"
+  rm -f "$RAW_FINDINGS" "$SORTED_FINDINGS" "$TOP_FINDINGS" "$GITLEAKS_REPORT" "$SEMGREP_REPORT" "$TMP_JSON" "$RECOMMENDATIONS_JSON" "$GITLEAKS_CONFIG"
 }
 trap cleanup EXIT
+
+SCANNER_EXCLUDE_PATTERNS=(
+  "node_modules"
+  "dist"
+  "build"
+  ".next"
+  ".turbo"
+  "vendor"
+  ".venv"
+  "venv"
+  "Pods"
+  "Derived"
+  "DerivedData"
+  "Tuist"
+  ".build"
+  "*.framework"
+  "*.xcframework"
+)
 
 severity_order() {
   case "$1" in
@@ -214,18 +235,117 @@ PY
 
 find_repo_files() {
   find "$PROJECT_ROOT" \
-    \( -path "$PROJECT_ROOT/.git" \
-    -o -path "$PROJECT_ROOT/node_modules" \
-    -o -path "$PROJECT_ROOT/dist" \
-    -o -path "$PROJECT_ROOT/build" \
-    -o -path "$PROJECT_ROOT/.next" \
-    -o -path "$PROJECT_ROOT/.turbo" \
-    -o -path "$PROJECT_ROOT/vendor" \
-    -o -path "$PROJECT_ROOT/.venv" \
-    -o -path "$PROJECT_ROOT/venv" \
-    -o -path "$PROJECT_ROOT/Pods" \
-    -o -path "$PROJECT_ROOT/DerivedData" \) -prune \
+    -type d \( -name ".git" \
+    -o -name "node_modules" \
+    -o -name "dist" \
+    -o -name "build" \
+    -o -name ".next" \
+    -o -name ".turbo" \
+    -o -name "vendor" \
+    -o -name ".venv" \
+    -o -name "venv" \
+    -o -name "Pods" \
+    -o -name "Derived" \
+    -o -name "DerivedData" \
+    -o -name "Tuist" \
+    -o -name ".build" \
+    -o -name "*.framework" \
+    -o -name "*.xcframework" \) -prune \
     -o -type f -print
+}
+
+run_command_with_timeout() {
+  local label="$1"
+  shift
+
+  python3 - "$SCANNER_TIMEOUT_SECONDS" "$@" <<'PY' >/dev/null 2>&1 &
+import subprocess
+import sys
+
+timeout_s = int(sys.argv[1])
+cmd = sys.argv[2:]
+
+try:
+    completed = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=timeout_s, check=False)
+except subprocess.TimeoutExpired:
+    raise SystemExit(124)
+except FileNotFoundError:
+    raise SystemExit(127)
+
+code = completed.returncode
+raise SystemExit(code if 0 <= code <= 255 else 1)
+PY
+  local cmd_pid=$!
+  local heartbeat_pid="" started_at now elapsed
+  started_at=$(date +%s)
+
+  if [ "${SCANNER_HEARTBEAT_SECONDS:-0}" -gt 0 ]; then
+    (
+      sleep "$SCANNER_HEARTBEAT_SECONDS"
+      while kill -0 "$cmd_pid" 2>/dev/null; do
+        now=$(date +%s)
+        elapsed=$((now - started_at))
+        echo "[Security] ${label} scanning... ${elapsed}s elapsed" >&2
+        sleep "$SCANNER_HEARTBEAT_SECONDS"
+      done
+    ) &
+    heartbeat_pid=$!
+  fi
+
+  local rc=0
+  set +e
+  wait "$cmd_pid"
+  rc=$?
+  set -e
+  if [ -n "$heartbeat_pid" ]; then
+    kill "$heartbeat_pid" >/dev/null 2>&1 || true
+    wait "$heartbeat_pid" 2>/dev/null || true
+  fi
+  return "$rc"
+}
+
+build_gitleaks_config() {
+  local project_config="$PROJECT_ROOT/.gitleaks.toml"
+  if [ -f "$project_config" ]; then
+    printf '%s\n' "$project_config"
+    return 0
+  fi
+
+  python3 - "$GITLEAKS_CONFIG" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+config_path = Path(sys.argv[1])
+patterns = [
+    r"(^|/)(node_modules|dist|build|\.next|\.turbo|vendor|\.venv|venv|Pods|Derived|DerivedData|Tuist|\.build)(/|$)",
+    r"(^|/).*?\.(framework|xcframework)(/|$)",
+]
+
+lines = [
+    'title = "ai-symbiote security scan temporary config"',
+    "",
+    "[extend]",
+    "useDefault = true",
+    "",
+    "[allowlist]",
+    'description = "Skip generated/build artifacts during local baseline scan"',
+    "paths = [",
+]
+for pattern in patterns:
+    lines.append(f"  '''{pattern}''',")
+lines.extend(["]", ""])
+config_path.write_text("\n".join(lines), encoding="utf-8")
+print(config_path)
+PY
+}
+
+append_semgrep_excludes() {
+  local target_name="$1"
+  local pattern
+  for pattern in "${SCANNER_EXCLUDE_PATTERNS[@]}"; do
+    eval "$target_name+=(\"--exclude\" \"\$pattern\")"
+  done
 }
 
 scan_builtin_rules() {
@@ -301,7 +421,24 @@ EOF
     [ -z "$world_writable" ] && continue
     append_finding "high" "permissions" "${world_writable#$PROJECT_ROOT/}" "" "builtin" "World-writable file or directory detected."
   done <<EOF
-$(find "$PROJECT_ROOT" \( -path "$PROJECT_ROOT/.git" -o -path "$PROJECT_ROOT/node_modules" -o -path "$PROJECT_ROOT/dist" -o -path "$PROJECT_ROOT/build" \) -prune -o \( -type f -o -type d \) -perm -0002 -print 2>/dev/null || true)
+$(find "$PROJECT_ROOT" \
+  -type d \( -name ".git" \
+  -o -name "node_modules" \
+  -o -name "dist" \
+  -o -name "build" \
+  -o -name ".next" \
+  -o -name ".turbo" \
+  -o -name "vendor" \
+  -o -name ".venv" \
+  -o -name "venv" \
+  -o -name "Pods" \
+  -o -name "Derived" \
+  -o -name "DerivedData" \
+  -o -name "Tuist" \
+  -o -name ".build" \
+  -o -name "*.framework" \
+  -o -name "*.xcframework" \) -prune \
+  -o \( -type f -o -type d \) -perm -0002 -print 2>/dev/null || true)
 EOF
 
   if [ -f "$PROJECT_ROOT/Dockerfile" ] && ! grep -qE '^\s*USER\s+' "$PROJECT_ROOT/Dockerfile" 2>/dev/null; then
@@ -320,6 +457,7 @@ EOF
 }
 
 run_gitleaks() {
+  local rc config_path
   if [ -n "${SECURITY_SCAN_FORCE_GITLEAKS_STATUS:-}" ]; then
     echo "$SECURITY_SCAN_FORCE_GITLEAKS_STATUS"
     return 0
@@ -329,13 +467,46 @@ run_gitleaks() {
     return 0
   fi
 
-  if gitleaks detect --no-git --source "$PROJECT_ROOT" --report-format json --report-path "$GITLEAKS_REPORT" >/dev/null 2>&1; then
-    :
-  elif gitleaks dir "$PROJECT_ROOT" --report-format json --report-path "$GITLEAKS_REPORT" >/dev/null 2>&1; then
-    :
+  config_path=$(build_gitleaks_config)
+
+  if run_command_with_timeout "gitleaks" \
+    gitleaks detect --no-git --source "$PROJECT_ROOT" \
+    --config "$config_path" \
+    --report-format json --report-path "$GITLEAKS_REPORT"; then
+    rc=0
   else
-    echo "error"
+    rc=$?
+  fi
+  if [ "$rc" -eq 124 ]; then
+    echo "timeout"
     return 0
+  fi
+  if [ "$rc" -eq 127 ]; then
+    echo "not-installed"
+    return 0
+  fi
+  if [ "$rc" -ne 0 ] && [ ! -s "$GITLEAKS_REPORT" ]; then
+    : > "$GITLEAKS_REPORT"
+    if run_command_with_timeout "gitleaks" \
+      gitleaks dir "$PROJECT_ROOT" \
+      --config "$config_path" \
+      --report-format json --report-path "$GITLEAKS_REPORT"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if [ "$rc" -eq 124 ]; then
+      echo "timeout"
+      return 0
+    fi
+    if [ "$rc" -eq 127 ]; then
+      echo "not-installed"
+      return 0
+    fi
+    if [ "$rc" -ne 0 ] && [ ! -s "$GITLEAKS_REPORT" ]; then
+      echo "error"
+      return 0
+    fi
   fi
 
   if [ -s "$GITLEAKS_REPORT" ] && command -v python3 >/dev/null 2>&1; then
@@ -363,6 +534,8 @@ PY
 }
 
 run_semgrep() {
+  local rc
+  local semgrep_cmd=(semgrep scan --config auto --json --output "$SEMGREP_REPORT")
   if [ -n "${SECURITY_SCAN_FORCE_SEMGREP_STATUS:-}" ]; then
     echo "$SECURITY_SCAN_FORCE_SEMGREP_STATUS"
     return 0
@@ -372,13 +545,36 @@ run_semgrep() {
     return 0
   fi
 
-  if semgrep scan --config auto --json --output "$SEMGREP_REPORT" "$PROJECT_ROOT" >/dev/null 2>&1; then
-    :
-  elif semgrep --config auto --json --output "$SEMGREP_REPORT" "$PROJECT_ROOT" >/dev/null 2>&1; then
-    :
+  append_semgrep_excludes semgrep_cmd
+  semgrep_cmd+=("$PROJECT_ROOT")
+
+  if run_command_with_timeout "semgrep" "${semgrep_cmd[@]}"; then
+    rc=0
   else
-    echo "error"
+    rc=$?
+  fi
+  if [ "$rc" -eq 124 ]; then
+    echo "timeout"
     return 0
+  fi
+  if [ "$rc" -ne 0 ] && [ ! -s "$SEMGREP_REPORT" ]; then
+    : > "$SEMGREP_REPORT"
+    semgrep_cmd=(semgrep --config auto --json --output "$SEMGREP_REPORT")
+    append_semgrep_excludes semgrep_cmd
+    semgrep_cmd+=("$PROJECT_ROOT")
+    if run_command_with_timeout "semgrep" "${semgrep_cmd[@]}"; then
+      rc=0
+    else
+      rc=$?
+    fi
+    if [ "$rc" -eq 124 ]; then
+      echo "timeout"
+      return 0
+    fi
+    if [ "$rc" -ne 0 ] && [ ! -s "$SEMGREP_REPORT" ]; then
+      echo "error"
+      return 0
+    fi
   fi
 
   if [ -s "$SEMGREP_REPORT" ] && command -v python3 >/dev/null 2>&1; then

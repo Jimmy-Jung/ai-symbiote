@@ -17,13 +17,16 @@ STATE_SUBDIR="$STATE_DIR/state"
 COVERED_MCP_PATH="$STATE_SUBDIR/cli-covered-mcps.json"
 RECOMMENDATION_PATH="$STATE_SUBDIR/mcp-store-recommendations.json"
 PROJECT_ROOT_OVERRIDE="${MCP_STORE_PROJECT_ROOT:-}"
+WRITE_STATE="${MCP_STORE_WRITE_STATE:-true}"
 
 if [ ! -f "$CATALOG" ]; then
   echo "[MCP Store] catalog.json not found: $CATALOG" >&2
   exit 1
 fi
 
-mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+if [ "$WRITE_STATE" = "true" ]; then
+  mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+fi
 
 MODE="query"
 QUERY=""
@@ -183,6 +186,7 @@ PY
 
 write_recommendations() {
   local payload_json="$1"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$RECOMMENDATION_PATH" "$payload_json" <<'PY'
 import json, sys
 from datetime import datetime, UTC
@@ -216,6 +220,7 @@ PY
 
 record_mcp_installation() {
   local entry_json="$1"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$MANIFEST_PATH" "$STATE_SUBDIR/mcp-store-installed.json" "$entry_json" <<'PY'
 import json, os, sys
 from datetime import datetime, UTC
@@ -232,6 +237,17 @@ status = "configured"
 if required_env and any(not env_values[key] for key in required_env):
     status = "needs-env"
 
+def deep_merge(current, incoming):
+    if not isinstance(current, dict) or not isinstance(incoming, dict):
+        return incoming
+    merged = dict(current)
+    for key, value in incoming.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
 manifest = {}
 if manifest_path.exists():
     try:
@@ -240,7 +256,8 @@ if manifest_path.exists():
         manifest = {}
 
 manifest.setdefault("mcpServers", {})
-manifest["mcpServers"][entry["id"]] = {
+existing_entry = manifest["mcpServers"].get(entry["id"], {})
+manifest["mcpServers"][entry["id"]] = deep_merge(existing_entry, {
     "name": entry.get("name"),
     "transport": entry.get("transport"),
     "command": entry.get("command"),
@@ -248,7 +265,7 @@ manifest["mcpServers"][entry["id"]] = {
     "env": required_env,
     "installed": now,
     "status": status,
-}
+})
 manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
 installed = {"generatedAt": now, "items": []}

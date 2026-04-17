@@ -29,10 +29,22 @@ assert_contains() {
   fi
 }
 
+assert_file_contains_regex() {
+  local desc="$1" pattern="$2" file="$3"
+  TOTAL=$((TOTAL + 1))
+  if grep -qE -- "$pattern" "$file" 2>/dev/null; then
+    PASSED=$((PASSED + 1))
+    printf "${GREEN}  PASS${NC} %s\n" "$desc"
+  else
+    FAILED=$((FAILED + 1))
+    printf "${RED}  FAIL${NC} %s\n    file: %s\n    pattern: %s\n" "$desc" "$file" "$pattern"
+  fi
+}
+
 assert_file_contains() {
   local desc="$1" needle="$2" file="$3"
   TOTAL=$((TOTAL + 1))
-  if grep -qF "$needle" "$file" 2>/dev/null; then
+  if grep -qF -- "$needle" "$file" 2>/dev/null; then
     PASSED=$((PASSED + 1))
     printf "${GREEN}  PASS${NC} %s\n" "$desc"
   else
@@ -41,12 +53,26 @@ assert_file_contains() {
   fi
 }
 
+assert_file_not_contains() {
+  local desc="$1" needle="$2" file="$3"
+  TOTAL=$((TOTAL + 1))
+  if grep -qF -- "$needle" "$file" 2>/dev/null; then
+    FAILED=$((FAILED + 1))
+    printf "${RED}  FAIL${NC} %s\n    file: %s\n    unexpected: %s\n" "$desc" "$file" "$needle"
+  else
+    PASSED=$((PASSED + 1))
+    printf "${GREEN}  PASS${NC} %s\n" "$desc"
+  fi
+}
+
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 PROJECT_DIR="$TMPDIR/demo"
 STATE_DIR="$TMPDIR/state"
-mkdir -p "$PROJECT_DIR/src" "$PROJECT_DIR/.github/workflows" "$STATE_DIR"
+FAKE_BIN="$TMPDIR/bin"
+FAKE_CAPTURE_DIR="$TMPDIR/fake-capture"
+mkdir -p "$PROJECT_DIR/src" "$PROJECT_DIR/.github/workflows" "$PROJECT_DIR/Pods" "$STATE_DIR" "$FAKE_BIN" "$FAKE_CAPTURE_DIR"
 
 cat > "$PROJECT_DIR/.env" <<'EOF'
 OPENAI_API_KEY=sk-real-secret-value
@@ -64,6 +90,11 @@ WORKDIR /app
 COPY . .
 CMD ["node", "server.js"]
 EOF
+
+cat > "$PROJECT_DIR/Pods/generated.cache" <<'EOF'
+generated
+EOF
+chmod 666 "$PROJECT_DIR/Pods/generated.cache"
 
 cat > "$PROJECT_DIR/context.md" <<'EOF'
 ## Project Summary
@@ -118,6 +149,7 @@ ACTIVE_OUTPUT=$(SECURITY_SCAN_FORCE_GITLEAKS_STATUS=not-installed SECURITY_SCAN_
 assert_contains "active scan prints install recommendations" "Recommended next tools:" "$ACTIVE_OUTPUT"
 assert_contains "active scan prints gitleaks command" "brew install gitleaks" "$ACTIVE_OUTPUT"
 assert_contains "active scan includes recent activity summary" "Recent activity: blocked=1 | warned=1" "$ACTIVE_OUTPUT"
+assert_file_not_contains "world-writable scan skips Pods artifacts" "Pods/generated.cache" "$STATE_DIR/security-baseline.json"
 
 INSTALL_OUTPUT=$(CLI_STORE_FORCE_PM=brew CLI_STORE_FORCE_STATUS_GITLEAKS=not-ready CLI_STORE_FORCE_STATUS_SEMGREP=not-ready bash "$SCAN_SCRIPT" install-tools \
   --project-root "$PROJECT_DIR" \
@@ -136,6 +168,78 @@ EXEC_INSTALL_OUTPUT=$(CLI_STORE_FORCE_PM=brew CLI_STORE_FORCE_STATUS_GITLEAKS=no
 
 assert_contains "install-tools execute runs real handoff" "Installing Gitleaks..." "$EXEC_INSTALL_OUTPUT"
 assert_contains "install-tools execute completes" "[Security] Installation handoff complete." "$EXEC_INSTALL_OUTPUT"
+
+cat > "$FAKE_BIN/gitleaks" <<'EOF'
+#!/bin/bash
+set -e
+args_file="${FAKE_CAPTURE_DIR:?}/gitleaks-args.txt"
+config_copy="${FAKE_CAPTURE_DIR:?}/gitleaks-config.toml"
+printf '%s\n' "$@" > "$args_file"
+report_path=""
+config_path=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--report-path" ]; then
+    report_path="$arg"
+  elif [ "$prev" = "--config" ]; then
+    config_path="$arg"
+  fi
+  prev="$arg"
+done
+if [ -n "$config_path" ] && [ -f "$config_path" ]; then
+  cp "$config_path" "$config_copy"
+fi
+sleep "${FAKE_GITLEAKS_SLEEP:-0}"
+if [ -n "$report_path" ] && [ "${FAKE_GITLEAKS_WRITE_REPORT:-true}" = "true" ]; then
+  printf '[]\n' > "$report_path"
+fi
+exit "${FAKE_GITLEAKS_EXIT_CODE:-0}"
+EOF
+chmod +x "$FAKE_BIN/gitleaks"
+
+cat > "$FAKE_BIN/semgrep" <<'EOF'
+#!/bin/bash
+set -e
+args_file="${FAKE_CAPTURE_DIR:?}/semgrep-args.txt"
+printf '%s\n' "$@" > "$args_file"
+report_path=""
+prev=""
+for arg in "$@"; do
+  if [ "$prev" = "--output" ]; then
+    report_path="$arg"
+  fi
+  prev="$arg"
+done
+sleep "${FAKE_SEMGREP_SLEEP:-0}"
+if [ -n "$report_path" ]; then
+  printf '{"results":[]}\n' > "$report_path"
+fi
+exit "${FAKE_SEMGREP_EXIT_CODE:-0}"
+EOF
+chmod +x "$FAKE_BIN/semgrep"
+
+FAKE_OUTPUT=$(PATH="$FAKE_BIN:$PATH" FAKE_CAPTURE_DIR="$FAKE_CAPTURE_DIR" FAKE_GITLEAKS_SLEEP=2 FAKE_SEMGREP_SLEEP=2 SECURITY_SCAN_TIMEOUT_SECONDS=5 SECURITY_SCAN_HEARTBEAT_SECONDS=1 bash "$SCAN_SCRIPT" scan \
+  --project-root "$PROJECT_DIR" \
+  --state-dir "$STATE_DIR" \
+  --context-file "$PROJECT_DIR/context.md" \
+  --install-hints off 2>&1)
+
+assert_contains "heartbeat prints gitleaks progress" "gitleaks scanning..." "$FAKE_OUTPUT"
+assert_contains "heartbeat prints semgrep progress" "semgrep scanning..." "$FAKE_OUTPUT"
+assert_file_contains "semgrep excludes Tuist" "--exclude" "$FAKE_CAPTURE_DIR/semgrep-args.txt"
+assert_file_contains "semgrep excludes Tuist value" "Tuist" "$FAKE_CAPTURE_DIR/semgrep-args.txt"
+assert_file_contains "semgrep excludes xcframework value" "*.xcframework" "$FAKE_CAPTURE_DIR/semgrep-args.txt"
+assert_file_contains_regex "gitleaks temp config has Tuist allowlist" "Tuist" "$FAKE_CAPTURE_DIR/gitleaks-config.toml"
+assert_file_contains_regex "gitleaks temp config has framework allowlist" "xcframework" "$FAKE_CAPTURE_DIR/gitleaks-config.toml"
+
+TIMEOUT_OUTPUT=$(PATH="$FAKE_BIN:$PATH" FAKE_CAPTURE_DIR="$FAKE_CAPTURE_DIR" FAKE_GITLEAKS_SLEEP=3 FAKE_SEMGREP_SLEEP=0 SECURITY_SCAN_TIMEOUT_SECONDS=1 SECURITY_SCAN_HEARTBEAT_SECONDS=1 bash "$SCAN_SCRIPT" scan \
+  --project-root "$PROJECT_DIR" \
+  --state-dir "$STATE_DIR" \
+  --context-file "$PROJECT_DIR/context.md" \
+  --install-hints off 2>&1)
+
+assert_contains "timeout scan still completes with summary" "[Security] Baseline scan complete" "$TIMEOUT_OUTPUT"
+assert_file_contains "baseline records gitleaks timeout status" "\"gitleaks\": \"timeout\"" "$STATE_DIR/security-baseline.json"
 
 echo ""
 echo "=== Results ==="

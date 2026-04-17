@@ -50,8 +50,9 @@ TEST_REPO="$TMPDIR/test-repo"
 STATE_DIR="$TMPDIR/state"
 BOOTSTRAP_STATE_DIR="$TMPDIR/bootstrap-state"
 GUIDED_STATE_DIR="$TMPDIR/guided-state"
+DRY_RUN_STATE_DIR="$TMPDIR/dry-run-state"
 
-mkdir -p "$TEST_REPO" "$STATE_DIR/state" "$BOOTSTRAP_STATE_DIR/state" "$GUIDED_STATE_DIR/state"
+mkdir -p "$TEST_REPO" "$STATE_DIR/state" "$BOOTSTRAP_STATE_DIR/state" "$GUIDED_STATE_DIR/state" "$DRY_RUN_STATE_DIR/state"
 
 cat > "$TEST_REPO/package.json" <<'EOF'
 {
@@ -76,7 +77,30 @@ cat > "$STATE_DIR/manifest.json" <<EOF
 }
 EOF
 
-cp "$STATE_DIR/manifest.json" "$GUIDED_STATE_DIR/manifest.json"
+cat > "$GUIDED_STATE_DIR/manifest.json" <<EOF
+{
+  "path": "$TEST_REPO",
+  "project": {
+    "languages": ["typescript"]
+  },
+  "stack": {
+    "frameworks": ["react"],
+    "packageManager": "npm"
+  },
+  "plugins": {
+    "vercel/react-best-practices": {
+      "notes": "preserve me"
+    }
+  },
+  "mcpServers": {
+    "supabase": {
+      "notes": "keep this"
+    }
+  }
+}
+EOF
+
+cp "$STATE_DIR/manifest.json" "$DRY_RUN_STATE_DIR/manifest.json"
 
 cat > "$STATE_DIR/state/cli-covered-mcps.json" <<'EOF'
 {
@@ -116,6 +140,29 @@ assert_contains "runner bootstraps missing manifest" "[Setup] bootstrap manifest
 assert_file_contains "bootstrap manifest created on first setup" "\"projectPath\": \"$TEST_REPO\"" "$BOOTSTRAP_STATE_DIR/manifest.json"
 assert_file_contains "bootstrap flow still writes covered MCP file" "\"supabase\"" "$BOOTSTRAP_STATE_DIR/state/cli-covered-mcps.json"
 
+cp "$DRY_RUN_STATE_DIR/manifest.json" "$TMPDIR/dry-run-before.json"
+DRY_RUN_OUTPUT=$(CLI_STORE_FORCE_STATUS_GH=not-ready CLI_STORE_FORCE_STATUS_SUPABASE=ready bash "$RUNNER" --state-dir "$DRY_RUN_STATE_DIR" --project-root "$TEST_REPO" --mode dry-run)
+
+assert_contains "dry-run still prints guided summary" "[Setup] Guided setup summary:" "$DRY_RUN_OUTPUT"
+assert_contains "dry-run summary keeps ready CLI counts" "1 already ready" "$DRY_RUN_OUTPUT"
+assert_contains "dry-run summary keeps CLI-covered MCP counts" "1 covered by CLI" "$DRY_RUN_OUTPUT"
+TOTAL=$((TOTAL + 1))
+if cmp -s "$DRY_RUN_STATE_DIR/manifest.json" "$TMPDIR/dry-run-before.json"; then
+  PASSED=$((PASSED + 1))
+  printf "${GREEN}  PASS${NC} dry-run keeps manifest byte-identical\n"
+else
+  FAILED=$((FAILED + 1))
+  printf "${RED}  FAIL${NC} dry-run keeps manifest byte-identical\n"
+fi
+TOTAL=$((TOTAL + 1))
+if [ -f "$DRY_RUN_STATE_DIR/state/setup-store-summary.json" ] || [ -f "$DRY_RUN_STATE_DIR/state/cli-store-recommendations.json" ] || [ -f "$DRY_RUN_STATE_DIR/state/skill-store-recommendations.json" ] || [ -f "$DRY_RUN_STATE_DIR/state/mcp-store-recommendations.json" ]; then
+  FAILED=$((FAILED + 1))
+  printf "${RED}  FAIL${NC} dry-run does not write state artifacts\n"
+else
+  PASSED=$((PASSED + 1))
+  printf "${GREEN}  PASS${NC} dry-run does not write state artifacts\n"
+fi
+
 GUIDED_OUTPUT=$( \
   SETUP_STORE_SKILLS_CHOICE=vercel/react-best-practices \
   SETUP_STORE_CLI_CHOICE=all \
@@ -135,8 +182,10 @@ assert_file_contains "guided mode records selected CLI choice" "\"choice\": \"al
 assert_file_contains "guided mode records selected MCP ids" "\"supabase\"" "$GUIDED_STATE_DIR/state/setup-store-preferences.json"
 assert_file_contains "guided mode writes plugins section" "\"plugins\"" "$GUIDED_STATE_DIR/manifest.json"
 assert_file_contains "guided mode writes selected skill repo" "\"vercel/react-best-practices\"" "$GUIDED_STATE_DIR/manifest.json"
+assert_file_contains "guided mode preserves plugin details" "\"notes\": \"preserve me\"" "$GUIDED_STATE_DIR/manifest.json"
 assert_file_contains "guided mode writes mcpServers section" "\"mcpServers\"" "$GUIDED_STATE_DIR/manifest.json"
 assert_file_contains "guided mode writes selected mcp id" "\"supabase\"" "$GUIDED_STATE_DIR/manifest.json"
+assert_file_contains "guided mode preserves mcp details" "\"notes\": \"keep this\"" "$GUIDED_STATE_DIR/manifest.json"
 
 echo ""
 echo "=== Results ==="

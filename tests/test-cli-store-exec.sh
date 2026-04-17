@@ -49,6 +49,13 @@ mkdir -p "$STATE_DIR/state"
 
 cat > "$STATE_DIR/manifest.json" <<'EOF'
 {
+  "cliTools": {
+    "semgrep": {
+      "cmd": "semgrep",
+      "usage": "inactive",
+      "reason": "custom detail"
+    }
+  },
   "project": { "languages": ["typescript"] },
   "stack": { "frameworks": ["react"] }
 }
@@ -65,6 +72,8 @@ assert_contains "dry-run prints brew command" "brew install gitleaks" "$DRY_RUN_
 READY_OUTPUT=$(CLI_STORE_STATE_DIR="$STATE_DIR" CLI_STORE_FORCE_STATUS_SEMGREP=ready bash "$CLI_STORE_SCRIPT" semgrep)
 assert_contains "ready tool acknowledged" "Semgrep CLI is already ready." "$READY_OUTPUT"
 assert_file_contains "manifest cliTools updated" "\"semgrep\"" "$STATE_DIR/manifest.json"
+assert_file_contains "existing cli detail preserved usage" "\"usage\": \"inactive\"" "$STATE_DIR/manifest.json"
+assert_file_contains "existing cli detail preserved reason" "\"reason\": \"custom detail\"" "$STATE_DIR/manifest.json"
 assert_file_contains "covered MCP file updated" "\"semgrep\"" "$STATE_DIR/state/cli-covered-mcps.json"
 
 EXEC_OUTPUT=$(CLI_STORE_STATE_DIR="$STATE_DIR" CLI_STORE_FORCE_PM=brew CLI_STORE_FORCE_STATUS_GITLEAKS=not-ready CLI_STORE_FORCE_INSTALL_CMD_GITLEAKS="echo simulated-install-gitleaks" CLI_STORE_FORCE_STATUS_AFTER_GITLEAKS=ready bash "$CLI_STORE_SCRIPT" gitleaks)
