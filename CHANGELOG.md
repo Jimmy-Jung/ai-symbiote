@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.8] - 2026-04-17
+
+### Added
+- **Codex용 PRD/Ralph 워크플로 추가** — `prd` 스킬로 기능 PRD를 작성하고 `ralph` 스킬과 `ralph-loop.sh`로 `prd.json` 변환 및 Codex 기반 자율 반복 실행을 준비할 수 있도록 확장
+
+### Fixed
+- **Ralph 아카이브 정합성 수정** — 브랜치 전환 시 이전 실행의 `prd.json`, `ralph-state.md`, `progress.txt`가 새 브랜치 내용으로 덮여 저장되던 문제를 이전 스냅샷 기준으로 보존하도록 수정
+- **Ralph prepare-only 실행성 수정** — `--prepare-only`가 런타임 툴 설치 여부와 무관하게 상태 파일과 작업 디렉터리를 준비할 수 있도록 실행 순서 조정
+- **setup/README 문서 정합성 보정** — Codex에서 Ralph를 외부 플러그인처럼 설치한다는 안내를 내장 워크플로 기준으로 바로잡고 스킬/테스트 개수 표기를 현재 구현과 일치시킴
+
 ## [0.10.7] - 2026-04-17
 
 ### Fixed

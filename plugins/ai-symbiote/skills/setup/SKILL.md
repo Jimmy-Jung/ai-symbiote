@@ -88,7 +88,7 @@ Base shape:
 5. Generate or normalize manifest/context defaults
 
 Optional items needing approval:
-- ralph plugin install
+- ralph workflow enable/check
 - codex plugin install or integration check
 - guided store selections (skill / cli / mcp)
 
@@ -186,9 +186,9 @@ echo "[Step 0.1] Complete"
 
 **After approval, execute this entire script as a single Bash tool call.** This is not illustrative code.
 
-### Step 0.5: Integration Plugin Installation -- snarktank/ralph
+### Step 0.5: PRD / Ralph Workflow Availability
 
-Check if the snarktank/ralph plugin is installed, and propose installation if missing.
+Check whether the built-in `prd` / `ralph` workflow is available for the current platform.
 
 #### Claude Environment
 
@@ -205,29 +205,34 @@ Check if the snarktank/ralph plugin is installed, and propose installation if mi
 
 #### Codex Environment
 
-1. Check installation:
+Codex uses the Ralph workflow bundled inside `ai-symbiote` itself.
+
+1. Check bundled skills:
    ```bash
-   [ -d "$HOME/plugins/ralph-skills" ] && echo "installed" || echo "not-installed"
+   [ -f "$PLUGIN_ROOT/skills/prd/SKILL.md" ] && [ -f "$PLUGIN_ROOT/skills/ralph/SKILL.md" ] && echo "installed" || echo "not-installed"
    ```
 
-2. If missing and the user approved optional installs, clone and register locally:
+2. Check bundled runner:
    ```bash
-   git clone https://github.com/snarktank/ralph.git "$HOME/plugins/ralph-skills" 2>/dev/null
+   [ -x "$PLUGIN_ROOT/skills/ralph/scripts/ralph-loop.sh" ] && echo "runner-ready" || echo "runner-missing"
    ```
-   Then add the ralph-skills entry to `~/.agents/plugins/marketplace.json`,
-   and add the plugin activation entry to `~/.codex/config.toml`.
+
+3. If missing, rebuild and reinstall ai-symbiote instead of cloning `snarktank/ralph` directly:
+   ```bash
+   bash platforms/codex/install.sh
+   ```
 
 #### Common -- Failure Message
 
 ```
-snarktank/ralph installation failed.
+Ralph workflow is not available.
 To install manually:
   [Claude] claude plugin marketplace add snarktank/ralph && claude plugin install ralph-skills@ralph-marketplace
-  [Codex]  git clone https://github.com/snarktank/ralph.git ~/plugins/ralph-skills
-This plugin provides /prd (PRD generation) and /ralph (PRD->JSON conversion) commands.
+  [Codex]  reinstall ai-symbiote so the bundled prd/ralph skills are synced
+This workflow provides /prd (PRD generation) and /ralph (PRD->JSON conversion) commands.
 ```
 
-Skills provided by snarktank/ralph:
+Skills provided by the Ralph workflow:
 - `/prd` - Generate PRD (Product Requirements Document)
 - `/ralph` - Convert PRD to prd.json for headless autonomous execution
 
@@ -416,7 +421,7 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
   },
   "plugins": {
     "ralph": {
-      "source": "github:snarktank/ralph",
+      "source": "builtin:ai-symbiote/ralph",
       "installed": true
     },
     "codex": {
@@ -589,7 +594,7 @@ Output setup summary to the user:
 - Project config directories: `.claude/` created/already exists, `.codex/` created/already exists, `.gitignore` registered
 - State directory location
 - Installed integration plugins:
-  - snarktank/ralph: installed / not installed
+  - Ralph workflow: installed / not installed
   - openai/codex: installed (CLI ready) / installed (CLI not authenticated) / not installed (skipped)
 - Sub-agent team composition:
   - Claude agents: Scout, Architect, Builder, Inspector, Researcher

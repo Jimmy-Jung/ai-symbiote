@@ -15,7 +15,7 @@ Do not execute Bash commands before presenting this checklist and receiving appr
 5. Generate or normalize manifest/context defaults
 
 Optional items needing approval:
-- ralph plugin install
+- ralph workflow enable/check
 - codex plugin install or integration check
 - guided store selections (skill / cli / mcp)
 - {project-specific optional item}

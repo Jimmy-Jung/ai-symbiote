@@ -52,11 +52,11 @@ flowchart LR
     G --> H["Claude / Codex / Cursor bundle"]
 ```
 
-- 공용 스킬: `shared/skills/` 30개
+- 공용 스킬: `shared/skills/` 32개
 - 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 22개
 - 시드 규칙: `shared/harness-seeds/` 5개
-- 테스트 스크립트: `tests/` 29개
-- 현재 버전: `0.10.7`
+- 테스트 스크립트: `tests/` 30개
+- 현재 버전: `0.10.8`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
 ## 빠른 이해를 위한 핵심 개념
@@ -178,6 +178,7 @@ bash platforms/cursor/install.sh
 - 리뷰: `/ai-symbiote:review`
 - 문서 갱신: `/ai-symbiote:dev-docs`
 - 보안 상태: `/ai-symbiote:security status`
+- PRD 기반 루프: `/ai-symbiote:prd`, `/ai-symbiote:ralph`
 
 ### 5. 최소 검증
 
