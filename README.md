@@ -56,7 +56,7 @@ flowchart LR
 - 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 22개
 - 시드 규칙: `shared/harness-seeds/` 5개
 - 테스트 스크립트: `tests/` 29개
-- 현재 버전: `0.10.6`
+- 현재 버전: `0.10.7`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
 ## 빠른 이해를 위한 핵심 개념

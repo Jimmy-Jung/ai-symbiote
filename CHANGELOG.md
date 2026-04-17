@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.7] - 2026-04-17
+
+### Fixed
+- **security 스킬 frontmatter YAML 파싱 오류 수정** — `argument-hint`를 배열처럼 보이는 비인용 값에서 문자열로 변경해 Codex 스킬 로더가 `invalid YAML` 경고 없이 `SKILL.md`를 정상 해석하도록 수정
+
 ## [0.10.6] - 2026-04-17
 
 ### Fixed
