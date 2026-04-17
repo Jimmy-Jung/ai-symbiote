@@ -8,8 +8,7 @@
 #
 # Protocol:
 #   stdin:  {"tool_name":"Edit","tool_input":{"file_path":"/path/to/file","old_string":"...","new_string":"..."}}
-#   stdout: {"continue":false,"permissionDecision":"deny","systemMessage":"..."} to block
-#           (empty or {"continue":true}) to approve
+#   stdout: Claude/Cursor/Codex hook protocol specific allow/deny payload
 
 # Safety: never crash the agent workflow
 trap 'exit 0' ERR
@@ -34,13 +33,13 @@ fi
 
 # --- 3. No file_path → continue ---
 if [ -z "$FILE_PATH" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
 # --- 4. Check override ---
 if [ "${SYMBIOTE_ALLOW_CONFIG_EDIT:-}" = "1" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
@@ -77,7 +76,7 @@ fi
 
 # --- 9. Block or continue ---
 if [ -n "$MATCHED" ]; then
-  emit_hook_block "[Config Protection] $BASENAME is protected. Fix the code instead of weakening the config. Override: set SYMBIOTE_ALLOW_CONFIG_EDIT=1"
+  emit_pretool_deny "[Config Protection] $BASENAME is protected. Fix the code instead of weakening the config. Override: set SYMBIOTE_ALLOW_CONFIG_EDIT=1"
 
   # Record to security-log.jsonl (escape file name for safe JSON)
   if [ -d "$STATE_DIR" ]; then
@@ -88,5 +87,5 @@ if [ -n "$MATCHED" ]; then
   exit 0
 fi
 
-emit_hook_continue
+emit_pretool_allow
 exit 0

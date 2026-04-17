@@ -301,6 +301,8 @@ bash tests/test-setup-check-summary.sh
 
 훅은 "프롬프트로만 부탁하지 않는다"는 설계를 실제로 구현하는 부분입니다.
 
+아래 흐름은 Claude/Codex 기준으로 읽는 것이 가장 정확합니다. Cursor는 현재 `Edit` 보다 `Write` 중심 매처를 사용합니다.
+
 ```mermaid
 flowchart TD
     A["SessionStart"] --> B["setup-check.sh"]
@@ -310,13 +312,14 @@ flowchart TD
     H["PreToolUse(Write|Edit)"] --> I["pre-edit-write-dispatcher.sh"]
     I --> I1["config-protection.sh"]
     I --> I2["gateguard-gate.sh"]
-    I --> I3["suggest-compact.sh"]
     J["PreToolUse(*)"] --> K["mcp-health-check.sh"]
-    L["PostToolUse(Read)"] --> M["gateguard-tracker.sh / usage-tracker.sh"]
-    N["PostToolUse(Write|Edit)"] --> O["harness-learn.sh"]
+    L["PostToolUse(Read|Write|Edit, platform-specific)"] --> M["gateguard-tracker.sh"]
+    L2["PostToolUse(Read|Skill)"] --> M2["usage-tracker.sh"]
+    N["PostToolUse(Write|Edit, platform-specific)"] --> O["harness-learn.sh"]
     N --> P["security-guard.sh"]
     N --> Q["comment-checker.sh"]
     N --> R["messenger-notify.sh"]
+    N --> R2["suggest-compact.sh"]
     S["PostToolUseFailure"] --> T["mcp-health-failure.sh"]
     U["Stop"] --> V["cost-tracker.sh"]
     U --> W["instinct-observer.sh"]
@@ -331,13 +334,13 @@ flowchart TD
 | `pre-compact.sh` | compaction 직전 핵심 컨텍스트 재주입 |
 | `intent-router.sh` | 사용자 프롬프트를 읽고 스킬 힌트 주입 |
 | `guard-shell.sh` | 위험 쉘 명령과 보안 패턴 차단 |
-| `pre-edit-write-dispatcher.sh` | 쓰기 전 검사들을 순서대로 통합 |
+| `pre-edit-write-dispatcher.sh` | 쓰기 전 차단 검사(config/gateguard)를 순서대로 통합 |
 | `config-protection.sh` | 민감한 설정 파일 수정 가드 |
 | `gateguard-gate.sh` | 읽지 않은 파일을 바로 수정하려는 흐름 차단 |
-| `suggest-compact.sh` | 컨텍스트가 커졌을 때 compact 제안 |
+| `suggest-compact.sh` | 쓰기 작업이 누적됐을 때 다음 단계 전 compact 제안 |
 | `mcp-health-check.sh` | 장애 난 MCP 서버 호출 차단 |
 | `build-watcher.sh` | 쉘 기반 빌드/테스트 실패를 분류하고 기록 |
-| `gateguard-tracker.sh` | 읽은 파일 추적 |
+| `gateguard-tracker.sh` | 읽은 파일과 성공한 쓰기 대상 추적, Cursor는 현재 `Write` 중심 |
 | `usage-tracker.sh` | 스킬/명령 사용량 기록 |
 | `harness-learn.sh` | 반복 실수 패턴을 학습 후보로 기록 |
 | `security-guard.sh` | 쓰기 후 보안 검사 |
@@ -357,9 +360,9 @@ flowchart TD
 |------|-------------|-----------|--------|
 | 플러그인 진입 | marketplace 설치 또는 `--plugin-dir` | `platforms/codex/install.sh` | `platforms/cursor/install.sh` |
 | 훅 이벤트 | `SessionStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `UserPromptSubmit`, `PreCompact` | `SessionStart`, `PreToolUse`, `PostToolUse` | `sessionStart`, `preToolUse`, `postToolUse`, `postToolUseFailure`, `stop`, `userPromptSubmit`, `preCompact` |
-| 읽기 추적 기반 GateGuard | 지원 | 미지원 | 지원 |
+| 읽기 추적 기반 GateGuard | `Read` + `Write|Edit` 추적 | 미지원 | `Read` + `Write` 추적 |
 | MCP health failure/success 추적 | 지원 | 미지원 | 지원 |
-| 쓰기 후 학습/보안/주석 검사 | 지원 | 제한적 | 지원 |
+| 쓰기 후 학습/보안/주석 검사 | `Write|Edit` | 제한적 | `Write` 중심 |
 | 설치 후 추가 작업 | Claude 안에서 `/plugin install` | `config.toml` 자동 수정 | Cursor 재시작 또는 Reload |
 
 Codex는 현재 플랫폼 훅 제약 때문에 `PostToolUse(Read)`와 `PostToolUseFailure`가 없습니다. 그래서 읽기 추적 기반 `gateguard`와 MCP failure 추적이 빠지고, 대신 `guard-shell.sh`, `pre-edit-write-dispatcher.sh`, `build-watcher.sh` 중심으로 동작합니다.

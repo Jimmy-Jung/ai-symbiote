@@ -7,7 +7,7 @@
 #
 # Protocol:
 #   stdin:  {"tool_name":"mcp__context7__query-docs","tool_input":{...}}
-#   stdout: {"continue":false,...} to block | {"continue":true} to approve
+#   stdout: Claude/Cursor/Codex hook protocol specific allow/deny payload
 
 # Safety: never crash the agent workflow
 trap 'exit 0' ERR
@@ -33,7 +33,7 @@ fi
 case "$TOOL_NAME" in
   mcp__*) ;;
   *)
-    emit_hook_continue
+    emit_pretool_allow
     exit 0
     ;;
 esac
@@ -46,7 +46,7 @@ SERVER="${TOOL_NAME#mcp__}"
 SERVER="${SERVER%%__*}"
 
 if [ -z "$SERVER" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
@@ -119,10 +119,10 @@ except Exception:
 
   ELAPSED=$((ELAPSED + 0)) 2>/dev/null || ELAPSED=0
 
-  if [ "$ELAPSED" -lt 300 ]; then
-    # Still within cooldown — block
-    emit_hook_block "[MCP Health] ${SERVER} is unhealthy (${FAIL_COUNT} consecutive failures). Use non-MCP alternatives or restart the server."
-    exit 0
+    if [ "$ELAPSED" -lt 300 ]; then
+      # Still within cooldown — block
+      emit_pretool_deny "[MCP Health] ${SERVER} is unhealthy (${FAIL_COUNT} consecutive failures). Use non-MCP alternatives or restart the server."
+      exit 0
   else
     # Cooldown expired — reset counter and allow retry
     if command -v jq >/dev/null 2>&1; then
@@ -146,11 +146,11 @@ except Exception:
     pass
 " 2>/dev/null
     fi
-    emit_hook_continue
+    emit_pretool_allow
     exit 0
   fi
 fi
 
 # --- 8. Under threshold — allow ---
-emit_hook_continue
+emit_pretool_allow
 exit 0

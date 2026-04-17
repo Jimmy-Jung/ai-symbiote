@@ -47,6 +47,18 @@ assert_not_contains() {
   fi
 }
 
+assert_empty() {
+  local desc="$1" value="$2"
+  TOTAL=$((TOTAL + 1))
+  if [ -z "$value" ]; then
+    PASSED=$((PASSED + 1))
+    printf "${GREEN}  PASS${NC} %s\n" "$desc"
+  else
+    FAILED=$((FAILED + 1))
+    printf "${RED}  FAIL${NC} %s (expected empty output)\n    actual: %s\n" "$desc" "$value"
+  fi
+}
+
 # Setup
 TMPDIR_ORIG="${TMPDIR:-/tmp}"
 TEST_TMPDIR=$(mktemp -d)
@@ -64,8 +76,8 @@ trap 'rm -rf "$TEST_TMPDIR" "$TEST_STATE"' EXIT
 
 # Helper: run tracker with Read JSON
 run_tracker() {
-  local file_path="$1"
-  echo "{\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$file_path\"}}" | \
+  local file_path="$1" tool_name="${2:-Read}"
+  echo "{\"tool_name\":\"$tool_name\",\"tool_input\":{\"file_path\":\"$file_path\"}}" | \
     TMPDIR="$TEST_TMPDIR" CLAUDE_SESSION_ID="$TEST_SESSION" \
     bash -c "source '$PROJECT_ROOT/shared/hooks/scripts/lib/common.sh'; get_state_dir() { echo '$TEST_STATE'; }; export -f get_state_dir; bash '$TRACKER_SCRIPT'" 2>/dev/null
 }
@@ -90,36 +102,38 @@ rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 OUTPUT=$(run_gate "Edit" "$TEST_EXISTING_FILE")
 assert_contains "blocks unread file" "GateGuard" "$OUTPUT"
 assert_contains "mentions Read first" "Read" "$OUTPUT"
-assert_contains "output denies" "continue" "$OUTPUT"
+assert_contains "claude deny payload" "\"permissionDecision\":\"deny\"" "$OUTPUT"
+assert_not_contains "does not stop continuation" "\"continue\":false" "$OUTPUT"
 
 # Test 2: Allow after read tracking
 printf "\n${YELLOW}Test 2: Allow after read tracking${NC}\n"
 rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 run_tracker "$TEST_EXISTING_FILE" > /dev/null
 OUTPUT=$(run_gate "Edit" "$TEST_EXISTING_FILE")
-assert_contains "allows after read" "\"continue\":true" "$OUTPUT"
+assert_empty "allows after read without extra output" "$OUTPUT"
 assert_not_contains "no block message" "GateGuard" "$OUTPUT"
 
 # Test 3: Allow new file creation (Write, file does NOT exist)
 printf "\n${YELLOW}Test 3: Allow new file creation${NC}\n"
 rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 OUTPUT=$(run_gate "Write" "$TEST_TMPDIR/brand-new-file.swift")
-assert_contains "allows new file" "\"continue\":true" "$OUTPUT"
+assert_empty "allows new file without extra output" "$OUTPUT"
 assert_not_contains "no block for new file" "GateGuard" "$OUTPUT"
 
 # Test 4: Override with SYMBIOTE_GATEGUARD=0
 printf "\n${YELLOW}Test 4: Override with SYMBIOTE_GATEGUARD=0${NC}\n"
 rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 OUTPUT=$(run_gate "Edit" "$TEST_EXISTING_FILE" "SYMBIOTE_GATEGUARD=0")
-assert_contains "override allows unread" "\"continue\":true" "$OUTPUT"
+assert_empty "override allows unread without extra output" "$OUTPUT"
 assert_not_contains "no block with override" "GateGuard" "$OUTPUT"
 
 # Test 5: Empty file_path → continue
 printf "\n${YELLOW}Test 5: Empty file_path → continue${NC}\n"
 OUTPUT=$(echo '{"tool_name":"Edit","tool_input":{}}' | \
   TMPDIR="$TEST_TMPDIR" CLAUDE_SESSION_ID="$TEST_SESSION" \
+  CLAUDE_PROJECT_DIR="/tmp/test" \
   bash -c "source '$PROJECT_ROOT/shared/hooks/scripts/lib/common.sh'; get_state_dir() { echo '$TEST_STATE'; }; export -f get_state_dir json_field json_nested_field json_escape emit_hook_block emit_hook_continue hook_uses_cursor_protocol; bash '$GATE_SCRIPT'" 2>/dev/null)
-assert_contains "continues on empty path" "\"continue\":true" "$OUTPUT"
+assert_empty "continues on empty path without extra output" "$OUTPUT"
 
 # Test 6: harness-log.jsonl records gateguard_blocked
 # Note: get_state_dir in the gate script resolves via slug. We set up a matching structure.
@@ -173,8 +187,15 @@ SESSION_CONTENT=$(cat "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION" 2>/dev/nul
 assert_contains "session file has file1" "/path/to/file1.swift" "$SESSION_CONTENT"
 assert_contains "session file has file2" "/path/to/file2.swift" "$SESSION_CONTENT"
 
-# Test 8: Cursor protocol on block
-printf "\n${YELLOW}Test 8: Cursor protocol output${NC}\n"
+# Test 8: Successful Write/Edit is auto-registered for follow-up edits
+printf "\n${YELLOW}Test 8: Successful Write is auto-registered${NC}\n"
+rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
+run_tracker "$TEST_EXISTING_FILE" "Write" > /dev/null
+OUTPUT=$(run_gate "Edit" "$TEST_EXISTING_FILE")
+assert_empty "write-tracked file can be edited again" "$OUTPUT"
+
+# Test 9: Cursor protocol on block
+printf "\n${YELLOW}Test 9: Cursor protocol output${NC}\n"
 rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 OUTPUT=$(echo "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TEST_EXISTING_FILE\"}}" | \
   TMPDIR="$TEST_TMPDIR" CLAUDE_SESSION_ID="$TEST_SESSION" \

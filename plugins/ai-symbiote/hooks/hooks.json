@@ -77,6 +77,16 @@
         ]
       },
       {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/gateguard-tracker.sh\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Read|Skill",
         "hooks": [
           {
@@ -107,6 +117,11 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/messenger-notify.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
             "timeout": 10
           }
         ]

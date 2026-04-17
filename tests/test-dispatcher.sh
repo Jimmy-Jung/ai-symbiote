@@ -49,6 +49,18 @@ assert_not_contains() {
   fi
 }
 
+assert_empty() {
+  local desc="$1" value="$2"
+  TOTAL=$((TOTAL + 1))
+  if [ -z "$value" ]; then
+    PASSED=$((PASSED + 1))
+    printf "${GREEN}  PASS${NC} %s\n" "$desc"
+  else
+    FAILED=$((FAILED + 1))
+    printf "${RED}  FAIL${NC} %s\n    expected empty output\n    actual: %s\n" "$desc" "$value"
+  fi
+}
+
 # --- Setup ---
 TEST_TMPDIR=$(mktemp -d)
 TEST_STATE=$(mktemp -d)
@@ -99,7 +111,8 @@ rm -f "$TEST_TMPDIR/symbiote-compact-$TEST_SESSION"
 OUTPUT=$(run_dispatcher '{"tool_name":"Edit","tool_input":{"file_path":"/project/.swiftlint.yml","old_string":"a","new_string":"b"}}')
 
 assert_contains "blocks .swiftlint.yml" "Config Protection" "$OUTPUT"
-assert_contains "output denies permission" '"continue":false' "$OUTPUT"
+assert_contains "output denies permission" '"permissionDecision":"deny"' "$OUTPUT"
+assert_not_contains "does not stop continuation" '"continue":false' "$OUTPUT"
 assert_not_contains "gateguard does not fire" "GateGuard" "$OUTPUT"
 
 # ============================================================
@@ -113,19 +126,19 @@ OUTPUT=$(run_dispatcher "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\
 
 assert_contains "blocks unread file" "GateGuard" "$OUTPUT"
 assert_contains "mentions Read first" "Read" "$OUTPUT"
-assert_contains "output denies" '"continue":false' "$OUTPUT"
+assert_contains "output denies" '"permissionDecision":"deny"' "$OUTPUT"
+assert_not_contains "does not stop continuation" '"continue":false' "$OUTPUT"
 
 # ============================================================
-# Test 3: Suggest-compact notice at threshold
+# Test 3: Dispatcher no longer emits compact notice in PreToolUse
 # ============================================================
-printf "\n${YELLOW}Test 3: Suggest-compact notice at threshold${NC}\n"
+printf "\n${YELLOW}Test 3: Dispatcher no longer emits compact notice${NC}\n"
 rm -f "$TEST_TMPDIR/symbiote-gateguard-$TEST_SESSION"
 rm -f "$TEST_TMPDIR/symbiote-compact-$TEST_SESSION"
 
 # Track the file as read so gateguard doesn't block
 run_tracker "$TEST_EXISTING_FILE" > /dev/null
 
-# Run dispatcher COMPACT_THRESHOLD=1 times to reach threshold
 OUTPUT=$(printf '%s' "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TEST_EXISTING_FILE\",\"old_string\":\"a\",\"new_string\":\"b\"}}" | \
   TMPDIR="$TEST_TMPDIR" \
   CLAUDE_SESSION_ID="$TEST_SESSION" \
@@ -135,8 +148,7 @@ OUTPUT=$(printf '%s' "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$T
   COMPACT_THRESHOLD=1 \
   bash "$DISPATCHER_SCRIPT" 2>/dev/null)
 
-assert_contains "compact notice appears" "[Compact]" "$OUTPUT"
-assert_contains "output allows continue" '"continue":true' "$OUTPUT"
+assert_empty "dispatcher stays silent even at compact threshold" "$OUTPUT"
 
 # ============================================================
 # Test 4: Allow regular file edit after read
@@ -150,7 +162,7 @@ run_tracker "$TEST_EXISTING_FILE" > /dev/null
 
 OUTPUT=$(run_dispatcher "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$TEST_EXISTING_FILE\",\"old_string\":\"a\",\"new_string\":\"b\"}}")
 
-assert_contains "allows after read" '"continue":true' "$OUTPUT"
+assert_empty "allows after read without extra output" "$OUTPUT"
 assert_not_contains "no config block" "Config Protection" "$OUTPUT"
 assert_not_contains "no gateguard block" "GateGuard" "$OUTPUT"
 
@@ -173,7 +185,7 @@ OUTPUT=$(printf '%s' '{"tool_name":"Edit","tool_input":{"file_path":"/project/.s
   SYMBIOTE_ALLOW_CONFIG_EDIT=1 \
   bash "$DISPATCHER_SCRIPT" 2>/dev/null)
 
-assert_contains "override allows config edit" '"continue":true' "$OUTPUT"
+assert_empty "override allows config edit without extra output" "$OUTPUT"
 assert_not_contains "no config block with override" "Config Protection" "$OUTPUT"
 
 # ============================================================
@@ -192,7 +204,7 @@ OUTPUT=$(printf '%s' "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$T
   SYMBIOTE_GATEGUARD=0 \
   bash "$DISPATCHER_SCRIPT" 2>/dev/null)
 
-assert_contains "gateguard disabled allows unread" '"continue":true' "$OUTPUT"
+assert_empty "gateguard disabled allows unread without extra output" "$OUTPUT"
 assert_not_contains "no gateguard block with override" "GateGuard" "$OUTPUT"
 
 # ============================================================

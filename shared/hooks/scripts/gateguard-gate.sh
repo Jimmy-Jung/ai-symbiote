@@ -6,8 +6,7 @@
 #
 # Protocol:
 #   stdin:  {"tool_name":"Edit","tool_input":{"file_path":"/path/to/file",...}}
-#   stdout: {"continue":false,...} to block
-#           {"continue":true,...} to approve
+#   stdout: Claude/Cursor/Codex hook protocol specific allow/deny payload
 
 # Safety: never crash the agent workflow
 trap 'exit 0' ERR
@@ -21,7 +20,7 @@ INPUT=$(read_stdin_safe)
 
 # --- 2. Check disable flag ---
 if [ "${SYMBIOTE_GATEGUARD:-}" = "0" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
@@ -47,13 +46,13 @@ fi
 
 # --- 5. No file_path → continue ---
 if [ -z "$FILE_PATH" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
 # --- 6. For Write tool: allow new file creation (file does not exist on disk) ---
 if [ "$TOOL_NAME" = "Write" ] && [ ! -e "$FILE_PATH" ]; then
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
@@ -62,12 +61,12 @@ SESSION_FILE=$(safe_session_file "symbiote-gateguard")
 
 if grep -qxF "$FILE_PATH" "$SESSION_FILE" 2>/dev/null; then
   # File has been read → allow
-  emit_hook_continue
+  emit_pretool_allow
   exit 0
 fi
 
 # --- 8. Block: file not read in this session ---
-emit_hook_block "[GateGuard] Read $(basename "$FILE_PATH") first. The file must be read before editing to ensure changes are based on current state."
+emit_pretool_deny "[GateGuard] Read $(basename "$FILE_PATH") first. The file must be read before editing to ensure changes are based on current state."
 
 # --- 9. Record to harness-log.jsonl ---
 STATE_DIR=$(get_state_dir)

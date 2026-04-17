@@ -69,9 +69,21 @@ run_hook '{"hook_event_name":"PostToolUse","tool_name":"Skill","tool_input":{"sk
 assert_eq "skills/review count after Skill tool" "1" "$(counter_value "$STATE_DIR/usage-data/skills/review")"
 
 echo ""
-echo "--- Test 4: legacy Read increments skill when no recent marker exists ---"
-run_hook "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$PROJECT_ROOT/shared/skills/setup/SKILL.md\"}}"
-assert_eq "skills/setup count after legacy Read" "1" "$(counter_value "$STATE_DIR/usage-data/skills/setup")"
+echo "--- Test 4: command-name tag increments skills and commands ---"
+run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"<command-name>/ai-symbiote:setup</command-name>"}'
+assert_eq "skills/setup count after command-name" "1" "$(counter_value "$STATE_DIR/usage-data/skills/setup")"
+assert_eq "commands/setup count after command-name" "1" "$(counter_value "$STATE_DIR/usage-data/commands/setup")"
+
+echo ""
+echo "--- Test 5: bare slash command increments skills and commands ---"
+run_hook '{"hook_event_name":"UserPromptSubmit","prompt":"  /ai-symbiote:security scan this repo"}'
+assert_eq "skills/security count after bare slash command" "1" "$(counter_value "$STATE_DIR/usage-data/skills/security")"
+assert_eq "commands/security count after bare slash command" "1" "$(counter_value "$STATE_DIR/usage-data/commands/security")"
+
+echo ""
+echo "--- Test 6: legacy Read increments skill when no recent marker exists ---"
+run_hook "{\"hook_event_name\":\"PostToolUse\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$PROJECT_ROOT/shared/skills/analyze/SKILL.md\"}}"
+assert_eq "skills/analyze count after legacy Read" "1" "$(counter_value "$STATE_DIR/usage-data/skills/analyze")"
 
 echo ""
 echo "=== Results ==="

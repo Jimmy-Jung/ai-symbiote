@@ -1,6 +1,6 @@
 #!/bin/bash
 # ai-symbiote PreToolUse dispatcher: Consolidates Edit/Write pre-flight checks.
-# Runs config-protection, gateguard-gate, and suggest-compact in sequence.
+# Runs config-protection and gateguard-gate in sequence.
 # First block wins — if any sub-handler blocks, dispatcher stops and outputs that block.
 #
 # Created by JunyoungJung on 2026-04-16. Copyright © 2026 ai-symbiote.
@@ -20,7 +20,7 @@ trap 'rm -f "$STDIN_TMP"' EXIT
 # --- 2. config-protection.sh (highest priority — blocking a config edit is more important) ---
 if [ -f "$SCRIPT_DIR/config-protection.sh" ]; then
   OUTPUT=$(cat "$STDIN_TMP" | bash "$SCRIPT_DIR/config-protection.sh" 2>/dev/null)
-  if echo "$OUTPUT" | grep -q '"continue":false' 2>/dev/null; then
+  if echo "$OUTPUT" | grep -q '"continue":false\|"permissionDecision":"deny"' 2>/dev/null; then
     echo "$OUTPUT"
     exit 0
   fi
@@ -32,21 +32,12 @@ fi
 GATEGUARD_TRACKER="$SCRIPT_DIR/gateguard-tracker.sh"
 if [ -f "$SCRIPT_DIR/gateguard-gate.sh" ] && [ -f "$GATEGUARD_TRACKER" ]; then
   OUTPUT=$(cat "$STDIN_TMP" | bash "$SCRIPT_DIR/gateguard-gate.sh" 2>/dev/null)
-  if echo "$OUTPUT" | grep -q '"continue":false' 2>/dev/null; then
+  if echo "$OUTPUT" | grep -q '"continue":false\|"permissionDecision":"deny"' 2>/dev/null; then
     echo "$OUTPUT"
     exit 0
   fi
 fi
 
-# --- 4. suggest-compact.sh (lowest — just a suggestion, never blocks) ---
-if [ -f "$SCRIPT_DIR/suggest-compact.sh" ]; then
-  COMPACT_OUTPUT=$(cat "$STDIN_TMP" | bash "$SCRIPT_DIR/suggest-compact.sh" 2>/dev/null)
-  if echo "$COMPACT_OUTPUT" | grep -q 'systemMessage\|user_message' 2>/dev/null; then
-    echo "$COMPACT_OUTPUT"
-    exit 0
-  fi
-fi
-
-# --- 5. Nothing blocked and no notice — continue ---
-emit_hook_continue
+# --- 4. Nothing blocked — continue ---
+emit_pretool_allow
 exit 0
