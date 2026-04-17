@@ -13,6 +13,7 @@ PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(
 STATE_DIR=""
 PROJECT_ROOT=""
 MODE="${SETUP_STORE_MODE:-guided}"
+TEMP_ROOT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -43,6 +44,15 @@ if [ -z "$PROJECT_ROOT" ]; then
   PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 fi
 
+ORIGINAL_STATE_DIR="$STATE_DIR"
+ORIGINAL_MANIFEST_PATH="$ORIGINAL_STATE_DIR/manifest.json"
+
+if [ "$MODE" = "dry-run" ]; then
+  TEMP_ROOT=$(mktemp -d)
+  trap 'rm -rf "$TEMP_ROOT"' EXIT
+  STATE_DIR="$TEMP_ROOT/state"
+fi
+
 STATE_SUBDIR="$STATE_DIR/state"
 MANIFEST_PATH="$STATE_DIR/manifest.json"
 PREFERENCES_PATH="$STATE_SUBDIR/setup-store-preferences.json"
@@ -51,10 +61,19 @@ SKILL_RECOMMENDATION_PATH="$STATE_SUBDIR/skill-store-recommendations.json"
 CLI_RECOMMENDATION_PATH="$STATE_SUBDIR/cli-store-recommendations.json"
 MCP_RECOMMENDATION_PATH="$STATE_SUBDIR/mcp-store-recommendations.json"
 
-mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+if [ "$MODE" != "dry-run" ]; then
+  mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+else
+  mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+fi
 
 bootstrap_manifest_if_missing() {
   if [ -f "$MANIFEST_PATH" ]; then
+    return 0
+  fi
+  mkdir -p "$STATE_DIR"
+  if [ "$MODE" = "dry-run" ] && [ -f "$ORIGINAL_MANIFEST_PATH" ]; then
+    cp "$ORIGINAL_MANIFEST_PATH" "$MANIFEST_PATH"
     return 0
   fi
   python3 - "$MANIFEST_PATH" "$PROJECT_ROOT" <<'PY'
@@ -80,21 +99,25 @@ PY
 }
 
 run_recommendation_pass() {
+  local write_state="true"
   echo "[Setup] Running store recommendations..."
   if ! SKILL_STORE_STATE_DIR="$STATE_DIR" \
     SKILL_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    SKILL_STORE_WRITE_STATE="$write_state" \
     bash "$PLUGIN_ROOT/skills/skill-store/scripts/skill-store.sh" --auto; then
     echo "[Setup] WARNING: skill-store recommendation failed." >&2
   fi
 
   if ! CLI_STORE_STATE_DIR="$STATE_DIR" \
     CLI_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    CLI_STORE_WRITE_STATE="$write_state" \
     bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" --auto; then
     echo "[Setup] WARNING: cli-store recommendation failed." >&2
   fi
 
   if ! MCP_STORE_STATE_DIR="$STATE_DIR" \
     MCP_STORE_PROJECT_ROOT="$PROJECT_ROOT" \
+    MCP_STORE_WRITE_STATE="$write_state" \
     bash "$PLUGIN_ROOT/skills/mcp-store/scripts/mcp-store.sh" --auto; then
     echo "[Setup] WARNING: mcp-store recommendation failed." >&2
   fi

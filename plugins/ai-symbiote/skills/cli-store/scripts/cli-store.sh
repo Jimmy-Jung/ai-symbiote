@@ -17,13 +17,16 @@ STATE_SUBDIR="$STATE_DIR/state"
 COVERED_MCP_PATH="$STATE_SUBDIR/cli-covered-mcps.json"
 RECOMMENDATION_PATH="$STATE_SUBDIR/cli-store-recommendations.json"
 PROJECT_ROOT_OVERRIDE="${CLI_STORE_PROJECT_ROOT:-}"
+WRITE_STATE="${CLI_STORE_WRITE_STATE:-true}"
 
 if [ ! -f "$CATALOG" ]; then
   echo "[CLI Store] catalog.json not found: $CATALOG" >&2
   exit 1
 fi
 
-mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+if [ "$WRITE_STATE" = "true" ]; then
+  mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+fi
 
 MODE="query"
 QUERY=""
@@ -259,6 +262,7 @@ PY
 
 update_manifest_and_state() {
   local entry_json="$1" status="$2"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$MANIFEST_PATH" "$COVERED_MCP_PATH" "$entry_json" "$status" <<'PY'
 import json, sys
 from datetime import datetime, UTC
@@ -270,6 +274,17 @@ entry = json.loads(sys.argv[3])
 status = sys.argv[4]
 now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+def deep_merge(current, incoming):
+    if not isinstance(current, dict) or not isinstance(incoming, dict):
+        return incoming
+    merged = dict(current)
+    for key, value in incoming.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
 manifest = {}
 if manifest_path.exists():
     try:
@@ -277,12 +292,13 @@ if manifest_path.exists():
     except Exception:
         manifest = {}
 manifest.setdefault("cliTools", {})
-manifest["cliTools"][entry["id"]] = {
+existing_entry = manifest["cliTools"].get(entry["id"], {})
+manifest["cliTools"][entry["id"]] = deep_merge(existing_entry, {
     "cmd": entry["cmd"],
     "installed": now,
     "mcpEquivalent": entry.get("mcpEquivalent"),
     "status": status,
-}
+})
 manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
 covered = {"coveredMcpIds": [], "generatedAt": now}
@@ -302,6 +318,7 @@ PY
 
 overwrite_covered_mcp_state() {
   local covered_ids_json="$1"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$COVERED_MCP_PATH" "$covered_ids_json" <<'PY'
 import json, sys
 from datetime import datetime, UTC
@@ -320,6 +337,7 @@ PY
 
 write_auto_recommendations() {
   local payload_json="$1"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$RECOMMENDATION_PATH" "$payload_json" <<'PY'
 import json, sys
 from datetime import datetime, UTC

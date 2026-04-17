@@ -16,13 +16,16 @@ MANIFEST_PATH="$STATE_DIR/manifest.json"
 STATE_SUBDIR="$STATE_DIR/state"
 RECOMMENDATION_PATH="$STATE_SUBDIR/skill-store-recommendations.json"
 PROJECT_ROOT_OVERRIDE="${SKILL_STORE_PROJECT_ROOT:-}"
+WRITE_STATE="${SKILL_STORE_WRITE_STATE:-true}"
 
 if [ ! -f "$CATALOG" ]; then
   echo "[Skill Store] catalog.json not found: $CATALOG" >&2
   exit 1
 fi
 
-mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+if [ "$WRITE_STATE" = "true" ]; then
+  mkdir -p "$STATE_DIR" "$STATE_SUBDIR"
+fi
 
 MODE="query"
 QUERY=""
@@ -164,6 +167,7 @@ PY
 
 write_recommendations() {
   local matches_json="$1"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$RECOMMENDATION_PATH" "$matches_json" <<'PY'
 import json, sys
 from datetime import datetime, UTC
@@ -199,6 +203,7 @@ PY
 
 record_installation() {
   local entry_json="$1" status="${2:-selected}"
+  [ "$WRITE_STATE" = "true" ] || return 0
   python3 - "$MANIFEST_PATH" "$STATE_SUBDIR/skill-store-installed.json" "$entry_json" "$status" <<'PY'
 import json, sys
 from datetime import datetime, UTC
@@ -210,6 +215,17 @@ entry = json.loads(sys.argv[3])
 status = sys.argv[4]
 now = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
+def deep_merge(current, incoming):
+    if not isinstance(current, dict) or not isinstance(incoming, dict):
+        return incoming
+    merged = dict(current)
+    for key, value in incoming.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
 manifest = {}
 if manifest_path.exists():
     try:
@@ -218,13 +234,14 @@ if manifest_path.exists():
         manifest = {}
 
 manifest.setdefault("plugins", {})
-manifest["plugins"][entry["repo"]] = {
+existing_entry = manifest["plugins"].get(entry["repo"], {})
+manifest["plugins"][entry["repo"]] = deep_merge(existing_entry, {
     "name": entry.get("name"),
     "category": entry.get("category"),
     "source": f"github:{entry['repo']}",
     "installed": now,
     "status": status,
-}
+})
 manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n")
 
 installed = {"generatedAt": now, "items": []}

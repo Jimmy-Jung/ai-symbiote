@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.5] - 2026-04-17
+
+### Fixed
+- **Issue #6 해결: setup dry-run이 manifest를 변형하던 문제 수정** — 실제 state는 건드리지 않으면서 임시 state에서 recommendation/summary를 정상 계산하도록 조정해 dry-run 출력 왜곡과 상태 오염을 함께 해소
+- **Issue #6 해결: store manifest detail key 유실 수정** — CLI Skill MCP store가 기존 manifest 엔트리를 덮어쓰지 않고 병합하도록 바꿔 사용자 정의 detail 필드가 유지되도록 수정
+- **Issue #5 해결: security scan 대형 Tuist iOS 프로젝트 지연 완화** — timeout heartbeat exclude 흐름을 정리하고 world-writable 검사까지 `Pods`, `DerivedData`, `Tuist`, `.build`, `*.xcframework` 제외 규칙을 일관되게 적용
+- **이슈 회귀 테스트 추가** — dry-run immutability, summary 정확도, scanner timeout heartbeat exclude 경로를 테스트로 고정
+
 ## [0.10.4] - 2026-04-17
 
 ### Fixed
