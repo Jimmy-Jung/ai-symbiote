@@ -2,493 +2,471 @@
 
 > Author: JunyoungJung
 
-마블의 <b>베놈(Venom)</b>을 기억하시나요?
-심비오트(Symbiote)는 숙주에 달라붙어 하나가 되는 외계 생명체입니다.
-숙주의 능력을 증폭시키고, 숙주의 경험을 통해 스스로도 진화합니다.
+마블의 베놈을 떠올리면 가장 먼저 보이는 것은 "기생"이 아니라 "공생"에 가깝습니다.  
+심비오트는 숙주에 달라붙어 하나가 되고, 숙주의 능력을 증폭시키며, 숙주의 경험을 통해 스스로도 진화합니다.
 
-ai-symbiote는 이 관계를 코드 위에 구현합니다.
-AI 에이전트에 달라붙어 하나가 되고, 에이전트가 실수하면 하네스가 자동으로 강해지고, 개발자가 규칙을 다듬으면 에이전트가 더 정확해집니다.
-베놈이 에디 브록과 함께 강해지듯, <b>ai-symbiote는 쓰면 쓸수록 개발자와 에이전트가 함께 강해지는 공생 시스템</b>입니다.
+`ai-symbiote`는 그 관계를 AI 코딩 에이전트 위에 옮긴 플러그인입니다.  
+에이전트에 스킬과 훅, 상태 관리, 학습 로그를 붙여서 한 번의 작업 결과가 다음 세션의 실행 품질을 바꾸게 만듭니다.
 
-Claude Code, Codex CLI, Cursor에서 동일한 스킬, 훅, 태스크 매니저를 공유하는
-AI 에이전트 오케스트레이션 플러그인입니다.
+Claude Code, Codex CLI, Cursor에서 같은 스킬과 하네스를 공유하면서, 에이전트가 반복 실수한 내용을 상태 파일과 훅, 로그에 축적해 다음 세션의 규칙으로 바꿉니다. 개발자가 규칙을 다듬을수록 에이전트는 더 정확해지고, 에이전트가 더 많이 일할수록 하네스는 더 프로젝트에 맞게 진화합니다. 베놈이 에디 브록과 함께 강해지듯, `ai-symbiote`는 개발자와 에이전트가 함께 강해지는 공생 시스템을 목표로 합니다.
+
+## ai-symbiote가 푸는 문제
+
+AI 코딩 에이전트는 기본적으로 세 가지 약점을 가집니다.
+
+1. 세션이 바뀌면 프로젝트 맥락을 잊기 쉽습니다.
+2. 같은 실수를 다른 파일에서 반복하기 쉽습니다.
+3. 플랫폼마다 설정과 훅 구조가 달라 운영 방식이 쉽게 분열됩니다.
+
+`ai-symbiote`는 이 문제를 다음 조합으로 풀었습니다.
+
+- `shared/` 공용 코어: 스킬, 훅, 시드 규칙, 메신저 브릿지, 태스크마스터를 한 군데서 관리
+- `platforms/*/overlay/` 오버레이: Claude, Codex, Cursor 차이만 얇게 분리
+- `~/ai-symbiote/{slug}/` 상태 루트: 저장소 바깥에서 프로젝트별 컨텍스트와 로그를 공용 관리
+- 하네스 학습 루프: 훅이 반복 실수를 기록하고, 통계와 GC 스킬이 규칙을 다듬음
+
+## 왜 이렇게 설계했나
+
+| 설계 선택 | 이유 | 얻는 효과 |
+|------|------|------|
+| `shared/` + 플랫폼 오버레이 분리 | 플랫폼별 차이는 적고, 공용 로직이 훨씬 많음 | 기능을 한 번 만들고 세 플랫폼에 재사용 |
+| 상태를 저장소 밖 `~/ai-symbiote/{slug}`에 저장 | 브랜치/워크트리와 무관하게 같은 프로젝트 맥락을 유지해야 함 | 세션이 바뀌어도 컨텍스트, 통계, 보안 로그, 메신저 상태 지속 |
+| 프롬프트만이 아니라 훅으로 강제 | "주의하세요"만으로는 반복 실수를 못 막음 | 위험 명령 차단, 읽지 않고 수정하는 행동 방지, 보안 검사 자동화 |
+| 로그를 남기고 `stats`/`gc`로 되돌아봄 | 규칙은 쌓기만 하면 비대해짐 | 실제로 예방한 규칙만 남기고 쓸모없는 규칙 정리 |
+| `synapse` 중심 라우팅 | 모든 요청을 사용자가 매번 적절한 스킬로 직접 연결하기 어려움 | 사용자 의도를 보고 분석/계획/구현/리뷰 팀을 자동 선택 |
 
 ## Overview
 
 <!-- AI-SYMBIOTE:START readme:overview -->
-이 저장소는 `shared/`에 공용 코어를 두고, `platforms/` 오버레이로 Claude Code, Codex CLI, Cursor 번들을 조립하는 AI 에이전트 오케스트레이션 플러그인입니다. 사용자는 스킬을 직접 호출할 수도 있고, `synapse`가 의도를 분류해 팀 템플릿과 역할 정의를 묶어 자동으로 실행 흐름을 조합할 수도 있습니다. 하네스는 `context.md`, 훅 스크립트, 로그 상태를 연결해 반복 실수를 줄이는 쪽으로 설계되어 있습니다.
+`ai-symbiote`의 실제 소스 오브 트루스는 `shared/`와 `platforms/*/overlay/`입니다. 빌드 스크립트가 이 둘을 합쳐 Claude/Codex/Cursor 번들을 만들고, 설치 스크립트가 각 런타임의 플러그인 경로와 설정으로 배포합니다. 런타임에서는 `synapse`가 요청을 해석해 적절한 스킬과 팀을 고르고, 훅이 세션 시작부터 종료까지 실행을 감시하며, 상태 디렉터리가 프로젝트 기억을 유지합니다.
 
 ```mermaid
 flowchart LR
-    A["사용자 요청"] --> B["synapse\n의도 분류"]
-    B --> C["shared/skills\n28개 스킬"]
-    B --> D["team-templates + roles\n팀 구성"]
-    C --> E["hooks/scripts\n실행 가드"]
+    A["사용자 요청"] --> B["synapse<br/>의도 라우팅"]
+    B --> C["skills/ 30개"]
+    B --> D["roles + team-templates"]
+    C --> E["hooks/scripts/ 22개"]
     D --> E
-    E --> F["~/ai-symbiote/{slug}\ncontext·manifest·logs"]
-    C --> G["platforms/*/overlay"]
-    G --> H["Claude / Codex / Cursor 번들"]
+    E --> F["~/ai-symbiote/{slug}<br/>manifest/context/logs/state"]
+    C --> G["platform overlays"]
+    G --> H["Claude / Codex / Cursor bundle"]
 ```
 
-- 소스 오브 트루스: `shared/`, `platforms/*/overlay/`, `scripts/`, `tests/`
-- 주요 출력: `plugins/ai-symbiote/`, `dist/claude-symbiote/`, `dist/codex-symbiote/`, `dist/cursor-symbiote/`
-- 런타임 상태: `~/ai-symbiote/{slug}/manifest.json`, `context.md`, `harness-log.jsonl`, `security-log.jsonl`
+- 공용 스킬: `shared/skills/` 30개
+- 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 22개
+- 시드 규칙: `shared/harness-seeds/` 5개
+- 테스트 스크립트: `tests/` 29개
+- 현재 버전: `0.10.4`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
-## Quick Start
+## 빠른 이해를 위한 핵심 개념
 
-<!-- AI-SYMBIOTE:START readme:quick-start -->
-가장 짧은 로컬 진입 경로는 빌드, 설치, 초기화, 검증 순서입니다. Claude, Codex, Cursor는 같은 공용 코어를 쓰지만 설치 스크립트와 플러그인 메타데이터 오버레이가 다르므로, 자신의 실행 환경에 맞는 설치 경로를 고르면 됩니다.
+### 1. `synapse`: 요청을 해석하는 팀 리더
 
-1. 저장소 검증: `python3 scripts/version_sync.py --check`
-2. 번들 생성: `bash scripts/build-all.sh`
-3. 플랫폼 설치
-   - Claude: `bash platforms/claude/install.sh`
-   - Codex: `bash platforms/codex/install.sh`
-   - Cursor: `bash platforms/cursor/install.sh`
-4. 프로젝트 초기화: `/ai-symbiote:setup` 또는 `$ai-symbiote:setup`
-5. 문서/업데이터 확인: `bash tests/test-dev-docs-skill.sh && bash tests/test-dev-docs-updater.sh`
+사용자가 "분석해줘", "고쳐줘", "리뷰해줘", "외부 문서 찾아줘"처럼 자연어로 말하면 `synapse`가 이를 `analysis`, `implementation`, `review`, `planning`, `research`, `dynamic` 흐름으로 분류합니다. 특정 키워드는 `setup`, `messenger`, `security`, `skill-store` 같은 직접 실행 스킬로 우회합니다.
 
-빠르게 문서만 갱신하려면 `/ai-symbiote:dev-docs` 또는 `$ai-symbiote:dev-docs`를 실행하면 됩니다.
-<!-- AI-SYMBIOTE:END readme:quick-start -->
+### 2. 하네스: AI가 실수하기 어려운 실행 환경
 
-## Harness Engineering
+하네스는 세 가지 축으로 동작합니다.
 
-AI 모델이 아무리 똑똑해도 혼자 두면 같은 실수를 반복합니다.
-하네스(harness)는 이 문제를 구조적으로 해결합니다.
-프롬프트로 "이렇게 하지 마"라고 부탁하는 대신, <b>실수 자체가 불가능한 환경을 설계</b>합니다.
+- 컨텍스트: `manifest.json`, `context.md`, 하네스 시드 규칙
+- 훅: 세션 시작, 읽기/쓰기, 쉘 실행, 종료 시점의 자동 검사와 관찰
+- 로그: `harness-log.jsonl`, `security-log.jsonl`, `usage-data/`를 통한 회고와 진화
 
-ai-symbiote의 하네스는 세 가지 기둥으로 구성됩니다:
+### 3. 상태 루트: 프로젝트를 기억하는 외부 메모리
 
-### 1. Context File (context.md)
+각 저장소는 git 루트 basename 기반 slug를 갖고, 모든 플랫폼이 같은 상태 폴더를 공유합니다.
 
-에이전트가 매 세션 시작 시 가장 먼저 읽는 프로젝트 지침서입니다.
-`setup` 스킬이 프로젝트 스택, 코딩 컨벤션, 아키텍처를 자동 감지하여 생성하고,
-`evolve` 스킬이 프로젝트 변화에 맞춰 동기화합니다.
-
-기술 스택별 <b>시드 규칙</b>(harness-seeds)이 초기 부트스트랩 시 로딩되어
-알려진 에이전트 실수를 첫 세션부터 방지합니다.
-
-```mermaid
-flowchart LR
-    A[SessionStart] --> B[setup-check.sh]
-    B --> C["context.md 전체 주입"]
-    C -->|"systemMessage"| D["에이전트가 프로젝트 규칙을<br/>인지한 상태로 작업 시작"]
-    B -->|"이전 세션 분석"| E["rule_prevented 기록"]
+```text
+~/ai-symbiote/{slug}/
+├── manifest.json
+├── context.md
+├── harness-log.jsonl
+├── security-baseline.json
+├── security-log.jsonl
+├── state/
+├── taskmaster/
+├── usage-data/
+└── messenger/
 ```
 
-### 2. Auto-Enforcement (Hooks)
-
-규칙을 "부탁"이 아닌 "강제"로 적용합니다:
-
-| Hook | Event | Action |
-|------|-------|--------|
-| `guard-shell.sh` | PreToolUse(Bash) | 위험 명령 차단 + 보안 패턴 16개(SEC-001~016) 실시간 차단 + 안전한 우회 경로 제시 |
-| `security-guard.sh` | PostToolUse(Write\|Edit) | 파일 작성 후 보안 스캔: 하드코딩 시크릿, SQL injection, XSS, 디버그 모드 감지 (Codex 미지원) |
-| `harness-learn.sh` | PostToolUse(Write\|Edit) | 에이전트 실수 감지 + auto-loop FAIL 연동 + 확장자 패턴 학습 → 자동 규칙 생성 |
-| `comment-checker.sh` | PostToolUse(Write\|Edit) | 자명한 주석, 주석 처리된 코드 경고 |
-
-```mermaid
-flowchart LR
-    subgraph PreToolUse
-        A["Bash 명령"] -->|guard-shell.sh| B{"위험한 명령?<br/>보안 위반?"}
-        B -->|"차단"| C["deny + 규칙ID/위험등급/대안"]
-        B -->|"경고"| C2["continue + 경고 메시지"]
-        B -->|"안전"| D["허용"]
-    end
-    subgraph PostToolUse
-        E["Write/Edit"] -->|security-guard.sh| E2{"보안 패턴?"}
-        E2 -->|"Yes"| E3["경고 + security-log 기록"]
-        E2 -->|"No"| F2["harness-learn.sh"]
-        F2 -->|"반복 실수"| G["규칙 자동 생성"]
-        F2 -->|"정상"| H["조용히 통과"]
-    end
-```
-
-핵심 원칙: <b>"성공은 조용히, 실패만 시끄럽게."</b>
-테스트가 통과하면 아무 출력 없이 진행하고, 실패했을 때만 에이전트에게 알립니다.
-통과한 4,000줄의 결과를 모두 보여주면 에이전트가 그걸 읽느라 정작 할 일을 잊어버리기 때문입니다.
-
-### 3. Garbage Collection (gc skill)
-
-규칙은 추가만 하면 비대해집니다.
-`gc` 스킬이 30일 이상 트리거되지 않은 규칙을 식별하고 정리를 제안합니다.
-규칙별 <b>방지 횟수(rule_prevented)</b> 카운터로 데이터 기반 삭제 판단이 가능합니다.
-
-코드 레벨 위생 검사는 별도 `lint` 스킬이 담당합니다 (gc = 규칙 정리, lint = 코드 정리).
-
-### Self-Evolving Harness
-
-```mermaid
-flowchart TD
-    A["에이전트 실수 발생"] --> B["harness-learn.sh"]
-    B -->|"기록"| C["harness-log.jsonl (v2)"]
-    B -->|"7일 내 동일 실수 2회+"| D["context.md에<br/>규칙 자동 추가"]
-    B -->|"동일 확장자 3개+ 파일"| D2["패턴 규칙 생성<br/>(파일별 → 확장자별)"]
-    D --> E["다음 세션: 에이전트가 규칙을 읽고<br/>동일 실수 회피"]
-    D2 --> E
-    F["gc 스킬"] -->|"30일+ 미사용<br/>규칙 정리"| D
-    C -->|"stats 스킬"| G["하네스 진화 지표<br/>+ 규칙 효과 대시보드"]
-    H["auto-loop Inspector FAIL"] -->|"파일 패턴 감지"| B
-    I["guard-shell 차단<br/>(파괴적 명령 + SEC-001~016)"] -->|"guard_blocked /<br/>security_blocked 이벤트"| C
-    I2["security-guard.sh<br/>(파일 보안 스캔)"] -->|"보안 경고"| L["security-log.jsonl"]
-    L --> G
-    J["setup-check.sh"] -->|"이전 세션 분석"| K["rule_prevented 기록"]
-    K --> G
-```
-
-시간이 지날수록 하네스는 프로젝트에 특화된 규칙을 축적합니다.
-auto-loop의 실패도 자동으로 학습하고, 파일 단위 규칙은 확장자 패턴으로 일반화됩니다.
-
-`stats --baseline`으로 반복률 기준선을 측정하고,
-`stats`로 하네스 진화 지표(규칙 수, 실수 빈도 추이, 재발률, 규칙 효과)를 확인할 수 있습니다.
-SessionStart 시에는 `setup-check.sh`가 `security-baseline.json`, `security-log.jsonl`, 설치 대기 중인 보안 추천 도구를 우선순위 기반의 한 줄 요약으로 압축해 주입하며, `manifest.json`의 `security.sessionSummaryLevel`로 민감도를 조절할 수 있습니다 (`auto`, `quiet`, `verbose`).
+이 구조 덕분에 Claude에서 시작한 컨텍스트를 Codex나 Cursor에서도 같은 프로젝트 단위로 재사용할 수 있습니다.
 
 ## 설치
 
-### 프롬프트로 자동 설치
-
-Claude Code에서 아래 프롬프트를 붙여넣으면 설치부터 초기 설정까지 한 번에 완료됩니다:
-
-```text
-ai-symbiote 플러그인을 설치하고 프로젝트 초기 설정을 해줘.
-
-1. /plugin marketplace add Jimmy-Jung/ai-symbiote
-2. /plugin install ai-symbiote@ai-symbiote
-3. /ai-symbiote:setup 실행
-```
-
-Claude Code + Codex CLI + Cursor를 함께 설치:
-
-```text
-ai-symbiote 플러그인을 Claude Code, Codex CLI, Cursor에 모두 설치해줘.
-
-1. Claude Code 플러그인 설치:
-   /plugin marketplace add Jimmy-Jung/ai-symbiote
-   /plugin install ai-symbiote@ai-symbiote
-
-2. Codex CLI 설치:
-   git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
-   cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
-
-3. Cursor 설치:
-   cd ~/ai-symbiote-repo && bash platforms/cursor/install.sh
-
-4. /ai-symbiote:setup 실행
-```
-
 ### Claude Code
 
-```text
-/plugin marketplace add Jimmy-Jung/ai-symbiote
-/plugin install ai-symbiote@ai-symbiote
-```
-
-로컬 저장소 사용:
-
-```text
-/plugin marketplace add /path/to/ai-symbiote
-/plugin install ai-symbiote@ai-symbiote
-```
-
-설치 없이 세션 한 번만 테스트:
+가장 간단한 경로는 로컬 저장소를 marketplace로 등록하는 방식입니다.
 
 ```bash
-claude --plugin-dir /path/to/ai-symbiote/plugins/ai-symbiote
+bash platforms/claude/install.sh
+```
+
+설치 스크립트 실행 후 Claude 안에서:
+
+```text
+/plugin marketplace add /Users/jimmy/Documents/GitHub/ai-symbiote
+/plugin install ai-symbiote@ai-symbiote
+```
+
+한 번만 테스트하려면:
+
+```bash
+claude --plugin-dir /Users/jimmy/Documents/GitHub/ai-symbiote/plugins/ai-symbiote
 ```
 
 ### Codex CLI
 
 ```bash
-git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
-cd ~/ai-symbiote-repo && bash platforms/codex/install.sh
+bash platforms/codex/install.sh
 ```
 
-`install.sh`가 빌드, `~/plugins/ai-symbiote/` 복사, marketplace 등록, `config.toml` 설정(`codex_hooks = true`)을 한 번에 처리합니다.
+이 스크립트는 아래를 한 번에 처리합니다.
+
+- `scripts/build-codex.sh` 실행
+- `~/plugins/ai-symbiote`에 번들 동기화
+- `~/.agents/plugins/marketplace.json` 등록
+- `~/.codex/config.toml`에 플러그인 활성화와 `codex_hooks = true` 설정
+- Codex 캐시 경로까지 동기화
 
 ### Cursor
 
 ```bash
-git clone https://github.com/Jimmy-Jung/ai-symbiote.git ~/ai-symbiote-repo
-cd ~/ai-symbiote-repo && bash platforms/cursor/install.sh
+bash platforms/cursor/install.sh
 ```
 
-`install.sh`가 `dist/cursor-symbiote/`를 다시 만들고, `~/.cursor/plugins/local/ai-symbiote`에 번들을 동기화합니다. 설치 후에는 Cursor 재시작 또는 `Developer: Reload Window`가 필요합니다.
+이 스크립트는 `dist/cursor-symbiote/`를 다시 빌드한 뒤 `~/.cursor/plugins/local/ai-symbiote`에 설치합니다. 설치 후에는 Cursor 재시작 또는 `Developer: Reload Window`가 필요합니다.
 
-### 업데이트
+## Quick Start
 
+<!-- AI-SYMBIOTE:START readme:quick-start -->
+처음 써볼 때는 "설치 → 상태 초기화 → 분석/계획 → 구현/리뷰" 순서를 밟는 것이 가장 빠릅니다.
+
+### 1. 저장소와 번들 검증
+
+```bash
+python3 scripts/version_sync.py --check
+bash scripts/build-all.sh
 ```
-Claude: /ai-symbiote:update
-Codex:  $ai-symbiote:update
-Cursor: bundle 재설치 후 Reload Window
+
+### 2. 플랫폼별 설치
+
+```bash
+bash platforms/claude/install.sh
+bash platforms/codex/install.sh
+bash platforms/cursor/install.sh
 ```
+
+### 3. 프로젝트 상태 초기화
+
+- Claude: `/ai-symbiote:setup`
+- Codex: `$ai-symbiote:setup`
+
+`setup`은 바로 파일을 만들지 않고 먼저 plan 모드로 시작합니다. 현재 저장소를 분석한 뒤 다음 항목을 보여줍니다.
+
+1. 상태 디렉터리 준비
+2. 플랫폼 연동 확인
+3. 프로젝트 스택 감지
+4. 추천 스킬/CLI/MCP 후보 제시
+5. `manifest.json`, `context.md` 기본값 생성 또는 보정
+
+### 4. 바로 써볼 만한 첫 명령
+
+- 구조 파악: `/ai-symbiote:analyze 인증 흐름 분석`
+- 계획 수립: `/ai-symbiote:plan 로그인 화면 리팩토링 계획`
+- 자동 실행: `/ai-symbiote:auto 다크모드 버그 수정`
+- 리뷰: `/ai-symbiote:review`
+- 문서 갱신: `/ai-symbiote:dev-docs`
+- 보안 상태: `/ai-symbiote:security status`
+
+### 5. 최소 검증
+
+```bash
+bash tests/test-dev-docs-skill.sh
+bash tests/test-dev-docs-updater.sh
+bash tests/test-setup-check-summary.sh
+```
+<!-- AI-SYMBIOTE:END readme:quick-start -->
+
+## 실전 사용법
+
+### 시나리오 1. 코드를 이해하고 싶다
+
+```text
+/ai-symbiote:analyze 이 프로젝트의 인증 구조를 설명해줘
+/ai-symbiote:deep-search token refresh 흐름을 찾아줘
+```
+
+- `analyze`: 구조와 의존성 중심의 깊은 설명
+- `deep-search`: Grep, Glob, Explorer를 병렬로 써서 빠르게 근거 수집
+
+### 시나리오 2. 구현 전에 계획을 고정하고 싶다
+
+```text
+/ai-symbiote:plan 결제 실패 복구 UX를 어떻게 구현할지 정리해줘
+```
+
+- 복잡한 변경을 바로 코딩하지 않고 단계별 계획으로 정리
+- 이후 사용자가 승인하면 `implementation` 흐름으로 이어가기 좋음
+
+### 시나리오 3. 끝까지 자동으로 처리하고 싶다
+
+```text
+/ai-symbiote:auto 캐시 무효화 버그를 수정하고 검증까지 끝내줘
+/ai-symbiote:auto 성능 병목을 찾아서 병렬로 최대한 처리해줘 --mode parallel-max
+```
+
+- `autonomous`: 최대 10회 반복, 안정 우선
+- `parallel-max`: Builder 병렬 극대화, 속도 우선
+
+### 시나리오 4. 변경 내용을 점검하고 싶다
+
+```text
+/ai-symbiote:review
+/ai-symbiote:security scan
+/ai-symbiote:lint
+```
+
+- `review`: 현재 변경사항 코드 리뷰
+- `security`: 보안 baseline, 최근 경고/차단 이벤트, 추가 도구 추천
+- `lint`: 프로젝트 린터 또는 기본 위생 검사
+
+### 시나리오 5. 저장소 운영 자체를 자동화하고 싶다
+
+```text
+/ai-symbiote:dev-docs
+/ai-symbiote:stats
+/ai-symbiote:gc
+/ai-symbiote:update
+```
+
+- 문서 생성/갱신
+- 사용량과 하네스 진화 추적
+- 오래된 규칙 정리
+- 플러그인 업데이트
+
+## 기능 전체 맵
+
+### 오케스트레이션과 자율 실행
+
+| 스킬 | 역할 | 언제 쓰나 |
+|------|------|------|
+| `synapse` | 사용자 의도 라우팅과 팀 선택 | 대부분의 자연어 요청 진입점 |
+| `auto` | 자율 실행 루프 | "끝까지 해줘", "자동으로 처리해줘" |
+| `verify-loop` | 자율 루프 완료 기준과 재시도 규칙 | `auto` 품질 기준 설명/확장 |
+| `roles` | Scout, Architect, Builder, Inspector, Researcher, Codex 역할 계약 | 팀 구성 원리 확인 |
+| `team-templates` | analysis/implementation/review/planning/research/dynamic 템플릿 | 어떤 팀이 어떻게 짜이는지 확인 |
+
+### 프로젝트 부트스트랩과 상태 진화
+
+| 스킬 | 역할 | 언제 쓰나 |
+|------|------|------|
+| `setup` | 상태 디렉터리, 컨텍스트, 추천 도구 초기화 | 프로젝트 첫 연결 |
+| `evolve` | 프로젝트 변화 반영, `manifest.json`/`context.md` 동기화 | 스택이나 구조가 바뀌었을 때 |
+| `note` | compaction 내성 메모 | 중요한 결정이나 진행상황 고정 |
+| `clean` | 완료된 작업 상태 폴더 정리 | 오래된 task 상태 청소 |
+| `stats` | 사용량, 하네스 진화, 보안 텔레메트리 보고 | 회고/운영 지표 확인 |
+| `gc` | 오래된 규칙과 로그 정리 | 하네스 비대화 방지 |
+| `instinct-status` | 학습된 instinct와 confidence 표시 | 하네스가 무엇을 배웠는지 확인 |
+| `context-budget` | 토큰 사용량 감사 | 컨텍스트 과적재 진단 |
+
+### 분석, 계획, 구현, 검증
+
+| 스킬 | 역할 | 언제 쓰나 |
+|------|------|------|
+| `analyze` | 대상 심층 분석 | 구조와 동작을 설명받고 싶을 때 |
+| `deep-search` | 다중 전략 코드 탐색 | 특정 패턴이나 의존성 위치를 찾을 때 |
+| `plan` | 구현 계획 수립 | 설계와 단계 정의가 먼저 필요할 때 |
+| `code-accuracy` | 심볼/라이브러리/API 정확성 검증 | 환각 코드 방지 |
+| `review` | 코드 리뷰 | 현재 diff 품질과 리스크 점검 |
+| `lint` | 코드 위생 검사 | 린트/기본 냄새 검사 |
+| `git-commit` | 커밋 메시지 생성 | Conventional Commits 작성 |
+| `pr` | PR 생성 지원 | 변경사항을 올릴 때 |
+
+### 생태계, 보안, 운영
+
+| 스킬 | 역할 | 언제 쓰나 |
+|------|------|------|
+| `security` | 보안 baseline과 상태 확인, 도구 추천 | 보안 점검과 최근 이벤트 확인 |
+| `dev-docs` | README와 번호형 문서 생성/갱신 | 문서 최신화 |
+| `skill-store` | 커뮤니티 스킬 추천/설치 | 새 워크플로우 확장 |
+| `cli-store` | CLI 도구 추천/설치 | MCP보다 가벼운 툴 우선 확장 |
+| `mcp-store` | MCP 서버 추천/설치 | 외부 서비스/툴 연동 확장 |
+| `taskmaster` | PRD와 task graph 관리 | 요구사항을 작업 단위로 전개 |
+| `messenger` | Slack/Discord/Telegram 브리지 | 원격 모니터링과 승인/지시 |
+| `update` | 플러그인 업데이트 | 새 버전 반영 |
+| `contribute` | 저장소 이슈 생성 | 개선 아이디어나 버그 신고 |
+
+## 훅 파이프라인
+
+훅은 "프롬프트로만 부탁하지 않는다"는 설계를 실제로 구현하는 부분입니다.
+
+```mermaid
+flowchart TD
+    A["SessionStart"] --> B["setup-check.sh"]
+    B --> C["context / manifest / seed 주입"]
+    D["UserPromptSubmit"] --> E["intent-router.sh + usage-tracker.sh"]
+    F["PreToolUse(Bash)"] --> G["guard-shell.sh"]
+    H["PreToolUse(Write|Edit)"] --> I["pre-edit-write-dispatcher.sh"]
+    I --> I1["config-protection.sh"]
+    I --> I2["gateguard-gate.sh"]
+    I --> I3["suggest-compact.sh"]
+    J["PreToolUse(*)"] --> K["mcp-health-check.sh"]
+    L["PostToolUse(Read)"] --> M["gateguard-tracker.sh / usage-tracker.sh"]
+    N["PostToolUse(Write|Edit)"] --> O["harness-learn.sh"]
+    N --> P["security-guard.sh"]
+    N --> Q["comment-checker.sh"]
+    N --> R["messenger-notify.sh"]
+    S["PostToolUseFailure"] --> T["mcp-health-failure.sh"]
+    U["Stop"] --> V["cost-tracker.sh"]
+    U --> W["instinct-observer.sh"]
+    U --> X["next-action.sh"]
+```
+
+### 훅/유틸 스크립트 전체 목록
+
+| 스크립트 | 역할 |
+|------|------|
+| `setup-check.sh` | 세션 시작 시 상태 확인, fingerprint/요약 주입 |
+| `pre-compact.sh` | compaction 직전 핵심 컨텍스트 재주입 |
+| `intent-router.sh` | 사용자 프롬프트를 읽고 스킬 힌트 주입 |
+| `guard-shell.sh` | 위험 쉘 명령과 보안 패턴 차단 |
+| `pre-edit-write-dispatcher.sh` | 쓰기 전 검사들을 순서대로 통합 |
+| `config-protection.sh` | 민감한 설정 파일 수정 가드 |
+| `gateguard-gate.sh` | 읽지 않은 파일을 바로 수정하려는 흐름 차단 |
+| `suggest-compact.sh` | 컨텍스트가 커졌을 때 compact 제안 |
+| `mcp-health-check.sh` | 장애 난 MCP 서버 호출 차단 |
+| `build-watcher.sh` | 쉘 기반 빌드/테스트 실패를 분류하고 기록 |
+| `gateguard-tracker.sh` | 읽은 파일 추적 |
+| `usage-tracker.sh` | 스킬/명령 사용량 기록 |
+| `harness-learn.sh` | 반복 실수 패턴을 학습 후보로 기록 |
+| `security-guard.sh` | 쓰기 후 보안 검사 |
+| `comment-checker.sh` | 자명한 주석, 죽은 코드성 주석 감시 |
+| `messenger-notify.sh` | 원격 브리지 알림 생성 |
+| `mcp-health-success.sh` | MCP 성공 시 상태 회복 반영 |
+| `mcp-health-failure.sh` | MCP 실패 이벤트 기록 |
+| `cost-tracker.sh` | 세션 비용/메트릭 수집 |
+| `instinct-observer.sh` | 세션 종료 시 학습 패턴 관찰 |
+| `next-action.sh` | 다음 추천 액션 제시 |
+| `feedback-logger.sh` | 사용자 거부/피드백 기록 유틸리티 |
+| `lib/common.sh` | 훅 공통 함수와 안전한 stdin 처리 |
+
+## 플랫폼별 차이
+
+| 항목 | Claude Code | Codex CLI | Cursor |
+|------|-------------|-----------|--------|
+| 플러그인 진입 | marketplace 설치 또는 `--plugin-dir` | `platforms/codex/install.sh` | `platforms/cursor/install.sh` |
+| 훅 이벤트 | `SessionStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `UserPromptSubmit`, `PreCompact` | `SessionStart`, `PreToolUse`, `PostToolUse` | `sessionStart`, `preToolUse`, `postToolUse`, `postToolUseFailure`, `stop`, `userPromptSubmit`, `preCompact` |
+| 읽기 추적 기반 GateGuard | 지원 | 미지원 | 지원 |
+| MCP health failure/success 추적 | 지원 | 미지원 | 지원 |
+| 쓰기 후 학습/보안/주석 검사 | 지원 | 제한적 | 지원 |
+| 설치 후 추가 작업 | Claude 안에서 `/plugin install` | `config.toml` 자동 수정 | Cursor 재시작 또는 Reload |
+
+Codex는 현재 플랫폼 훅 제약 때문에 `PostToolUse(Read)`와 `PostToolUseFailure`가 없습니다. 그래서 읽기 추적 기반 `gateguard`와 MCP failure 추적이 빠지고, 대신 `guard-shell.sh`, `pre-edit-write-dispatcher.sh`, `build-watcher.sh` 중심으로 동작합니다.
+
+## 상태와 로그
+
+### `manifest.json`
+
+프로젝트 스택, 보안 설정, auto loop 기본값, 설치된 추천 도구 상태 같은 구조화 설정을 담습니다. 사람보다 스크립트와 훅이 읽기 좋은 파일입니다.
+
+### `context.md`
+
+에이전트가 실제로 읽는 프로젝트 지침서입니다. 스택 요약, 코딩 컨벤션, 하네스 규칙, 보안 요약이 들어갑니다.
+
+### `harness-log.jsonl`
+
+실수, rule creation, rule prevention, guard block 같은 이벤트를 누적합니다. `stats`와 `gc`가 이 파일을 근거로 진화 상태를 계산합니다.
+
+### `security-baseline.json` / `security-log.jsonl`
+
+현재 보안 점수와 최근 보안 이벤트를 추적합니다. `/ai-symbiote:security scan`이 baseline을 갱신하고, 쓰기 후 `security-guard.sh`가 경고/차단 이벤트를 남깁니다.
+
+### `usage-data/`
+
+사용한 스킬과 명령을 `{count}|{timestamp}` 형식으로 저장합니다. 자주 쓰는 워크플로우와 거의 안 쓰는 기능을 정량적으로 볼 수 있습니다.
+
+## 메신저 브릿지
+
+`shared/messenger-bridge/`는 TypeScript 기반의 별도 서브시스템입니다. Telegram, Slack, Discord를 통해 로컬 AI 세션을 원격으로 다루게 해 줍니다.
+
+핵심 기능은 다음과 같습니다.
+
+- 메신저에서 Claude/Codex 백엔드에 질의
+- 진행 중인 auto loop 상태 확인, 정지, 재개, 지시 주입
+- 승인 요청과 결과 회신
+- macOS 알림과 브리지 로그를 통한 실시간 모니터링
+
+자세한 설정은 [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md)를 보면 됩니다.
+
+## 저장소 구조
+
+```text
+ai-symbiote/
+├── shared/                    # 공용 원본: 여기만 수정하는 것이 원칙
+│   ├── skills/                # 30개 스킬
+│   ├── hooks/scripts/         # 22개 훅/유틸 스크립트
+│   ├── harness-seeds/         # generic, security, nextjs, python, swift
+│   ├── lib/                   # intent 힌트, skill chain, service pattern
+│   ├── taskmaster/            # PRD/task/state schema + template
+│   └── messenger-bridge/      # 메신저 브리지 소스
+├── platforms/
+│   ├── claude/overlay/
+│   ├── codex/overlay/
+│   └── cursor/overlay/
+├── scripts/                   # build-all + platform build + version sync
+├── tests/                     # shell 기반 계약/회귀 테스트
+├── docs/                      # 00~08 번호형 문서
+├── plugins/ai-symbiote/       # Claude marketplace용 빌드 산출물
+└── dist/                      # Codex/Cursor 포함 플랫폼별 산출물
+```
+
+### 수정 원칙
+
+- 공용 기능은 `shared/`에서 수정
+- 플랫폼 차이는 `platforms/<name>/overlay/`에서만 수정
+- `plugins/`와 `dist/`는 빌드 산출물로 보고 직접 수정하지 않음
+- 수정 후 `bash scripts/build-all.sh`로 번들 재생성
 
 ## 개발자 문서
 
 <!-- AI-SYMBIOTE:START readme:docs-map -->
-README는 허브입니다. 실제 온보딩은 아래 번호형 문서 순서로 진행하면 됩니다.
+README는 전체 그림과 빠른 진입을 담당하고, 상세 설계와 운영 규칙은 번호형 문서에 분리되어 있습니다.
 
 | 순서 | 문서 | 목적 |
 |------|------|------|
-| 00 | [docs/00-시작하기.md](docs/00-시작하기.md) | 첫날 경로 |
-| 01 | [docs/01-프로젝트-개요.md](docs/01-프로젝트-개요.md) | 프로젝트 맥락 |
-| 02 | [docs/02-아키텍처.md](docs/02-아키텍처.md) | 시스템 구조 |
-| 03 | [docs/03-빌드-및-실행.md](docs/03-빌드-및-실행.md) | 빌드와 설치 경로 |
-| 04 | [docs/04-주요-기능.md](docs/04-주요-기능.md) | 핵심 기능 |
-| 05 | [docs/05-코딩-컨벤션.md](docs/05-코딩-컨벤션.md) | 수정 경계 |
-| 06 | [docs/06-문제해결-가이드.md](docs/06-문제해결-가이드.md) | 복구 경로 |
-| 07 | [docs/07-운영-흐름-및-배포.md](docs/07-운영-흐름-및-배포.md) | 릴리즈 흐름 |
-| 08 | [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md) | 원격 운영 |
+| 00 | [docs/00-시작하기.md](docs/00-시작하기.md) | 첫날 온보딩과 최소 실행 경로 |
+| 01 | [docs/01-프로젝트-개요.md](docs/01-프로젝트-개요.md) | 제품 목적과 저장소 지도 |
+| 02 | [docs/02-아키텍처.md](docs/02-아키텍처.md) | 서브시스템, 경계, 플랫폼 차이 |
+| 03 | [docs/03-빌드-및-실행.md](docs/03-빌드-및-실행.md) | 빌드, 설치, 업데이트 |
+| 04 | [docs/04-주요-기능.md](docs/04-주요-기능.md) | 하네스와 오케스트레이션 기능 |
+| 05 | [docs/05-코딩-컨벤션.md](docs/05-코딩-컨벤션.md) | 수정 규칙과 생성물 경계 |
+| 06 | [docs/06-문제해결-가이드.md](docs/06-문제해결-가이드.md) | 장애 진단과 복구 |
+| 07 | [docs/07-운영-흐름-및-배포.md](docs/07-운영-흐름-및-배포.md) | 운영 흐름, 배포, 상태 전이 |
+| 08 | [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md) | 원격 운영과 승인 흐름 |
 
-이 문서 세트는 `dev-docs` 스킬이 마커 블록 기준으로 갱신합니다.
+`dev-docs` 스킬은 위 문서들의 AI 소유 마커 블록만 갱신합니다. README를 사람이 더 풍부하게 다듬고 싶다면 마커 바깥 수동 섹션을 유지하는 방식이 가장 안전합니다.
 <!-- AI-SYMBIOTE:END readme:docs-map -->
 
-## 스킬 목록 (28개)
-
-`/ai-symbiote:<name>` (Claude) 또는 `$ai-symbiote:<name>` (Codex)으로 호출합니다.
-
-### 핵심 워크플로우
-
-| 스킬 | 설명 |
-|------|------|
-| `synapse` | Intent Contract 기반 의도 라우팅으로 적절한 스킬과 팀을 자동 선택하는 오케스트레이터 |
-| `auto` | Analyze → Plan → Execute → Verify 자율 실행. 두 가지 모드: `autonomous` (기본, 최대 10회 반복), `parallel-max` (Builder 병렬 극대화, 최대 3회) |
-| `setup` | 프로젝트 스택 감지, 연동 플러그인 자동 설치, 상태 디렉터리 초기화 |
-
-### 계획 및 분석
-
-| 스킬 | 설명 |
-|------|------|
-| `plan` | Scout 2명 + Architect 1명으로 구현 계획 수립 |
-| `analyze` | Scout 2~3명 + Architect 1명으로 대상 심층 분석 |
-| `deep-search` | Grep, Glob, Agent(Explore) 병렬 3-Track 코드베이스 탐색 |
-
-### 코드 품질
-
-| 스킬 | 설명 |
-|------|------|
-| `review` | 현재 변경사항에 대해 코드 리뷰 실행 |
-| `code-accuracy` | 심볼 존재 확인, import 검증, 환각 코드 방지 가드레일 |
-| `security` | 프로젝트 보안 baseline 생성, `/security scan|status` 실행, 최근 보안 이벤트 요약 표시, 외부 보안 도구 추천 |
-| `verify-loop` | 자율 루프의 4-Level 완료 기준과 재시도 전략 |
-
-### Git 및 협업
-
-| 스킬 | 설명 |
-|------|------|
-| `git-commit` | git diff를 분석하여 Conventional Commits 형식으로 커밋 메시지 생성 |
-| `pr` | 현재 브랜치의 변경사항을 분석하고 Pull Request 생성 |
-| `messenger` | Slack, Discord, Telegram 연동으로 원격 모니터링 및 제어 ([상세](docs/08-메신저-브릿지.md)) |
-
-### 태스크 관리
-
-| 스킬 | 설명 |
-|------|------|
-| `taskmaster` | Task Master task graph 관리. 서브커맨드: `init` (초기화), `board` (상태 요약), `parse-prd` (PRD → task 변환) |
-
-### 유틸리티
-
-| 스킬 | 설명 |
-|------|------|
-| `note` | Compaction 내성 메모장. 컨텍스트 윈도우 초과 시에도 정보 보존 |
-| `dev-docs` | 코드 기준으로 README/docs 문서를 Mermaid 중심으로 생성·갱신 |
-| `evolve` | 프로젝트 변경을 감지하여 `manifest.json`과 `context.md` 동기화 |
-| `update` | 저장소 pull + 플랫폼별 재설치를 자동 수행 |
-| `clean` | 완료된 작업의 상태 폴더 정리 |
-| `gc` | 하네스 자동 생성 규칙의 가비지 컬렉션. 미사용 규칙 정리, 규칙 효과 측정 |
-| `lint` | 코드 위생 검사. 프로젝트 린터 자동 감지/실행 또는 기본 패턴 검사 |
-| `skill-store` | 커뮤니티 스킬 카탈로그(1,060+개)에서 프로젝트에 맞는 스킬 추천/설치 |
-| `cli-store` | 프로젝트 스택에 맞는 CLI 도구 추천/설치. MCP보다 가벼운 대안 우선 |
-| `mcp-store` | MCP 서버 카탈로그(530+개)에서 프로젝트에 맞는 서버 추천/설치 |
-| `stats` | 스킬/커맨드 사용 빈도 분석 + 하네스 진화 지표 + 규칙 효과 + 보안 이벤트 텔레메트리 |
-| `contribute` | 플러그인의 버그/개선점 발견 시 GitHub 이슈 등록. 환경 정보 자동 수집 |
-
-### 내부 스킬 (synapse가 자동 참조)
-
-| 스킬 | 설명 |
-|------|------|
-| `roles` | Scout, Architect, Builder, Inspector, Researcher, Codex 6개 역할의 계약 정의 |
-| `team-templates` | analysis, implementation, review, planning, research, dynamic 6개 팀 템플릿 |
-
-## Intent Contract (ADK 패턴)
-
-Synapse 오케스트레이터는 사용자 요청의 <b>의도(intent)</b>를 분석하여 최적의 팀을 자동 구성합니다.
-각 팀은 Google ADK(Agent Development Kit)의 에이전트 패턴이 매핑되어 있어,
-작업 유형에 따라 병렬화, 반영(reflection), 라우팅 전략이 달라집니다.
-
-### 라우팅 흐름
-
-```mermaid
-flowchart TD
-    A["사용자 요청"] --> B{"Skill Direct Routes"}
-    B -->|"키워드 매칭<br/>(skill-store, messenger,<br/>evolve, setup 등)"| C["스킬 직접 실행"]
-    B -->|"매칭 없음"| D{"Intent Contract<br/>의도 분류"}
-    D -->|"none"| E["직접 처리<br/>(1파일 단순 수정)"]
-    D -->|"analysis"| F["analysis 팀"]
-    D -->|"implementation"| G["implementation 팀"]
-    D -->|"review"| H["review 팀"]
-    D -->|"planning"| I["planning 팀"]
-    D -->|"research"| J["research 팀"]
-    D -->|"dynamic"| K["dynamic 팀<br/>(fallback)"]
-```
-
-### 의도 분류 기준
-
-| Intent | 설명 | 예시 |
-|--------|------|------|
-| `none` | 단순하고 명확한 요청. 1개 파일, 구체적인 변경 | "이 함수 이름 바꿔줘", "타입 에러 고쳐줘" |
-| `analysis` | 코드 구조, 패턴, 의존성을 깊이 이해해야 할 때 | "이 모듈 아키텍처 분석해줘", "의존성 구조 알려줘" |
-| `implementation` | 코드 변경/추가/수정. 버그 수정 포함 | "이 버그 수정해줘", "새 API 엔드포인트 추가해줘" |
-| `review` | 기존 코드나 변경사항의 품질/보안 평가 | "이 PR 리뷰해줘", "보안 점검 해줘" |
-| `planning` | 구현 전 계획 수립과 설계 확정 | "어떻게 구현하면 좋을까?", "리팩토링 계획 세워줘" |
-| `research` | 외부 문서, API, 라이브러리 조사 | "React 19 새 기능 정리해줘", "마이그레이션 가이드 조사해줘" |
-| `dynamic` | 위 카테고리에 맞지 않는 모호/복합 의도 | "이거 좀 도와줘" (모호한 요청) |
-
-### 팀 구성과 ADK 패턴
-
-각 팀은 역할(Scout, Architect, Builder, Inspector, Researcher)을 조합하고, ADK 에이전트 패턴을 적용합니다:
-
-```mermaid
-flowchart LR
-    subgraph "analysis"
-        A1["Scout ×2-3<br/>(Parallel)"] --> A2["Architect ×1"]
-    end
-    subgraph "implementation"
-        B1["Scout ×1-2"] --> B2["Architect ×1"] --> B3["Builder ×1-3<br/>(Parallel)"] --> B4["Inspector ×1"]
-        B4 -->|"FAIL"| B3
-    end
-    subgraph "review"
-        C1["Scout ×1"] --> C2["Inspector ×2-3<br/>(Parallel)"]
-    end
-```
-
-| 팀 | ADK 패턴 | 구성 | 특징 |
-|----|----------|------|------|
-| <b>analysis</b> | Parallel Fan-Out/Gather + Hierarchical | Scout ×2-3 → Architect ×1 | Scout가 서로 다른 탐색 전략으로 병렬 수집 |
-| <b>implementation</b> | Sequential Pipeline + Reflection + Retry/Fallback | Scout → Architect → Builder → Inspector | Inspector FAIL 시 Builder 재투입. Codex 이중 검증 가능 |
-| <b>review</b> | Parallel Fan-Out/Gather + Multi-Agent Collaboration | Scout ×1 → Inspector ×2-3 | Inspector별 관점 분리 (품질/패턴/버그/보안) |
-| <b>planning</b> | Sequential Pipeline + Planning (Plan-and-Execute) | Scout ×2 → Architect ×1 | 사용자 승인 후 implementation으로 전환 가능 |
-| <b>research</b> | Parallel Fan-Out/Gather + Routing | Scout + Researcher → Architect ×1 | 내부(코드베이스) + 외부(문서/API) 동시 조사 |
-| <b>dynamic</b> | Routing + ReAct (Tool-Using) | Scout ×1 → 필요에 따라 역할 추가 | Scout 결과 분석 후 동적으로 팀 확장 (최대 5명) |
-
-### 모호한 프롬프트 해소 규칙
-
-- 코드 변경 의도가 조금이라도 있으면 → <b>implementation</b> 우선
-- "봐줘"처럼 변경/평가 모두 가능한 표현 → <b>review</b> 우선 (비파괴적 선택)
-- 복합 의도("분석하고 수정해줘") → <b>planning</b>으로 라우팅하거나 요청 분해
-- 두 팀 이상이 동등하게 적합한 경우 → 사용자에게 확인 질문
-
-## 아키텍처
-
-```text
-ai-symbiote/
-├── shared/                    # 공용 원본 (여기만 편집)
-│   ├── skills/                #   28개 스킬
-│   ├── hooks/scripts/         #   10개 파일 (훅 8 + 유틸리티 1 + 공용 lib 1)
-│   │   ├── setup-check.sh     #     세션 시작: 컨텍스트 주입 + rule_prevented 분석
-│   │   ├── guard-shell.sh     #     위험 명령 차단 + 보안 패턴 16개 실시간 차단
-│   │   ├── build-watcher.sh   #     build/test 실패 분류 및 기록
-│   │   ├── security-guard.sh  #     파일 보안 스캔 (시크릿/SQLi/XSS 감지, Codex 미지원)
-│   │   ├── usage-tracker.sh   #     스킬/도구 사용 추적
-│   │   ├── harness-learn.sh   #     실수 감지 + auto-loop 연동 + 패턴 학습
-│   │   ├── comment-checker.sh #     코드 주석 품질 검사
-│   │   ├── messenger-notify.sh#     메신저 알림 전송
-│   │   ├── feedback-logger.sh #     사용자 거부 피드백 기록 (유틸리티, 에이전트가 Bash로 호출)
-│   │   └── lib/common.sh      #     훅 공용 라이브러리
-│   ├── harness-seeds/         #   스택별 초기 하네스 규칙 시드
-│   ├── taskmaster/            #   PRD/task/state 스키마 및 템플릿
-│   └── messenger-bridge/      #   Slack/Discord/Telegram 브릿지 (TypeScript)
-├── platforms/
-│   ├── claude/overlay/        #   .claude-plugin/plugin.json, hooks/hooks.json
-│   ├── codex/overlay/         #   .codex-plugin/plugin.json, hooks/hooks.json
-│   └── cursor/overlay/        #   .cursor-plugin/plugin.json, hooks/hooks.json
-├── plugins/ai-symbiote/       # Claude marketplace용 번들 (빌드 생성물)
-├── dist/                      # 빌드 출력
-├── scripts/                   # build-all.sh + 플랫폼별 build-*.sh
-└── docs/                      # 00~08 번호형 개발자 문서
-```
-
-### 빌드 흐름
-
-```mermaid
-flowchart LR
-    S["shared/"] --> C["claude/overlay/"]
-    S --> X["codex/overlay/"]
-    S --> R["cursor/overlay/"]
-    C -->|rsync| P["plugins/ai-symbiote/<br/>dist/claude-symbiote/"]
-    X -->|rsync| D["dist/codex-symbiote/"]
-    R -->|rsync| E["dist/cursor-symbiote/"]
-```
+## 자주 쓰는 명령
 
 ```bash
-bash scripts/build-all.sh      # 세 플랫폼 모두
-bash scripts/build-claude.sh   # Claude만
-bash scripts/build-codex.sh    # Codex만
-bash scripts/build-cursor.sh   # Cursor만
-```
-
-## 플랫폼 차이
-
-| 항목 | Claude Code | Codex CLI | Cursor |
-|------|-------------|-----------|--------|
-| 플러그인 경로 | `${CLAUDE_PLUGIN_ROOT}` | `~/plugins/ai-symbiote` | `~/.cursor/plugins/local/ai-symbiote` |
-| Hooks 이벤트 | SessionStart, PreToolUse, PostToolUse | SessionStart, PreToolUse, PostToolUse | `sessionStart`, `preToolUse`, `postToolUse` |
-| PostToolUse 매처 | Read\|Skill, Write\|Edit, Bash | Bash만 지원 | Shell, Read, Write |
-| Hooks 활성화 | 기본 활성 | `config.toml`에 `codex_hooks = true` 필요 | 플러그인 동기화 후 Reload Window |
-| 기본 모델 | — | gpt-5.4 | 사용자 선택 |
-
-Codex에서 PostToolUse는 Bash 매처만 지원하므로,
-usage-tracker, harness-learn, comment-checker, messenger-notify, security-guard 훅은 Codex에서 미지원입니다.
-대신 build-watcher 훅과 guard-shell.sh의 보안 패턴(SEC-001~016)은 세 플랫폼 모두에서 동작합니다.
-Cursor는 `Shell`, `Read`, `Write` 매처를 모두 사용하므로 Claude와 동일하게 build-watcher, usage-tracker, harness-learn, security-guard, comment-checker, messenger-notify를 함께 연결합니다.
-
-## 상태 관리
-
-모든 플랫폼은 `~/ai-symbiote/{slug}/`를 공용 상태 루트로 사용합니다.
-
-slug는 <b>git 루트 디렉터리의 basename</b>을 소문자로 변환하여 생성합니다:
-
-```
-/home/user/projects/MyApp  →  myapp
-/home/user/work/api-server →  api-server
+python3 scripts/version_sync.py --check
+bash scripts/build-all.sh
+bash platforms/claude/install.sh
+bash platforms/codex/install.sh
+bash platforms/cursor/install.sh
+bash tests/test-dev-docs-skill.sh
+bash tests/test-dev-docs-updater.sh
 ```
 
 ```text
-~/ai-symbiote/{slug}/
-├── manifest.json       # 프로젝트 스택, 설정, 경로, 연동 플러그인 상태
-├── context.md          # 동적 컨텍스트 (스택, 컨벤션, 하네스 규칙)
-├── harness-log.jsonl   # 에이전트 실수 로그 (자동 관리)
-├── security-baseline.json # baseline 점수, severity 요약, top risks
-├── security-log.jsonl  # 보안 이벤트 로그 (차단/경고, 최대 10,000줄 rotation)
-├── state/              # 작업별 상태 (ralph-state.md, 결과 파일)
-├── taskmaster/         # PRD, task graph
-├── usage-data/         # 스킬/커맨드 사용 통계
-└── messenger/          # 메신저 브릿지 설정, 커맨드, 승인 요청
+/ai-symbiote:setup
+/ai-symbiote:analyze <질문>
+/ai-symbiote:plan <작업>
+/ai-symbiote:auto <작업>
+/ai-symbiote:review
+/ai-symbiote:security status
+/ai-symbiote:dev-docs
+/ai-symbiote:stats
 ```
-
-### 연동 플러그인
-
-setup 시 자동으로 설치/확인되는 외부 플러그인:
-
-| 플러그인 | 용도 | 필수 여부 |
-|----------|------|-----------|
-| [snarktank/ralph](https://github.com/snarktank/ralph) | PRD 생성(`/prd`) 및 JSON 변환(`/ralph`) | 자동 설치 |
-| [openai/codex-plugin-cc](https://github.com/openai/codex-plugin-cc) | Codex(GPT-5.4) 서브에이전트 연동 | 선택적 |
-
-## 메신저 브릿지
-
-Telegram, Slack, Discord를 통해 Claude/Codex 백엔드를 원격으로 사용할 수 있습니다.
-자세한 설정 및 사용법은 [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md)를 참조하세요.
-
-- <b>AI 챗봇</b>: Telegram에서 질문하면 Claude/Codex가 직접 답변
-- <b>세션 연동</b>: 맥 터미널의 Claude Code 세션을 Telegram에서 이어감
-- <b>실시간 모니터링</b>: macOS 알림 + 봇 로그로 CLI 실행 과정 확인
-- <b>보안</b>: 사용자 인증 (allowedUserIds) + CLI 권한 제한 (permissionLevel)
-- <b>루프 제어</b>: auto-loop/autopilot 세션의 원격 모니터링, 중지, 재개, 지시 주입
-
-## 유지보수 원칙
-
-- <b>공용 변경</b>: `shared/`만 수정 → `build-all.sh`로 양쪽 번들 갱신
-- <b>플랫폼 차이</b>: `platforms/<name>/overlay/`만 수정
-- <b>빌드 생성물</b>: `plugins/ai-symbiote/`와 `dist/`는 직접 편집 금지
-- <b>상세 구조</b>: [docs/02-아키텍처.md](docs/02-아키텍처.md) 참조
