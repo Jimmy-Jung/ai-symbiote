@@ -9,8 +9,7 @@
 #
 # Claude Code hook protocol:
 #   stdin:  {"session_id":"...","cwd":"...","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"..."}}
-#   stdout: {"continue":false,"permissionDecision":"deny","systemMessage":"..."} to block
-#           (empty or {"continue":true}) to approve
+#   stdout: Claude/Cursor/Codex hook protocol specific allow/deny payload
 #
 # Security rules: SEC-001 ~ SEC-016
 #   SEC-001~005: Secret Exposure
@@ -302,7 +301,7 @@ if [ -n "$BLOCKED" ]; then
       MSG="Blocked: ${BLOCKED}"
     fi
   fi
-  emit_hook_block "[Guard] ${MSG}"
+  emit_pretool_deny "[Guard] ${MSG}"
 
   # Record blocked event
   STATE_DIR=$(get_state_dir)

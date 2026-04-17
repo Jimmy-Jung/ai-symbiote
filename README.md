@@ -310,13 +310,14 @@ flowchart TD
     H["PreToolUse(Write|Edit)"] --> I["pre-edit-write-dispatcher.sh"]
     I --> I1["config-protection.sh"]
     I --> I2["gateguard-gate.sh"]
-    I --> I3["suggest-compact.sh"]
     J["PreToolUse(*)"] --> K["mcp-health-check.sh"]
-    L["PostToolUse(Read)"] --> M["gateguard-tracker.sh / usage-tracker.sh"]
+    L["PostToolUse(Read|Write|Edit)"] --> M["gateguard-tracker.sh"]
+    L2["PostToolUse(Read|Skill)"] --> M2["usage-tracker.sh"]
     N["PostToolUse(Write|Edit)"] --> O["harness-learn.sh"]
     N --> P["security-guard.sh"]
     N --> Q["comment-checker.sh"]
     N --> R["messenger-notify.sh"]
+    N --> R2["suggest-compact.sh"]
     S["PostToolUseFailure"] --> T["mcp-health-failure.sh"]
     U["Stop"] --> V["cost-tracker.sh"]
     U --> W["instinct-observer.sh"]
@@ -331,13 +332,13 @@ flowchart TD
 | `pre-compact.sh` | compaction 직전 핵심 컨텍스트 재주입 |
 | `intent-router.sh` | 사용자 프롬프트를 읽고 스킬 힌트 주입 |
 | `guard-shell.sh` | 위험 쉘 명령과 보안 패턴 차단 |
-| `pre-edit-write-dispatcher.sh` | 쓰기 전 검사들을 순서대로 통합 |
+| `pre-edit-write-dispatcher.sh` | 쓰기 전 차단 검사(config/gateguard)를 순서대로 통합 |
 | `config-protection.sh` | 민감한 설정 파일 수정 가드 |
 | `gateguard-gate.sh` | 읽지 않은 파일을 바로 수정하려는 흐름 차단 |
-| `suggest-compact.sh` | 컨텍스트가 커졌을 때 compact 제안 |
+| `suggest-compact.sh` | 쓰기 작업이 누적됐을 때 다음 단계 전 compact 제안 |
 | `mcp-health-check.sh` | 장애 난 MCP 서버 호출 차단 |
 | `build-watcher.sh` | 쉘 기반 빌드/테스트 실패를 분류하고 기록 |
-| `gateguard-tracker.sh` | 읽은 파일 추적 |
+| `gateguard-tracker.sh` | 읽은 파일과 성공한 쓰기 대상 추적 |
 | `usage-tracker.sh` | 스킬/명령 사용량 기록 |
 | `harness-learn.sh` | 반복 실수 패턴을 학습 후보로 기록 |
 | `security-guard.sh` | 쓰기 후 보안 검사 |

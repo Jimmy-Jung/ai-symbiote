@@ -42,6 +42,11 @@
         "timeout": 5
       },
       {
+        "matcher": "Write",
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/gateguard-tracker.sh\"",
+        "timeout": 5
+      },
+      {
         "matcher": "Read",
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/usage-tracker.sh\"",
         "timeout": 10
@@ -64,6 +69,11 @@
       {
         "matcher": "Write",
         "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/messenger-notify.sh\"",
+        "timeout": 10
+      },
+      {
+        "matcher": "Write",
+        "command": "bash \"${CURSOR_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
         "timeout": 10
       },
       {

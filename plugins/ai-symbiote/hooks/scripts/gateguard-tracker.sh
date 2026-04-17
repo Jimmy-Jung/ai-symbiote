@@ -14,6 +14,12 @@ source "$SCRIPT_DIR/lib/common.sh"
 # --- 1. Read stdin JSON ---
 INPUT=$(read_stdin_safe)
 
+# --- 1a. Extract tool_name for successful Write/Edit tracking ---
+TOOL_NAME=$(json_field "$INPUT" "tool_name")
+if [ -z "$TOOL_NAME" ]; then
+  TOOL_NAME="Read"
+fi
+
 # --- 2. Extract file_path from tool_input ---
 FILE_PATH=""
 if command -v jq >/dev/null 2>&1; then
@@ -29,6 +35,16 @@ if [ -z "$FILE_PATH" ]; then
   emit_hook_continue
   exit 0
 fi
+
+# --- 3a. Skip failed/nonexistent Write/Edit targets ---
+case "$TOOL_NAME" in
+  Write|Edit)
+    if [ ! -f "$FILE_PATH" ]; then
+      emit_hook_continue
+      exit 0
+    fi
+    ;;
+esac
 
 # --- 4. Record to session tracking file ---
 SESSION_FILE=$(safe_session_file "symbiote-gateguard")

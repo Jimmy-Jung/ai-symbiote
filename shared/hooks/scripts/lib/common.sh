@@ -178,6 +178,10 @@ hook_uses_cursor_protocol() {
   [ -n "${CURSOR_PLUGIN_ROOT:-}" ]
 }
 
+hook_uses_claude_protocol() {
+  [ -n "${CLAUDE_PLUGIN_ROOT:-${CLAUDE_PROJECT_DIR:-}}" ]
+}
+
 emit_hook_continue() {
   if hook_uses_cursor_protocol; then
     printf '{"continue":true,"permission":"allow"}\n'
@@ -214,6 +218,29 @@ emit_hook_block() {
   escaped=$(json_escape "$message")
   if hook_uses_cursor_protocol; then
     printf '{"continue":false,"permission":"deny","user_message":"%s","agent_message":"%s"}\n' "$escaped" "$escaped"
+  else
+    printf '{"continue":false,"permissionDecision":"deny","systemMessage":"%s"}\n' "$escaped"
+  fi
+}
+
+emit_pretool_allow() {
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":true,"permission":"allow"}\n'
+  elif hook_uses_claude_protocol; then
+    :
+  else
+    printf '{"continue":true}\n'
+  fi
+}
+
+emit_pretool_deny() {
+  local message="$1"
+  local escaped
+  escaped=$(json_escape "$message")
+  if hook_uses_cursor_protocol; then
+    printf '{"continue":false,"permission":"deny","user_message":"%s","agent_message":"%s"}\n' "$escaped" "$escaped"
+  elif hook_uses_claude_protocol; then
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' "$escaped"
   else
     printf '{"continue":false,"permissionDecision":"deny","systemMessage":"%s"}\n' "$escaped"
   fi

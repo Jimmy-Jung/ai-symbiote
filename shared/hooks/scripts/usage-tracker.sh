@@ -17,6 +17,18 @@ sanitize_name() {
   printf '%s' "$1" | tr -cd 'a-zA-Z0-9_-'
 }
 
+first_line_match() {
+  local pattern="$1" input="$2"
+  printf '%s' "$input" | sed -n "s:${pattern}:\\1:p" | head -1
+}
+
+normalize_command_token() {
+  local raw="$1"
+  raw=$(printf '%s' "$raw" | tr '\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]].*$//')
+  raw=${raw#/}
+  printf '%s' "$raw"
+}
+
 recent_skill_marker_file() {
   local state_dir
   state_dir=$(get_state_dir)
@@ -137,20 +149,50 @@ INPUT=$(read_stdin_safe)
 # <command-message>ai-symbiote:setup</command-message>
 PROMPT=$(json_field "$INPUT" "prompt")
 if [ -n "$PROMPT" ]; then
-  COMMAND_MESSAGE=$(printf '%s' "$PROMPT" | sed -n 's:.*<command-message>\([^<]*\)</command-message>.*:\1:p' | head -1)
+  COMMAND_MESSAGE=$(first_line_match '.*<command-message>\([^<]*\)</command-message>.*' "$PROMPT")
   if [ -n "$COMMAND_MESSAGE" ]; then
-    case "$COMMAND_MESSAGE" in
-      ai-symbiote:*)
-        NAME="${COMMAND_MESSAGE##*:}"
-        NAME=$(sanitize_name "$NAME")
-        if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
-          increment_counter "commands" "$NAME"
-          track_skill_usage "$NAME" "command"
-        fi
-        exit 0
-        ;;
-    esac
+    COMMAND_MESSAGE=$(normalize_command_token "$COMMAND_MESSAGE")
   fi
+
+  if [ -z "$COMMAND_MESSAGE" ]; then
+    COMMAND_MESSAGE=$(first_line_match '.*<command-name>\([^<]*\)</command-name>.*' "$PROMPT")
+    [ -n "$COMMAND_MESSAGE" ] && COMMAND_MESSAGE=$(normalize_command_token "$COMMAND_MESSAGE")
+  fi
+
+  if [ -z "$COMMAND_MESSAGE" ]; then
+    COMMAND_MESSAGE=$(normalize_command_token "$PROMPT")
+  fi
+
+  case "$COMMAND_MESSAGE" in
+    ai-symbiote:*)
+      NAME="${COMMAND_MESSAGE##*:}"
+      NAME=$(sanitize_name "$NAME")
+      if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
+        increment_counter "commands" "$NAME"
+        track_skill_usage "$NAME" "command"
+      fi
+      exit 0
+      ;;
+    ai-symbiote/*)
+      NAME="${COMMAND_MESSAGE##*/}"
+      NAME=$(sanitize_name "$NAME")
+      if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
+        increment_counter "commands" "$NAME"
+        track_skill_usage "$NAME" "command"
+      fi
+      exit 0
+      ;;
+    /ai-symbiote:*)
+      # normalize_command_token should have removed '/', but keep defensive fallback
+      NAME="${COMMAND_MESSAGE##*:}"
+      NAME=$(sanitize_name "$NAME")
+      if [ -n "$NAME" ] && [ "$NAME" != "stats" ]; then
+        increment_counter "commands" "$NAME"
+        track_skill_usage "$NAME" "command"
+      fi
+      exit 0
+      ;;
+  esac
 fi
 
 # --- Skill tool detection ---
@@ -159,9 +201,19 @@ SKILL_NAME=$(json_nested_field "$INPUT" "tool_input" "skill")
 if [ -z "$SKILL_NAME" ]; then
   SKILL_NAME=$(json_field "$INPUT" "skill")
 fi
+if [ -z "$SKILL_NAME" ]; then
+  SKILL_NAME=$(json_nested_field "$INPUT" "tool_input" "skill_name")
+fi
+if [ -z "$SKILL_NAME" ]; then
+  SKILL_NAME=$(json_nested_field "$INPUT" "tool_input" "command")
+fi
+if [ -z "$SKILL_NAME" ]; then
+  SKILL_NAME=$(json_nested_field "$INPUT" "tool_input" "name")
+fi
 
 if [ -n "$SKILL_NAME" ]; then
   # Strip plugin prefix if present (e.g. "ai-symbiote:setup" -> "setup")
+  SKILL_NAME=$(normalize_command_token "$SKILL_NAME")
   NAME="${SKILL_NAME##*:}"
   NAME=$(sanitize_name "$NAME")
   track_skill_usage "$NAME" "skill"
