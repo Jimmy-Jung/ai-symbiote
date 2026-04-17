@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.6] - 2026-04-17
+
+### Fixed
+- **Issue #7 해결: GateGuard가 방금 쓴 파일의 후속 수정까지 막던 문제 수정** — 성공한 `Write|Edit` 대상을 PostToolUse에서 자동 등록하도록 바꿔 같은 세션의 정상적인 연속 수정 흐름을 허용
+- **Issue #8 해결: usage tracker가 command-message 외 입력 형태를 놓치던 문제 수정** — `command-name`, bare slash command, 추가 skill 필드를 함께 인식하도록 확장해 `usage-data/{skills,commands}`가 실제 사용량을 반영
+- **Issue #9 해결: Claude PreToolUse 차단이 continuation 자체를 끊던 문제 수정** — deny 응답을 Claude 공식 `permissionDecision` 포맷으로 전환하고 compact 제안을 PostToolUse로 이동해 연속 작업이 끊기지 않도록 정리
+- **문서 정합성 보정** — Cursor 훅 배선이 현재 `Write` 중심이라는 점을 README와 주요 기능 문서에 명시해 플랫폼별 동작 범위를 실제 구현과 맞춤
+
 ## [0.10.5] - 2026-04-17
 
 ### Fixed

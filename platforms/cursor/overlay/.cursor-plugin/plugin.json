@@ -1,7 +1,7 @@
 {
   "name": "ai-symbiote",
   "displayName": "AI Symbiote",
-  "version": "0.10.5",
+  "version": "0.10.6",
   "description": "AI Symbiote 오케스트레이션 플러그인 번들.",
   "author": {
     "name": "JunyoungJung"
