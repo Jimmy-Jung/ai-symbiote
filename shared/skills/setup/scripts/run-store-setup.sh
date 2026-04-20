@@ -30,7 +30,7 @@ while [ $# -gt 0 ]; do
       shift 2
       ;;
     *)
-      echo "Usage: run-store-setup.sh [--state-dir PATH] [--project-root PATH] [--mode fast|guided|dry-run]" >&2
+      echo "Usage: run-store-setup.sh [--state-dir PATH] [--project-root PATH] [--mode fast|guided|dry-run|recommend]" >&2
       exit 1
       ;;
   esac
@@ -362,6 +362,11 @@ build_summary_file
 print_guided_summary
 
 if [ "$MODE" = "dry-run" ]; then
+  exit 0
+fi
+
+if [ "$MODE" = "recommend" ]; then
+  echo "[Setup] recommend mode: recommendations available at $SUMMARY_PATH (no selections recorded)."
   exit 0
 fi
 
