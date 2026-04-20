@@ -362,6 +362,26 @@ if [ -d "$STATE_DIR/instincts" ]; then
   done
 fi
 
+# Verify queue: count pending verifications for current project/branch
+VERIFY_QUEUE="$HOME/.ai-symbiote/state/verify-queue.jsonl"
+if [ -f "$VERIFY_QUEUE" ]; then
+  _VQ_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+  if [ -n "$_VQ_REPO_ROOT" ]; then
+    _VQ_PROJECT=$(basename "$_VQ_REPO_ROOT")
+    _VQ_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+    if command -v jq >/dev/null 2>&1; then
+      _VQ_PENDING=$(jq -rc --arg p "$_VQ_PROJECT" --arg b "$_VQ_BRANCH" \
+        'select(.project==$p and .branch==$b)' "$VERIFY_QUEUE" 2>/dev/null | wc -l | tr -d ' ')
+    else
+      _VQ_PENDING=$(grep "\"project\":\"$_VQ_PROJECT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+    fi
+    _VQ_PENDING=${_VQ_PENDING:-0}
+    if [ "$_VQ_PENDING" -gt 0 ] 2>/dev/null; then
+      CONTEXT_PARTS+=("[Verify] ${_VQ_PENDING} pending verification(s) for ${_VQ_PROJECT}/${_VQ_BRANCH}. Run /verify to process.")
+    fi
+  fi
+fi
+
 # Messenger bridge: check pending commands
 MESSENGER_CMD_DIR="$STATE_DIR/messenger/commands"
 if [ -d "$MESSENGER_CMD_DIR" ]; then

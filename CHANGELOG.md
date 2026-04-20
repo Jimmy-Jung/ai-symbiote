@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Write-time Verification Layer** — AI가 작성한 코드의 opacity(이유 불투명)를 행동적으로 측정·제거하는 신규 파이프라인. `/verify` 스킬이 큐잉된 edit 각각에 대해 cold-read reviewer + LLM judge를 돌려 gaming 저항성 있는 검증 아티팩트(`.ai-symbiote/qa/<project>/<date>/<sha>.md`)를 생성
+- **verify-queue.sh 훅** — Claude PostToolUse(Write|Edit)에 추가된 append-only 훅. 편집 메타데이터를 `~/.ai-symbiote/state/verify-queue.jsonl`에 <100ms로 기록해 edit flow에 영향 없이 큐잉 (timeout: 10s 준수)
+- **/verify 스킬** — 큐에서 pending entry를 꺼내 3개 역할(Intent/Structural/Alternative) cold-read reviewer로 질문 생성, 저자 답변 수집, V2b LLM judge의 verifiability check로 gaming 탐지
+- **SessionStart 알림 확장** — `setup-check.sh`가 현재 project/branch의 pending 검증 건수를 감지해 "[Verify] N pending verifications" 메시지로 노출
+
+### Changed
+- **Codex 플랫폼 제한 명시** — Codex의 hooks.json은 Write|Edit matcher를 지원하지 않아 자동 큐잉 불가. Codex 유저는 `/verify --sha <sha>` 또는 `--file <path>`로 수동 호출만 지원
+
 ## [0.10.9] - 2026-04-20
 
 ### Added

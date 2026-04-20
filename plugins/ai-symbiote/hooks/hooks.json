@@ -1,5 +1,5 @@
 {
-  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success, intent-router, next-action",
+  "description": "ai-symbiote hooks (Claude Code): guard-shell, setup-check, pre-compact, usage-tracker, harness-learn, comment-checker, messenger-notify, pre-edit-write-dispatcher, mcp-health-check, mcp-health-failure, mcp-health-success, intent-router, next-action, verify-queue",
   "hooks": {
     "SessionStart": [
       {
@@ -122,6 +122,11 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/suggest-compact.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/verify-queue.sh\"",
             "timeout": 10
           }
         ]
