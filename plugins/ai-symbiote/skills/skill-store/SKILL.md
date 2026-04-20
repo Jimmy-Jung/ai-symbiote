@@ -1,24 +1,29 @@
 ---
 name: skill-store
-description: "Recommends and installs community skills matching your project stack. Browses the awesome-agent-skills catalog (1,060+) by framework, service, and domain. Triggers on: skill recommendation, skill install, skill store, recommend skills, skill discovery."
+description: "Recommends and installs community Claude Code / Codex plugins matching your project stack. Starts from a curated local catalog and falls back to live GitHub / web search when the catalog has no coverage. Triggers on: skill recommendation, skill install, skill store, recommend skills, skill discovery."
 user-invocable: true
 argument-hint: [search query | --auto | --list <category>]
-allowed-tools: [Read, Write, Bash, Glob, Grep, Agent]
+allowed-tools: [Read, Write, Bash, Glob, Grep, WebFetch, WebSearch, Agent]
 ---
 
 # Skill Store
 
-Recommends and installs community skills matching your project stack.
-Source: [VoltAgent/awesome-agent-skills](https://github.com/VoltAgent/awesome-agent-skills) (1,060+ skills)
+Recommends and installs community agent skills / plugins matching your project stack.
+
+**No single upstream catalog is required.** The bundled `catalog.json` is a curated seed list of well-known plugins (e.g. Swift / iOS, Next.js, Supabase). Anything outside that seed is resolved via live GitHub / web search.
 
 ## Catalog
 
-The skill-to-stack recommendation mapping is stored in `skills/skill-store/catalog.json` under the current plugin root.
+The curated seed is stored in `skills/skill-store/catalog.json` under the current plugin root.
 
-Catalog structure:
+Structure:
 - `stacks`: Recommendations by language/framework (nextjs, react, react-native, swift, python, typescript, rust, go, java, dotnet)
-- `services`: Recommendations by service (supabase, neon, stripe, cloudflare, netlify, vercel, terraform, sanity, wordpress, sentry, figma, etc.)
+- `services`: Recommendations by service (supabase, neon, stripe, cloudflare, netlify, vercel, terraform, sanity, wordpress, sentry, figma, …)
 - `domains`: Recommendations by domain (security, ai, scraping, marketing, product, document, video, design)
+
+Each entry references a real GitHub repo installable via `/plugin marketplace add {owner}/{repo}`.
+
+To grow the seed, add entries directly to `catalog.json`. There is no external mirror to sync.
 
 ## Usage Modes
 
@@ -27,97 +32,98 @@ Catalog structure:
 Reads `~/ai-symbiote/{slug}/manifest.json` and auto-recommends based on detected stack.
 
 Workflow:
-1. Read `project.languages`, `stack.frameworks`, `stack.packageManager` from manifest.json
-2. Match against `stacks` in catalog.json by language/framework
-3. Scan project dependency files (package.json, requirements.txt, etc.) to detect services:
-   - `@supabase/supabase-js` -> supabase recommendation
-   - `stripe` -> stripe recommendation
-   - `@sentry/node` -> sentry recommendation
-   - `better-auth` -> betterauth recommendation
+1. Collect lookup keys from manifest.json:
+   - `project.languages`
+   - `project.platforms` (ios, ipados, macos, tvos, watchos, visionos, android, web)
+   - `project.type`
+   - `stack.frameworks`
+   - `stack.buildTool`
+2. Expand keys through `shared/lib/stack-aliases.json` (e.g. `ios`, `ipados`, `swiftui`, `uikit` → `swift`; `next.js` → `nextjs`; `expo` → `react-native`)
+3. Match expanded keys against `stacks` in catalog.json
+4. Scan project dependency files (`package.json`, `Podfile`, `Project.swift`, `*.xcodeproj/project.pbxproj`, `requirements.txt`, etc.) to detect services:
+   - `@supabase/supabase-js` / `supabase-swift` -> supabase recommendation
+   - `stripe` / `stripe-ios` -> stripe recommendation
+   - `@sentry/node` / `sentry-cocoa` -> sentry recommendation
+   - `firebase/firebase-ios-sdk` -> firebase recommendation
+   - `revenuecat/purchases-ios` -> revenuecat recommendation
    - `@cloudflare/workers-types` -> cloudflare recommendation
    - `@netlify/functions` -> netlify recommendation
-   - `sanity` -> sanity recommendation
    - `terraform` (*.tf files) -> terraform recommendation
-4. Display matched skill list with numbers
-5. Install when user selects by number
+5. Display matched skill list with numbers
+6. **If zero matches are returned** (no catalog coverage for the detected stack), automatically run Mode 2 Step 2 with the primary platform/language as the query (e.g. `ios`, `swiftui`). Never return an empty recommendation without attempting live search.
+7. Install when the user selects by number
 
 Output format:
 ```
 [Skill Store] Recommended skills based on project analysis:
 
 Frameworks:
-  1. Next.js Best Practices (vercel/next-best-practices)
-  2. React Best Practices (vercel/react-best-practices)
+  1. Swift iOS Skills (dpearson2699/swift-ios-skills)
+  2. Axiom (CharlesWiltgen/Axiom)
 
 Services:
   3. Supabase Postgres Best Practices (supabase-community/postgres-best-practices)
-  4. Stripe Best Practices (nickcopi/stripe-best-practices)
 
-Select skill numbers to install (e.g., 1,3,4 or "all"):
+Select skill numbers to install (e.g., 1,3 or "all"):
 ```
 
 ### Mode 2: Search (`skill-store <query>`)
 
-Searches skills by keyword. Uses a 3-tier fallback to always find results.
+Searches skills by keyword with a 2-tier fallback — no external catalog dependency.
 
 Examples:
-- `skill-store security` -> recommends 22 Trail of Bits security skills
-- `skill-store ai` -> recommends Hugging Face, fal.ai, Replicate, Gemini
-- `skill-store marketing` -> recommends 30+ marketing skills
-- `skill-store figma` -> recommends Figma design skills
-- `skill-store xcode build` -> auto-searches GitHub/web if not in catalog
+- `skill-store security` -> local seed hits (Trail of Bits, etc.)
+- `skill-store ios simulator` -> falls through to GitHub search
+- `skill-store figma` -> local seed for Figma design skills
 
-Workflow (3-tier fallback):
+Workflow (2-tier fallback):
 
 #### Step 1: Local Catalog Search
-- Match query against stacks, services, domains keys in catalog.json
-- If results found, display and let user select
+- Substring match against `repo`, `name`, `category`, `_group` in catalog.json
+- If any results found, display numbered list and let the user select
 
-#### Step 2: awesome-agent-skills Source Search (when Step 1 yields no results)
-- Fetch the awesome-agent-skills README via WebFetch and match against query:
-  ```
-  WebFetch(url: "https://raw.githubusercontent.com/VoltAgent/awesome-agent-skills/main/README.md")
-  ```
-- If results found, display and let user select
+#### Step 2: Live GitHub / Web Search (when Step 1 yields no results)
+Run **both** of the following searches via `WebSearch` (or `WebFetch` against GitHub when a specific repo is known):
 
-#### Step 3: GitHub/Web Search (when Step 2 also yields no results)
-- Search GitHub for related skills/plugins:
-  ```
-  WebSearch(query: "{query} claude code skill site:github.com")
-  WebSearch(query: "{query} (plugin OR agent skill) site:github.com")
-  ```
-- Prioritize repos with `.claude-plugin` or `.codex-plugin` directories
-- Display candidate repos to user:
-  ```
-  [Skill Store] No "{query}" related skills found in catalog. Searched GitHub instead:
+```
+WebSearch(query: "{query} claude code plugin site:github.com")
+WebSearch(query: "{query} (agent skill OR codex plugin) site:github.com")
+```
 
-    1. {owner}/{repo} - {description} (stars: N)
-    2. {owner}/{repo} - {description} (stars: N)
+Ranking / filtering rules:
+- Prioritize repos whose root contains `.claude-plugin/plugin.json` or `.codex-plugin/plugin.json`
+- Prefer higher-star repos that mention "Claude Code", "agent skill", or "plugin" in the README
+- Deduplicate by `{owner}/{repo}`
+- Cap to the top 5 candidates
 
-  Select a number to install (or "skip" to skip):
-  ```
-- If no search results either:
-  ```
-  [Skill Store] No skills found related to "{query}".
-  Try searching GitHub directly or create your own skill:
-  https://github.com/search?q={query}+codex+skill&type=repositories
-  ```
+Display:
+```
+[Skill Store] No "{query}" results in the local catalog. GitHub search:
+
+  1. {owner}/{repo} — {short description} (★ {stars})
+  2. {owner}/{repo} — {short description} (★ {stars})
+
+Select a number to install (or "skip" to skip):
+```
+
+If the live search also returns nothing:
+```
+[Skill Store] No plugins found for "{query}".
+Try searching GitHub directly:
+https://github.com/search?q={query}+claude-plugin&type=repositories
+```
 
 ### Mode 3: Category List (`--list <category>`)
 
-Lists all skills in a specific category.
+Lists all seed entries in a specific category.
 
 - `skill-store --list stacks` -> full list by language/framework
 - `skill-store --list services` -> full list by service
 - `skill-store --list domains` -> full list by domain
 
-### Mode 4: Update Full Catalog (`--update`)
-
-Fetches the awesome-agent-skills README via WebFetch and updates catalog.json.
-
 ## Installation Method
 
-When installing a selected skill, detects the current platform and uses the appropriate method:
+When installing a selected skill, detect the current platform and use the appropriate method:
 
 ### Claude Environment
 
@@ -150,24 +156,24 @@ Notes:
 - Plugin name is based on the `name` field in each manifest.
 
 Post-installation:
-- Add installation record to the `plugins` section of manifest.json
+- Add an installation record to the `plugins` section of `manifest.json`
 - Provide usage instructions for the installed skill to the user
 
 ## Setup Integration
 
-During the `setup` workflow, the `--auto` mode runs automatically at Step 2 (platform-specific skill pack request):
+During the `setup` workflow, `--auto` runs at Step 2 (platform-specific skill pack request):
 
 1. After project stack detection completes
-2. Generate recommended skill list based on catalog.json
-3. Display recommended skills to user
+2. Generate the recommended skill list from catalog.json + (if needed) live search fallback
+3. Display recommended skills to the user
 4. Install selected skills
 5. Record in manifest.json
 
 ## Principles
 
-- Never force-install (always user's choice)
-- 3-tier fallback: local catalog -> awesome-agent-skills source -> GitHub/web search
-- Always searches GitHub/web for skills not in the catalog
-- Provides manual installation instructions on failure
-- Does not duplicate-install already installed skills
-- Prioritizes repos with `.claude-plugin` or `.codex-plugin` directories when searching GitHub
+- Never force-install — always user's choice
+- Catalog is a **curated seed**, not a mirror of any external source
+- When the seed has no match, always run live GitHub / web search before reporting "nothing found"
+- Prioritize repos with `.claude-plugin` or `.codex-plugin` directories
+- Provide manual installation instructions on failure
+- Do not duplicate-install already installed skills

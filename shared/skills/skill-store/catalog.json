@@ -1,6 +1,6 @@
 {
-  "_source": "https://github.com/VoltAgent/awesome-agent-skills",
-  "_updated": "2026-04-02",
+  "_note": "Curated seed catalog of agent skill plugins by stack/service/domain. Entries are real GitHub repositories installable via `/plugin marketplace add {owner}/{repo}`. When a query or auto-recommendation has no catalog match, the skill falls back to WebSearch + GitHub discovery (no external catalog dependency).",
+  "_updated": "2026-04-20",
   "stacks": {
     "nextjs": [
       { "repo": "vercel/next-best-practices", "name": "Next.js Best Practices", "category": "framework" },
@@ -21,7 +21,15 @@
       { "repo": "expo/expo-agent-skills", "name": "Expo Skills (11 skills)", "category": "framework" }
     ],
     "swift": [
-      { "repo": "anthropic-official/webapp-testing", "name": "Webapp Testing (Playwright)", "category": "testing" }
+      { "repo": "dpearson2699/swift-ios-skills", "name": "Swift iOS Skills (76 skills: SwiftUI, SwiftData, App Intents, StoreKit, WidgetKit, …)", "category": "framework" },
+      { "repo": "CharlesWiltgen/Axiom", "name": "Axiom (iOS auditors: build, swiftui, data, concurrency, performance, media, …)", "category": "framework" },
+      { "repo": "twostraws/swift-agent-skills", "name": "Swift Agent Skills (Paul Hudson / Hacking with Swift)", "category": "language" },
+      { "repo": "twostraws/swiftui-agent-skill", "name": "SwiftUI Agent Skill (Paul Hudson)", "category": "ui" },
+      { "repo": "AvdLee/SwiftUI-Agent-Skill", "name": "SwiftUI Best Practices (Antoine van der Lee)", "category": "ui" },
+      { "repo": "AvdLee/Swift-Concurrency-Agent-Skill", "name": "Swift Concurrency Agent Skill", "category": "concurrency" },
+      { "repo": "vabole/apple-skills", "name": "Apple Skills (iOS 26+ APIs, Liquid Glass, HIG)", "category": "framework" },
+      { "repo": "kylehughes/apple-platform-build-tools-claude-code-plugin", "name": "Apple Platform Build Tools (xcodebuild / swift build)", "category": "build" },
+      { "repo": "conorluddy/ios-simulator-skill", "name": "iOS Simulator Skill (21 testing/build scripts)", "category": "testing" }
     ],
     "python": [
       { "repo": "huggingface/agent-skills", "name": "Hugging Face AI Skills (14 skills)", "category": "ai" },
@@ -42,6 +50,17 @@
     ],
     "dotnet": [
       { "repo": "microsoft/agent-skills", "name": "Microsoft .NET Skills (133+ skills)", "category": "cloud" }
+    ],
+    "android": [
+      { "repo": "android/skills", "name": "Android Official Skills", "category": "framework" },
+      { "repo": "Drjacky/claude-android-ninja", "name": "Claude Android Ninja (Kotlin + Compose + Navigation3 + Gradle conventions)", "category": "framework" },
+      { "repo": "dpconde/claude-android-skill", "name": "Claude Android Skill (NowInAndroid reference architecture)", "category": "framework" },
+      { "repo": "aldefy/compose-skill", "name": "Jetpack Compose Skill (androidx source receipts)", "category": "ui" },
+      { "repo": "new-silvermoon/awesome-android-agent-skills", "name": "Awesome Android Agent Skills (curated collection)", "category": "framework" }
+    ],
+    "kotlin": [
+      { "repo": "Kotlin/kotlin-agent-skills", "name": "Kotlin Official Agent Skills (backend + tooling)", "category": "framework" },
+      { "repo": "kbrgnj/kotlin-backend-agent-skills", "name": "Kotlin Backend Skills (Spring, JPA)", "category": "backend" }
     ]
   },
   "services": {
