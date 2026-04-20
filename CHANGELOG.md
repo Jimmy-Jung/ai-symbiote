@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.9] - 2026-04-20
+
+### Added
+- **setup: AI 주도 2단계 guided 흐름 + `recommend` 모드** — 비대화형 AI agent Bash 도구에서 stdin TTY 부재로 guided 선택이 전부 `later`로 떨어지던 문제 해결. `--mode recommend`로 추천만 수집 후, `SETUP_STORE_{SKILLS,CLI,MCP}_CHOICE` 환경변수로 선택값을 전달해 `--mode guided` 실행 시 `read`를 건너뛰도록 정비
+- **store 계열 auto 매칭에 플랫폼/별칭 지원** — `project.platforms`(ios, ipados, android, …), `project.type`, `stack.buildTool`을 lookup 키로 추가하고 `shared/lib/stack-aliases.json`으로 `ios/ipados/swiftui/uikit → swift`, `android/jetpack/compose/kmp → android|kotlin` 등을 정규화
+- **iOS/Swift 프로젝트 감지 및 추천 보강** — `*.xcodeproj/project.pbxproj`, `Podfile`, `Project.swift`를 서비스 스캔 후보에 추가. cli-store에 `swiftlint`, `swiftformat`, `xcbeautify`, `fastlane`, `tuist`, `xcodegen`, `cocoapods`, `simctl` 엔트리 추가. mcp-store `stacks.swift`에 Apple 문서 조회용 `context7` 추가
+- **Android/Kotlin 스택 커버리지 신설** — 세 catalog에 `stacks.android`/`stacks.kotlin` 추가. cli-store에 `adb`, `emulator`, `gradle`, `ktlint`, `detekt`, `fastlane`, `bundletool`, `kotlinc` 제공. mcp-store에 `context7` + `github` 제공. `Podfile`·`Project.swift`·`build.gradle(.kts)`·`AndroidManifest.xml`·`libs.versions.toml`을 `candidateFiles`에 포함, service-patterns에 Firebase/Sentry/RevenueCat/Amplitude/Mixpanel/OneSignal iOS·Android 좌표 보강
+- **skill-store 추천 스킬 대규모 보강** — iOS/Swift: `dpearson2699/swift-ios-skills`, `CharlesWiltgen/Axiom`, `twostraws/swift-agent-skills`, `twostraws/swiftui-agent-skill`, `AvdLee/SwiftUI-Agent-Skill`, `AvdLee/Swift-Concurrency-Agent-Skill`, `vabole/apple-skills`, `kylehughes/apple-platform-build-tools-claude-code-plugin`, `conorluddy/ios-simulator-skill`. Android: `android/skills`, `Drjacky/claude-android-ninja`, `dpconde/claude-android-skill`, `aldefy/compose-skill`, `new-silvermoon/awesome-android-agent-skills`. Kotlin: `Kotlin/kotlin-agent-skills`(공식), `kbrgnj/kotlin-backend-agent-skills`
+
+### Changed
+- **skill-store: awesome-agent-skills 외부 카탈로그 의존성 제거** — `_source`(VoltAgent/awesome-agent-skills) 필드를 들어내고 카탈로그를 "큐레이트된 시드 + 누락 시 WebSearch/GitHub 검색"으로 재정의. SKILL.md를 3-tier(local → awesome-agent-skills README → GitHub)에서 2-tier(local → WebSearch/GitHub)로 단순화하고 `allowed-tools`에 `WebFetch`/`WebSearch` 추가
+- **README 설치 섹션 개선** — 프롬프트로 자동 설치할 수 있도록 Claude Code/Codex CLI/Cursor용 프롬프트 블록 추가, 하드코딩된 `/Users/jimmy` 절대 경로를 `~/ai-symbiote` 홈 디렉터리 예시로 일반화
+
 ## [0.10.8] - 2026-04-17
 
 ### Added
