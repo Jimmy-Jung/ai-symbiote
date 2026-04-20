@@ -1,6 +1,6 @@
 {
   "_note": "CLI tools that can replace or complement MCP servers. When a CLI is installed and authenticated, it is preferred over the equivalent MCP server.",
-  "_updated": "2026-04-14",
+  "_updated": "2026-04-20",
   "stacks": {
     "nextjs": [
       { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh", "npm": "npm install -g @github/cli" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
@@ -14,7 +14,15 @@
     ],
     "swift": [
       { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
-      { "id": "xcodebuild", "name": "Xcode Build Tools", "cmd": "xcodebuild", "checkCmd": "xcodebuild -version", "installCmd": { "xcode": "xcode-select --install" }, "mcpEquivalent": "xcodebuildmcp", "category": "build", "description": "Build, test, and archive Xcode projects" }
+      { "id": "xcodebuild", "name": "Xcode Build Tools", "cmd": "xcodebuild", "checkCmd": "xcodebuild -version", "installCmd": { "xcode": "xcode-select --install" }, "mcpEquivalent": "xcodebuildmcp", "category": "build", "description": "Build, test, and archive Xcode projects" },
+      { "id": "swiftlint", "name": "SwiftLint", "cmd": "swiftlint", "checkCmd": "swiftlint version", "installCmd": { "brew": "brew install swiftlint" }, "mcpEquivalent": null, "category": "quality", "description": "Swift style and convention linter" },
+      { "id": "swiftformat", "name": "SwiftFormat", "cmd": "swiftformat", "checkCmd": "swiftformat --version", "installCmd": { "brew": "brew install swiftformat" }, "mcpEquivalent": null, "category": "quality", "description": "Automatic Swift code formatter" },
+      { "id": "xcbeautify", "name": "xcbeautify", "cmd": "xcbeautify", "checkCmd": "xcbeautify --version", "installCmd": { "brew": "brew install xcbeautify" }, "mcpEquivalent": null, "category": "build", "description": "Readable formatter for xcodebuild output" },
+      { "id": "fastlane", "name": "Fastlane", "cmd": "fastlane", "checkCmd": "fastlane --version", "installCmd": { "brew": "brew install fastlane" }, "mcpEquivalent": null, "category": "release", "description": "Automate iOS/macOS beta and App Store release" },
+      { "id": "tuist", "name": "Tuist", "cmd": "tuist", "checkCmd": "tuist version", "installCmd": { "brew": "brew install --formula tuist" }, "mcpEquivalent": null, "category": "build", "description": "Generate and maintain Xcode projects at scale" },
+      { "id": "xcodegen", "name": "XcodeGen", "cmd": "xcodegen", "checkCmd": "xcodegen --version", "installCmd": { "brew": "brew install xcodegen" }, "mcpEquivalent": null, "category": "build", "description": "Generate Xcode project from a spec file" },
+      { "id": "cocoapods", "name": "CocoaPods", "cmd": "pod", "checkCmd": "pod --version", "installCmd": { "brew": "brew install cocoapods" }, "mcpEquivalent": null, "category": "package-manager", "description": "Dependency manager for Swift and Objective-C" },
+      { "id": "simctl", "name": "iOS Simulator CLI", "cmd": "xcrun", "checkCmd": "xcrun simctl help", "installCmd": { "xcode": "xcode-select --install" }, "mcpEquivalent": null, "category": "simulator", "description": "Manage iOS/iPadOS/tvOS/watchOS simulators" }
     ],
     "python": [
       { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" }
@@ -34,6 +42,22 @@
     "dotnet": [
       { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
       { "id": "dotnet", "name": ".NET CLI", "cmd": "dotnet", "checkCmd": "dotnet --version", "installCmd": { "brew": "brew install dotnet", "apt": "sudo apt install dotnet-sdk-8.0" }, "mcpEquivalent": null, "category": "build", "description": "Build, test, publish .NET projects" }
+    ],
+    "android": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
+      { "id": "adb", "name": "Android Debug Bridge", "cmd": "adb", "checkCmd": "adb version", "installCmd": { "brew": "brew install --cask android-platform-tools", "apt": "sudo apt install adb" }, "mcpEquivalent": null, "category": "device", "description": "Install/debug APKs, pull logs, manage devices and emulators" },
+      { "id": "emulator", "name": "Android Emulator", "cmd": "emulator", "checkCmd": "emulator -version", "installCmd": { "brew": "brew install --cask android-commandlinetools" }, "mcpEquivalent": null, "category": "simulator", "description": "Launch and manage Android virtual devices" },
+      { "id": "gradle", "name": "Gradle", "cmd": "gradle", "checkCmd": "gradle --version", "installCmd": { "brew": "brew install gradle", "apt": "sudo apt install gradle" }, "mcpEquivalent": null, "category": "build", "description": "JVM / Android build system (prefer project-local ./gradlew)" },
+      { "id": "ktlint", "name": "ktlint", "cmd": "ktlint", "checkCmd": "ktlint --version", "installCmd": { "brew": "brew install ktlint" }, "mcpEquivalent": null, "category": "quality", "description": "Kotlin style and convention linter" },
+      { "id": "detekt", "name": "detekt", "cmd": "detekt", "checkCmd": "detekt --version", "installCmd": { "brew": "brew install detekt" }, "mcpEquivalent": null, "category": "quality", "description": "Static analysis for Kotlin" },
+      { "id": "fastlane", "name": "Fastlane", "cmd": "fastlane", "checkCmd": "fastlane --version", "installCmd": { "brew": "brew install fastlane" }, "mcpEquivalent": null, "category": "release", "description": "Automate Android beta and Play Store release" },
+      { "id": "bundletool", "name": "bundletool", "cmd": "bundletool", "checkCmd": "bundletool version", "installCmd": { "brew": "brew install bundletool" }, "mcpEquivalent": null, "category": "build", "description": "Inspect/build AAB → APK bundles for Play Store" }
+    ],
+    "kotlin": [
+      { "id": "gh", "name": "GitHub CLI", "cmd": "gh", "checkCmd": "gh auth status", "installCmd": { "brew": "brew install gh", "apt": "sudo apt install gh" }, "mcpEquivalent": "github", "category": "version-control", "description": "GitHub issues, PRs, repos, releases, actions" },
+      { "id": "ktlint", "name": "ktlint", "cmd": "ktlint", "checkCmd": "ktlint --version", "installCmd": { "brew": "brew install ktlint" }, "mcpEquivalent": null, "category": "quality", "description": "Kotlin style and convention linter" },
+      { "id": "detekt", "name": "detekt", "cmd": "detekt", "checkCmd": "detekt --version", "installCmd": { "brew": "brew install detekt" }, "mcpEquivalent": null, "category": "quality", "description": "Static analysis for Kotlin" },
+      { "id": "kotlinc", "name": "Kotlin Compiler", "cmd": "kotlinc", "checkCmd": "kotlinc -version", "installCmd": { "brew": "brew install kotlin" }, "mcpEquivalent": null, "category": "build", "description": "Kotlin command-line compiler" }
     ]
   },
   "services": {

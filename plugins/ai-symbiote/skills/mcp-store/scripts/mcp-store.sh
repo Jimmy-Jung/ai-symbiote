@@ -11,6 +11,7 @@ source "$SCRIPT_DIR/../../../hooks/scripts/lib/common.sh"
 
 CATALOG="$SCRIPT_DIR/../catalog.json"
 SERVICE_PATTERNS_PATH="$SCRIPT_DIR/../../../lib/service-patterns.json"
+STACK_ALIASES_PATH="$SCRIPT_DIR/../../../lib/stack-aliases.json"
 STATE_DIR="${MCP_STORE_STATE_DIR:-$(ensure_state_dir)}"
 MANIFEST_PATH="$STATE_DIR/manifest.json"
 STATE_SUBDIR="$STATE_DIR/state"
@@ -58,7 +59,7 @@ done
 
 query_catalog() {
   local mode="$1" arg="$2" project_root="$3" covered_path="$4"
-  python3 - "$CATALOG" "$mode" "$arg" "$project_root" "$covered_path" "$SERVICE_PATTERNS_PATH" <<'PY'
+  python3 - "$CATALOG" "$mode" "$arg" "$project_root" "$covered_path" "$SERVICE_PATTERNS_PATH" "$STACK_ALIASES_PATH" <<'PY'
 import json, sys
 from pathlib import Path
 
@@ -68,11 +69,37 @@ arg = sys.argv[3].strip().lower()
 project_root_arg = sys.argv[4].strip()
 covered_path = Path(sys.argv[5])
 sp_path = Path(sys.argv[6])
+alias_path = Path(sys.argv[7])
 
 all_patterns = json.loads(sp_path.read_text())
 catalog_services = set(catalog.get("services", {}).keys())
 SERVICE_PATTERNS = {k: v for k, v in all_patterns["patterns"].items() if k in catalog_services}
 CANDIDATE_FILES = all_patterns.get("candidateFiles", [])
+
+ALIAS_MAP = {}
+if alias_path.exists():
+    try:
+        ALIAS_MAP = json.loads(alias_path.read_text()).get("aliases", {}) or {}
+    except Exception:
+        ALIAS_MAP = {}
+
+def expand_keys(raw_keys):
+    expanded = []
+    seen = set()
+    for raw in raw_keys:
+        if not isinstance(raw, str):
+            continue
+        key = raw.strip().lower()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        expanded.append(key)
+        for mapped in ALIAS_MAP.get(key, []):
+            mapped_key = str(mapped).strip().lower()
+            if mapped_key and mapped_key not in seen:
+                seen.add(mapped_key)
+                expanded.append(mapped_key)
+    return expanded
 
 def detect_project_root(manifest_path):
     if project_root_arg:
@@ -99,6 +126,12 @@ def scan_services(project_root):
                 haystacks.append(path.read_text(encoding="utf-8", errors="ignore").lower())
             except Exception:
                 pass
+    try:
+        for pbx in project_root.glob("*.xcodeproj/project.pbxproj"):
+            if pbx.is_file():
+                haystacks.append(pbx.read_text(encoding="utf-8", errors="ignore").lower())
+    except Exception:
+        pass
     try:
         if any(project_root.rglob("*.tf")):
             haystacks.append(".tf")
@@ -136,18 +169,27 @@ if mode == "list":
 
 if mode == "auto":
     manifest_path = Path(arg)
-    languages = []
-    frameworks = []
+    raw_keys = []
     if manifest_path.exists():
         try:
             manifest = json.loads(manifest_path.read_text())
-            languages = [str(x).lower() for x in manifest.get("project", {}).get("languages", [])]
-            frameworks = [str(x).lower() for x in manifest.get("stack", {}).get("frameworks", [])]
+            project = manifest.get("project", {}) or {}
+            stack = manifest.get("stack", {}) or {}
+            raw_keys.extend(project.get("languages", []) or [])
+            raw_keys.extend(project.get("platforms", []) or [])
+            raw_keys.extend(stack.get("frameworks", []) or [])
+            build_tool = stack.get("buildTool")
+            if build_tool:
+                raw_keys.append(build_tool)
+            ptype = project.get("type")
+            if ptype:
+                raw_keys.append(ptype)
         except Exception:
             pass
+    lookup_keys = expand_keys(raw_keys)
     matched = []
     seen = set()
-    for key in languages + frameworks:
+    for key in lookup_keys:
         for entry in catalog.get("stacks", {}).get(key, []):
             if entry["id"] not in seen:
                 seen.add(entry["id"])

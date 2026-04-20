@@ -1,6 +1,6 @@
 {
   "_source": "https://github.com/wong2/awesome-mcp-servers",
-  "_updated": "2026-04-12",
+  "_updated": "2026-04-20",
   "_note": "install commands are curated from official READMEs. Run --update to refresh.",
   "stacks": {
     "nextjs": [
@@ -141,6 +141,20 @@
         "env": [],
         "category": "build",
         "description": "Build, run, and test iOS/macOS apps"
+      },
+      {
+        "id": "context7",
+        "name": "Context7",
+        "repo": "upstash/context7-mcp",
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@upstash/context7-mcp@latest"
+        ],
+        "env": [],
+        "category": "docs",
+        "description": "Up-to-date Apple framework documentation lookup"
       },
       {
         "id": "github",
@@ -381,6 +395,70 @@
         "env": [],
         "category": "docs",
         "description": "Up-to-date documentation for any prompt"
+      }
+    ],
+    "android": [
+      {
+        "id": "context7",
+        "name": "Context7",
+        "repo": "upstash/context7-mcp",
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@upstash/context7-mcp@latest"
+        ],
+        "env": [],
+        "category": "docs",
+        "description": "Up-to-date AndroidX / Jetpack Compose documentation"
+      },
+      {
+        "id": "github",
+        "name": "GitHub",
+        "repo": "github/github-mcp-server",
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@github/mcp-server"
+        ],
+        "env": [
+          "GITHUB_PERSONAL_ACCESS_TOKEN"
+        ],
+        "category": "version-control",
+        "description": "GitHub official MCP Server"
+      }
+    ],
+    "kotlin": [
+      {
+        "id": "context7",
+        "name": "Context7",
+        "repo": "upstash/context7-mcp",
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@upstash/context7-mcp@latest"
+        ],
+        "env": [],
+        "category": "docs",
+        "description": "Up-to-date Kotlin / JVM documentation"
+      },
+      {
+        "id": "github",
+        "name": "GitHub",
+        "repo": "github/github-mcp-server",
+        "transport": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@github/mcp-server"
+        ],
+        "env": [
+          "GITHUB_PERSONAL_ACCESS_TOKEN"
+        ],
+        "category": "version-control",
+        "description": "GitHub official MCP Server"
       }
     ]
   },

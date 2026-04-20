@@ -42,23 +42,25 @@ Each catalog entry contains:
 Reads `~/ai-symbiote/{slug}/manifest.json` and auto-recommends based on detected stack.
 
 Workflow:
-1. Read `project.languages`, `stack.frameworks`, `stack.packageManager` from manifest.json
-2. Match against `stacks` in catalog.json by language/framework
-3. Scan project dependency files to detect services:
-   - `@supabase/supabase-js` -> supabase recommendation
-   - `stripe` -> stripe recommendation
-   - `@sentry/*` -> sentry recommendation
-   - `@cloudflare/*` -> cloudflare recommendation
-   - `@neondatabase/*` -> neon recommendation
-   - `firebase` or `firebase-admin` -> firebase recommendation
-   - `@notionhq/*` -> notion recommendation
-   - `@linear/sdk` -> linear recommendation
-   - `pg` or `postgres` -> postgres recommendation
-   - `better-sqlite3` or `sqlite3` -> sqlite recommendation
-   - `mongodb` or `mongoose` -> mongodb recommendation
-   - `@playwright/test` -> playwright recommendation
-   - `*.tf` files -> terraform recommendation
-   - `Dockerfile` -> docker recommendation
+1. Collect lookup keys from manifest.json: `project.languages`, `project.platforms`, `project.type`, `stack.frameworks`, `stack.buildTool`
+2. Expand keys through `shared/lib/stack-aliases.json` so that platform names like `ios`, `ipados`, `swiftui`, `uikit`, `expo` all resolve to their underlying stack (`swift`, `react-native`, ...)
+3. Match expanded keys against `stacks` in catalog.json
+4. Scan project dependency files — including `Podfile`, `Project.swift`, `*.xcodeproj/project.pbxproj` — to detect services:
+   - `@supabase/supabase-js` / `supabase-swift` -> supabase
+   - `stripe` / `stripe-ios` -> stripe
+   - `@sentry/*` / `sentry-cocoa` -> sentry
+   - `firebase/firebase-ios-sdk` / `firebase-admin` -> firebase
+   - `revenuecat/purchases-ios` -> revenuecat
+   - `@cloudflare/*` -> cloudflare
+   - `@neondatabase/*` -> neon
+   - `@notionhq/*` -> notion
+   - `@linear/sdk` -> linear
+   - `pg` or `postgres` -> postgres
+   - `better-sqlite3` / `sqlite3` / `GRDB` -> sqlite
+   - `mongodb` / `mongoose` -> mongodb
+   - `@playwright/test` -> playwright
+   - `*.tf` files -> terraform
+   - `Dockerfile` -> docker
 4. **CLI deduplication**: Check `~/ai-symbiote/{slug}/state/cli-covered-mcps.json` for MCP IDs already covered by CLI tools (produced by cli-store). Remove those IDs from the recommendation list and mark them as: `~~{name} MCP~~ — covered by CLI`
 5. Check already installed MCPs:
    ```bash

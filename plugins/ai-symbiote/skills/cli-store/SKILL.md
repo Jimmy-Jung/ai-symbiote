@@ -72,9 +72,10 @@ bash "$PLUGIN_ROOT/skills/cli-store/scripts/cli-store.sh" "$@"
 Reads `~/ai-symbiote/{slug}/manifest.json` and auto-recommends based on detected stack.
 
 Workflow:
-1. Read `project.languages`, `stack.frameworks`, `stack.packageManager` from manifest.json
-2. Match against `stacks` in catalog.json by language/framework
-3. Scan project dependency files to detect services (same patterns as mcp-store)
+1. Collect lookup keys from manifest.json: `project.languages`, `project.platforms`, `project.type`, `stack.frameworks`, `stack.buildTool`
+2. Expand keys through `shared/lib/stack-aliases.json` so that `ios`/`ipados`/`swiftui`/`uikit` all resolve to the `swift` stack, `expo` resolves to `react-native`, etc.
+3. Match expanded keys against `stacks` in catalog.json
+4. Scan project dependency files including `Podfile`, `Project.swift`, `*.xcodeproj/project.pbxproj` to detect services (same patterns as mcp-store, see `shared/lib/service-patterns.json`)
 4. For each matched CLI, run `checkCmd` to determine install status:
    ```bash
    {checkCmd} 2>/dev/null && echo "ready" || echo "not-ready"
