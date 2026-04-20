@@ -94,6 +94,49 @@ flowchart LR
 
 ## 설치
 
+### 프롬프트로 자동 설치
+
+이미 Claude Code, Codex CLI, Cursor 중 하나를 쓰고 있다면 아래 프롬프트를 그대로 붙여 넣어 에이전트가 클론부터 빌드·설치·검증까지 처리하게 할 수 있습니다. 예시의 `~/ai-symbiote`는 사용자 홈 디렉터리(`$HOME`) 아래 경로이며, 다른 위치에 두고 싶으면 원하는 절대 경로로 바꿔 쓰면 됩니다.
+
+#### Claude Code
+
+```text
+ai-symbiote 플러그인을 설치해줘.
+
+1. https://github.com/JunyoungJung/ai-symbiote 를 ~/ai-symbiote에 클론
+2. `bash scripts/build-all.sh` 실행해서 번들 빌드
+3. `bash platforms/claude/install.sh` 실행
+4. 설치된 절대 경로를 알려주고, 내가 `/plugin marketplace add <절대 경로>`와
+   `/plugin install ai-symbiote@ai-symbiote`를 이어서 실행할 수 있게 안내
+5. `python3 scripts/version_sync.py --check`로 버전 싱크 검증까지 수행
+```
+
+#### Codex CLI
+
+```text
+ai-symbiote 플러그인을 Codex CLI에 설치해줘.
+
+1. https://github.com/JunyoungJung/ai-symbiote 를 ~/ai-symbiote에 클론
+2. 저장소 루트로 이동 후 `bash platforms/codex/install.sh` 실행
+3. `~/.codex/config.toml`에 플러그인 활성화와 `codex_hooks = true`가 반영됐는지 확인
+4. `$ai-symbiote:setup` 실행 준비가 됐는지 알려줘
+```
+
+#### Cursor
+
+```text
+ai-symbiote 플러그인을 Cursor에 설치해줘.
+
+1. https://github.com/JunyoungJung/ai-symbiote 를 ~/ai-symbiote에 클론
+2. `bash platforms/cursor/install.sh` 실행
+3. `~/.cursor/plugins/local/ai-symbiote` 경로에 번들이 놓였는지 확인
+4. Cursor 재시작 또는 `Developer: Reload Window`가 필요함을 안내
+```
+
+세 플랫폼을 한 번에 설치하려면 위 프롬프트들을 합쳐 "Claude/Codex/Cursor 모두 설치해줘"처럼 요청해도 됩니다. 에이전트가 `bash scripts/build-all.sh`와 세 `install.sh`를 순차 실행합니다.
+
+> 자동 설치 중 에이전트가 시스템 경로 쓰기, `config.toml` 수정, 심볼릭 링크 생성 등을 요청할 수 있습니다. 필요한 권한만 승인하세요.
+
 ### Claude Code
 
 가장 간단한 경로는 로컬 저장소를 marketplace로 등록하는 방식입니다.
@@ -105,14 +148,16 @@ bash platforms/claude/install.sh
 설치 스크립트 실행 후 Claude 안에서:
 
 ```text
-/plugin marketplace add /Users/jimmy/Documents/GitHub/ai-symbiote
+/plugin marketplace add ~/ai-symbiote
 /plugin install ai-symbiote@ai-symbiote
 ```
+
+`~/ai-symbiote`는 사용자 홈 디렉터리(`$HOME`) 아래에 클론한 저장소 경로 예시입니다. 다른 위치에 클론했다면 해당 절대 경로로 바꿔 주세요. 현재 경로는 저장소 루트에서 `pwd`로 확인할 수 있습니다.
 
 한 번만 테스트하려면:
 
 ```bash
-claude --plugin-dir /Users/jimmy/Documents/GitHub/ai-symbiote/plugins/ai-symbiote
+claude --plugin-dir ~/ai-symbiote/plugins/ai-symbiote
 ```
 
 ### Codex CLI
