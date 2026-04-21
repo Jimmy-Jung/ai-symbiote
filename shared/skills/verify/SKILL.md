@@ -1,7 +1,7 @@
 ---
 name: verify
-description: "Write-time Verification Layer. Processes queued edits via cold-read reviewer + LLM judge to expose opaque decisions. Triggers on: verify, run verify, process verification, check reasoning, verify queue."
-argument-hint: [--all | --sha <sha> | --file <path> | --dry-run]
+description: "Write-time Verification Layer. Processes queued edits via cold-read reviewer + bounded LLM judge to expose opaque decisions. Triggers on: verify, run verify, process verification, check reasoning, verify queue."
+argument-hint: [--all | --sha <sha> | --file <path> | --dry-run | --max-batch <n> | --max-rewrites <n> | --pool-size <n> | --judge-strictness strict|standard | --judge-repo-scan]
 user-invocable: true
 allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Skill, Agent]
 ---
@@ -25,6 +25,29 @@ and the office-hours design doc (Stage 0 / Stage 1).
 If `codex` is unavailable, fall back to a Claude subagent (degraded mode).
 
 ## Workflow
+
+### Cost Safety Defaults
+
+The verification loop is intentionally adversarial, so it MUST be bounded:
+
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `--max-batch` | `10` | Maximum queue entries per invocation |
+| `--max-rewrites` | `2` | Maximum answer/rewrite rounds after the first attempt |
+| `--pool-size` | `5` | Reviewer question pool target before V2c selects K=3 |
+| `--judge-strictness` | `standard` | Verify factual claims strictly, but ignore clearly marked engineering judgment |
+| `--judge-repo-scan` | `off` | Judge must not browse the repository unless the user opts in |
+
+Budget policy:
+- Attempt count per entry is `1 + max_rewrites`.
+- When the budget is exhausted, write a FAIL artifact with
+  `budget_exhausted: true`, keep the queue entry, and move to the next entry.
+- Never loop indefinitely on V1 failure or `GAMING_DETECTED`.
+- The confirmation prompt MUST estimate worst-case cost using
+  `entries * (1 + max_rewrites)` judge rounds, not the happy path.
+- Record per-round elapsed time, status, and token usage when the model output
+  exposes token counters. If token counters are unavailable, record
+  `tokens: unknown`.
 
 ### Step 1: Queue read + filtering
 
@@ -55,7 +78,8 @@ No pending verifications for {project}/{branch}. Queue empty.
 - SHA def456 / file: src/bar.ts
 ...
 
-Estimated: ~60s × {N} = ~{total}s, ~${cost} USD.
+Estimated worst case: ~60s × {N} entries × {1 + max_rewrites} rounds
+= ~{total}s, ~${cost} USD.
 Proceed? [Y/n]
 ```
 
@@ -64,8 +88,9 @@ Proceed? [Y/n]
 - `N > 10` → process the first 10 only; leave the rest in the queue; user
   re-invokes for the next batch
 - `--max-batch <n>` overrides the default of 10 (cap is the operator's judgment)
-- `{cost}` estimate is ~$0.15 USD per entry (Codex medium-reasoning reviewer +
-  judge), deliberately conservative
+- `{cost}` estimate is ~$0.15 USD per reviewer/judge round multiplied by
+  `1 + max_rewrites`. This is a rough guardrail; the summary artifact is the
+  source of truth for observed time/tokens.
 
 `Y` → proceed to Step 2.5.
 `n` → exit (queue untouched).
@@ -101,7 +126,7 @@ PRE-FLIGHT MACHINE CHECKS:
 - test: (pre-flight: timeout)
 ```
 
-### Step 3: Reviewer call (per entry)
+### Step 3: Reviewer call (per entry, once)
 
 For each entry:
 
@@ -162,11 +187,13 @@ For each entry:
    Parse only `item.completed` / `agent_message` from the JSON stream to
    harvest questions.
 
-4. Persist the emitted questions and proceed to Step 3.5.
+4. Persist the emitted questions and proceed to Step 3.5. Do NOT call the
+   reviewer again during answer rewrites for the same entry unless the code diff
+   itself changed. Reusing the same question set keeps retry cost bounded.
 
 ### Step 3.5: Random question subset selection (V2c gaming defense — required)
 
-The reviewer emits 3 roles × 2-3 questions = **pool size N = 5~8**. The author
+The reviewer emits **pool size N = 5 by default**. The author
 answers a **randomly selected K = 3** subset of that pool. This blocks the
 attack where the author prepares answers to every possible question in advance
 (seeding).
@@ -180,8 +207,10 @@ attack where the author prepares answers to every possible question in advance
    reviewer hit a guardrail, or the reviewer produced near-duplicate output.
    Any of these would let an opaque edit bypass verification silently if we
    treated them as "trivial verification"
-3. `len(pool) ≥ 3` → seed the RNG with `sha + current_timestamp` for deterministic reproducibility of logs. Pick 3 independent entries from `pool`
-4. Pass only the K=3 to Step 4. Record unselected questions in the artifact's `skipped_by_v2c` section (transparency)
+3. If `len(pool) > pool_size`, keep the strongest role-balanced `pool_size`
+   questions and record dropped questions in the artifact.
+4. `len(pool) ≥ 3` → seed the RNG with `sha + current_timestamp` for deterministic reproducibility of logs. Pick 3 independent entries from `pool`
+5. Pass only the K=3 to Step 4. Record unselected questions in the artifact's `skipped_by_v2c` section (transparency)
 
 **Exception — `--all-questions` flag**:
 - Use for debugging only, when answering the full pool is desired
@@ -206,21 +235,33 @@ For each answer:
 - V1c no "I don't know / no reason" keywords (Korean "모르겠음 / 그냥" also rejected)
 - V1d mentions at least one alternative ("instead / could have / rejected / considered" — Korean "대신" also accepted)
 
-V1 fail → enter the rewrite loop immediately (regenerate the answer only).
+V1 fail → enter the bounded rewrite loop immediately (regenerate the answer
+only). If `max_rewrites` is exhausted, write a FAIL artifact and keep the queue
+entry instead of retrying again.
 
 ### Step 6: V2 Validator — LLM Judge Verifiability Check ⭐
 
 **Required mechanism**. Codex adjudication detects gaming.
 
 ```
-You are a strict LLM judge evaluating whether a code author's reasoning is
-CAUSALLY linked to the code, or post-hoc fabrication paraphrased from the PR body.
+You are a bounded LLM judge evaluating whether a code author's factual claims
+are CAUSALLY linked to the supplied evidence, or post-hoc fabrication
+paraphrased from the PR body.
 
 PASS = claims verifiable from code/artifacts (benchmark file, comments, referenced
 data, test case, or visible code structure).
 FAIL = claims plausible-but-fabricated. Numerical claims, measurements, or
 specific data without corresponding artifacts in the code = FAIL. Paraphrase of
 PR body text without independent evidence = FAIL.
+
+Ignore clearly labeled engineering judgment when it is not a factual claim, for
+example tradeoff language like "minor logging noise", "acceptable performance
+cost", or "future promotion path". Evaluate only whether factual claims are
+supported by the provided evidence.
+
+Repository exploration is disabled. Use only the evidence packet below. If the
+evidence is insufficient, mark the specific claim UNKNOWN and explain what
+artifact would be needed; do not run shell commands or inspect additional files.
 
 For each answer, output:
 - VERDICT: PASS | FAIL
@@ -229,13 +270,46 @@ For each answer, output:
 Final line: OVERALL: GAMING_DETECTED | GENUINE
 ```
 
-Judge call inputs: `(CODE, PR_BODY or commit_message, QUESTIONS, ANSWERS)`.
+Judge call inputs: bounded evidence packet:
+- commit message or PR body excerpt
+- collected diff
+- pre-flight summary
+- selected questions
+- current round answers only
+- optional previous round verdict summary, not full previous answers
 
 Judge model: default Codex (must differ in vendor from the author). Fall back
 to a Claude subagent only when the author is Codex.
 
-Judge returns `GAMING_DETECTED` → full rewrite loop.
+Judge invocation:
+```bash
+codex exec "$(cat "$JUDGE_PROMPT_FILE")" -C "$(git rev-parse --show-toplevel)" \
+  -s read-only -c 'model_reasoning_effort="medium"' --json < /dev/null
+```
+
+The local Codex CLI supports `read-only` sandboxing but does not expose a
+`--no-exec` flag. Therefore the prompt above is the hard contract: the judge
+must not run shell commands or inspect extra repository files unless
+`--judge-repo-scan` is explicitly supplied by the user. If `--judge-repo-scan`
+is on, record `repo_scan: true` in the artifact.
+
+Judge returns `GAMING_DETECTED` → bounded rewrite loop.
 Judge returns `GENUINE` + every V1 passes → verification PASS.
+
+### Step 6.5: Bounded rewrite loop
+
+For each entry:
+
+1. Set `attempt=1`.
+2. Set `max_attempts=1 + max_rewrites`.
+3. Run Step 4, Step 5, and Step 6.
+4. If V1 passes and V2b returns `GENUINE`, mark PASS.
+5. If V1 fails or V2b returns `GAMING_DETECTED`:
+   - if `attempt >= max_attempts`, mark FAIL with `budget_exhausted: true`
+   - otherwise increment `attempt` and regenerate/refine answers only
+6. Do not re-run pre-flight or reviewer during answer-only rewrites.
+7. Do not append full previous answers to the next judge prompt. Include only a
+   compact verdict summary such as `round 1: A2 unsupported measurement claim`.
 
 ### Step 7: Artifact persistence
 
@@ -250,6 +324,9 @@ File(s): <list>
 Reviewer: codex / <model>
 Judge: codex / <model>
 Result: PASS | FAIL
+Budget: max_rewrites=<n>, attempts=<n>, budget_exhausted=<true|false>
+Judge strictness: strict | standard
+Judge repo scan: false | true
 
 ## Pre-flight Machine Checks
 - typecheck: PASS | FAIL | (skipped)
@@ -278,6 +355,12 @@ A3: ...
   - A2: FAIL — ...
   - OVERALL: GENUINE | GAMING_DETECTED
 - V2c pool size: N, answered: K, bypassed: false
+
+## Round Metrics
+| Round | Stage | Status | Elapsed | Tokens |
+|-------|-------|--------|---------|--------|
+| 1 | reviewer | PASS | 12s | unknown |
+| 1 | judge | GAMING_DETECTED | 18s | 4109 |
 
 ## Rewrite Notes (if applicable)
 <feedback to author>
@@ -324,15 +407,17 @@ Rules (every question):
 
 ### Reviewer 1 — Intent Reviewer
 Check commit-message vs diff alignment. Out-of-scope additions. Missing pieces
-the message implies. Produce 2-3 questions.
+the message implies. Produce 1-2 questions.
 
 ### Reviewer 2 — Structural Reviewer
 Check why new abstractions/structures exist. Could simpler inline code have
-worked? Are existing utilities being re-implemented? Produce 2-3 questions.
+worked? Are existing utilities being re-implemented? Produce 1-2 questions.
 
 ### Reviewer 3 — Alternative Reviewer
 Check whether an obvious boring alternative was skipped. Custom impl vs
-stdlib/existing tooling. Produce 2-3 questions.
+stdlib/existing tooling. Produce 1-2 questions.
+
+Target total pool size: 5 questions. Prefer role coverage over quantity.
 
 ## Output
 
@@ -368,8 +453,8 @@ DIFF:
 
 ### V2 Gaming Resistance (Required Defense)
 - **V2a** PR body vs answer bigram overlap > 40% → seeding suspicion flag
-- **V2b** LLM judge verifiability check → `GAMING_DETECTED` = fail (the real block)
-- **V2c** Reviewer emits a pool of N=5~8; author answers only a random K=3 subset (see Step 3.5). Blocks predictive seeding. Only `--all-questions` can bypass.
+- **V2b** bounded LLM judge verifiability check → `GAMING_DETECTED` = retry/fail within `max_rewrites`
+- **V2c** Reviewer emits a pool of N=5 by default; author answers only a random K=3 subset (see Step 3.5). Blocks predictive seeding. Only `--all-questions` can bypass.
 
 Stage 0 empirical (2026-04-20): V1 alone let 3/3 gaming cases through. V2b judge
 is the real block; V2c randomization raises the attacker's preparation cost.
@@ -405,6 +490,13 @@ that each `Agent` invocation is an independent session.
 - `--file <path>`: process entries related to the given file only
 - `--dry-run`: print queue contents and exit without calling out to models
 - `--max-batch <n>`: override the default 10-entry per-invocation cap (Step 2)
+- `--max-rewrites <n>`: override the default 2 answer rewrite rounds
+- `--pool-size <n>`: override the default reviewer pool size of 5. Minimum is 3
+- `--judge-strictness strict|standard`: `standard` ignores clearly labeled
+  engineering judgment and verifies factual claims; `strict` preserves the
+  original all-claims-must-have-artifacts behavior
+- `--judge-repo-scan`: allow the judge to inspect repository files beyond the
+  supplied evidence packet. Off by default because it can multiply token cost
 - `--all-questions`: bypass V2c randomization and answer the full pool. Debug-only, forbidden in production.
 
 ## Related Skills
@@ -417,6 +509,10 @@ that each `Agent` invocation is an independent session.
 
 - **Never skip V2b judge check**. V1 alone cannot detect gaming (Stage 0 empirical).
 - **Never skip V2c randomization**. `--all-questions` is debug-only; any production artifact carrying `v2c_bypassed: true` is an invalid verification.
+- **Never run unbounded rewrites**. Respect `max_rewrites`; on exhaustion,
+  write FAIL and move on.
+- **Never let the judge browse the repo by default**. Use the bounded evidence
+  packet unless the user explicitly passes `--judge-repo-scan`.
 - **Judge model MUST differ from the author's vendor**. Config override forbidden.
 - **Every artifact lives under `.ai-symbiote/qa/`**. Permanent path that can be linked from a PR body.
 - **Delete queue entries only after PASS**. FAIL stays in the queue and retries on the next `/verify`.
