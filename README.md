@@ -52,11 +52,11 @@ flowchart LR
     G --> H["Claude / Codex / Cursor bundle"]
 ```
 
-- 공용 스킬: `shared/skills/` 32개
-- 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 22개
+- 공용 스킬: `shared/skills/` 33개 (v0.11에서 `/verify` 추가)
+- 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 23개 (v0.11에서 `verify-queue.sh` 추가)
 - 시드 규칙: `shared/harness-seeds/` 5개
-- 테스트 스크립트: `tests/` 30개
-- 현재 버전: `0.10.8`
+- 테스트 스크립트: `tests/` 32개 (v0.11에서 `test-verify-queue.sh`, `test-setup-check-verify.sh` 추가)
+- 현재 버전: `0.11.0`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
 ## 빠른 이해를 위한 핵심 개념
