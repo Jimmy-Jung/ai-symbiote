@@ -74,6 +74,24 @@ if [ -z "$MATCHED" ]; then
   esac
 fi
 
+# Path-based match: ai-symbiote's own manifest.json. The file lives under
+# ~/ai-symbiote/<slug>/manifest.json (or a SYMBIOTE_HOME override) and
+# controls security.mode + security.hooks.*, so letting an AI-triggered
+# Edit/Write mutate it would bypass the entire restriction layer. Users
+# who need to change it interactively can set SYMBIOTE_ALLOW_CONFIG_EDIT=1
+# or use the /security mode subcommand (it writes through a Python script
+# invoked via Bash, not through the Write/Edit tool, so it bypasses this
+# hook legitimately).
+if [ -z "$MATCHED" ] && [ "$BASENAME" = "manifest.json" ]; then
+  SYMBIOTE_ROOT="${SYMBIOTE_HOME:-$HOME/ai-symbiote}"
+  case "$FILE_PATH" in
+    "$SYMBIOTE_ROOT"/*)
+      MATCHED="yes"
+      BASENAME="manifest.json (ai-symbiote kill-switch)"
+      ;;
+  esac
+fi
+
 # --- 9. Block or continue ---
 if [ -n "$MATCHED" ]; then
   emit_pretool_deny "[Config Protection] $BASENAME is protected. Fix the code instead of weakening the config. Override: set SYMBIOTE_ALLOW_CONFIG_EDIT=1"

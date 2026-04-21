@@ -56,14 +56,31 @@ _SEC_MODE_HOOK_NAMES=(
   verifyQueue
 )
 
-# Return the absolute path to the security-mode cache for the current slug.
-# The caller is responsible for ensuring the parent directory exists.
+# Return the absolute path to the security-mode cache for the current slug,
+# or empty when the cache location is unsafe (symlinked state/ or symlinked
+# cache file). We refuse to follow symlinks here because the cache content
+# directly controls whether gated hooks run — letting a symlinked cache
+# point to an attacker-writable file would defeat the whole mechanism
+# (same symmetry as verify-queue.sh's refusal to write through a symlinked
+# queue file).
 _sec_mode_cache_path() {
-  local state_dir
+  local state_dir state_subdir cache_file
   state_dir=$(get_state_dir 2>/dev/null) || return 1
   [ -z "$state_dir" ] && return 1
-  mkdir -p "$state_dir/state" 2>/dev/null || true
-  printf '%s/state/security-mode.cache' "$state_dir"
+  state_subdir="$state_dir/state"
+  cache_file="$state_subdir/security-mode.cache"
+  # Refuse a symlinked state/ dir — creating files through it would land
+  # outside the project's ai-symbiote home.
+  if [ -L "$state_subdir" ]; then
+    return 1
+  fi
+  mkdir -p "$state_subdir" 2>/dev/null || true
+  # Refuse a symlinked cache file itself. The file may not exist yet, which
+  # is fine; we only reject if it exists AND is a symlink.
+  if [ -e "$cache_file" ] && [ -L "$cache_file" ]; then
+    return 1
+  fi
+  printf '%s' "$cache_file"
 }
 
 # Return the manifest.json path for the current slug, or empty string when
@@ -193,6 +210,13 @@ _sec_mode_is_known_hook() {
   return 1
 }
 
+# Version marker — callers can probe this to detect that the helper loaded
+# cleanly. A cold `source` failure plus `trap 'exit 0' ERR` on the calling
+# hook would silently disable the hook because `is_hook_enabled` would be
+# command-not-found and `if ! is_hook_enabled …` would be true. The wrapper
+# in each hook checks `_SEC_MODE_LIB_LOADED` and fails OPEN if absent.
+_SEC_MODE_LIB_LOADED=1
+
 # Public API: is the named hook enabled for the current project?
 #
 # Exit codes:
@@ -213,11 +237,35 @@ is_hook_enabled() {
   # Test hook: allow forcing a specific outcome from a test harness without
   # touching the user's real manifest. Values: "on", "off". Any other value
   # is ignored.
-  if [ -n "${SYMBIOTE_SECURITY_FORCE:-}" ]; then
+  #
+  # IMPORTANT: The override ONLY activates when SYMBIOTE_TESTING=1 is also
+  # set. This double-gate prevents a stray environment export in a user's
+  # shell (e.g. inherited from CI, .zshrc, or a prompt-injected subshell)
+  # from silently disabling every restriction hook. When the override fires,
+  # we emit a single stderr warning per process so the user always sees
+  # evidence of the bypass in their logs.
+  if [ -n "${SYMBIOTE_SECURITY_FORCE:-}" ] && [ "${SYMBIOTE_TESTING:-0}" = "1" ]; then
     case "$SYMBIOTE_SECURITY_FORCE" in
-      off) return 1 ;;
-      on) return 0 ;;
+      off)
+        [ -z "${_SEC_MODE_FORCE_WARNED:-}" ] && {
+          printf >&2 '[security-mode] WARNING: SYMBIOTE_SECURITY_FORCE=off is disabling every gated hook (hook=%s). Unset SYMBIOTE_TESTING to restore normal behavior.\n' "$hook_name"
+          export _SEC_MODE_FORCE_WARNED=1
+        }
+        return 1
+        ;;
+      on)
+        return 0
+        ;;
     esac
+  fi
+  # Legacy safety net: if SYMBIOTE_SECURITY_FORCE is set WITHOUT the TESTING
+  # gate, warn once and ignore it. This preserves test-suite compatibility
+  # during the migration window — tests must opt in to the gate explicitly.
+  if [ -n "${SYMBIOTE_SECURITY_FORCE:-}" ] && [ "${SYMBIOTE_TESTING:-0}" != "1" ]; then
+    [ -z "${_SEC_MODE_UNGATED_WARNED:-}" ] && {
+      printf >&2 '[security-mode] WARNING: SYMBIOTE_SECURITY_FORCE is set but SYMBIOTE_TESTING!=1; ignoring override (set SYMBIOTE_TESTING=1 to activate).\n'
+      export _SEC_MODE_UNGATED_WARNED=1
+    }
   fi
 
   # Reject unknown names up front so a renamed hook or typo cannot be

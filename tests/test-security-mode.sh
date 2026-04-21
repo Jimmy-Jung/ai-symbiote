@@ -144,19 +144,30 @@ FORCE_OFF=$(
   printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
   (
     source "$LIB"
-    SYMBIOTE_SECURITY_FORCE=off is_hook_enabled guardShell && printf on || printf off
-  )
+    SYMBIOTE_TESTING=1 SYMBIOTE_SECURITY_FORCE=off is_hook_enabled guardShell && printf on || printf off
+  ) 2>/dev/null
 )
-assert_eq "FORCE=off overrides balanced" "off" "$FORCE_OFF"
+assert_eq "FORCE=off + TESTING=1 overrides balanced" "off" "$FORCE_OFF"
 FORCE_ON=$(
   rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
   printf '%s' "$MIN" > "$HARNESS_TEST_STATE_DIR/manifest.json"
   (
     source "$LIB"
-    SYMBIOTE_SECURITY_FORCE=on is_hook_enabled guardShell && printf on || printf off
-  )
+    SYMBIOTE_TESTING=1 SYMBIOTE_SECURITY_FORCE=on is_hook_enabled guardShell && printf on || printf off
+  ) 2>/dev/null
 )
-assert_eq "FORCE=on overrides minimal" "on" "$FORCE_ON"
+assert_eq "FORCE=on + TESTING=1 overrides minimal" "on" "$FORCE_ON"
+# Regression: Codex adversarial finding — FORCE without TESTING must be
+# ignored (otherwise a stray env export silently disables all hooks).
+FORCE_UNGATED=$(
+  rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+  printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+  (
+    source "$LIB"
+    SYMBIOTE_SECURITY_FORCE=off is_hook_enabled guardShell && printf on || printf off
+  ) 2>/dev/null
+)
+assert_eq "FORCE=off without TESTING=1 is IGNORED" "on" "$FORCE_UNGATED"
 
 # --- Case 10: cache rebuild on manifest mtime change ---
 echo ""

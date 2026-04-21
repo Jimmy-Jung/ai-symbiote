@@ -24,10 +24,9 @@ set +e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
 # shellcheck source=lib/security-mode.sh
-source "$SCRIPT_DIR/lib/security-mode.sh"
-
-# Gate: opted-out projects skip auto-rule-learning entirely.
-if ! is_hook_enabled harnessLearn; then
+# Defensive load: a source failure must not silently disable the hook.
+source "$SCRIPT_DIR/lib/security-mode.sh" 2>/dev/null || true
+if [ "${_SEC_MODE_LIB_LOADED:-0}" = "1" ] && ! is_hook_enabled harnessLearn; then
   exit 0
 fi
 
