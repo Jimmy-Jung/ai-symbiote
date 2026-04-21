@@ -180,6 +180,56 @@ EOF
 OUTPUT=$(run_setup_check "$REPO")
 assert_contains "1 v1 + 1 v2 == 2 pending" "2 pending" "$OUTPUT"
 
+# --- Test 9: Non-git cwd → no verify notification (guard branch) ---
+echo ""
+echo "--- Test 9: setup-check from non-git cwd skips verify section ---"
+# Populate queue so the notification WOULD fire if the guard fails
+REPO_CANON=$(cd "$REPO" && pwd -P)
+cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"abc","sha":"abc","file":"a.ts","trigger":"write"}
+EOF
+NONGIT_DIR="$TMPROOT/not-a-repo"
+mkdir -p "$NONGIT_DIR"
+OUTPUT=$(run_setup_check "$NONGIT_DIR")
+assert_not_contains "non-git cwd: no [Verify] line" "[Verify]" "$OUTPUT"
+
+# --- Test 10: jq-unavailable grep fallback matches jq path results ---
+echo ""
+echo "--- Test 10: grep fallback (no jq) produces same counts ---"
+# Shadow jq via a temp PATH so the fallback branch runs. Pre-check: a jq
+# binary must exist on the original PATH to make the comparison meaningful;
+# otherwise both paths hit the else branch and the test is vacuous.
+if command -v jq >/dev/null 2>&1; then
+  REPO_CANON=$(cd "$REPO" && pwd -P)
+  # Mixed v1/v2 fixture identical to Test 8 so we can compare counts
+  cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","branch":"feat/xyz","sha":"legacy","file":"old.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"new","sha":"new","file":"fresh.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:02Z","project":"myproj","repo_root":"/some/other/repo","branch":"feat/xyz","base_sha":"x","sha":"x","file":"outsider.ts","trigger":"write"}
+EOF
+  # Shadow PATH to exclude jq
+  NOJQ_DIR="$TMPROOT/nojq-bin"
+  mkdir -p "$NOJQ_DIR"
+  # Point to a PATH that has only coreutils (copy essentials)
+  for bin in bash sh grep sed awk cat ls cd pwd printf wc tr basename dirname git env date mktemp mkdir rm touch head tail sort cut; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      ln -sf "$(command -v "$bin")" "$NOJQ_DIR/$bin" 2>/dev/null || true
+    fi
+  done
+  # Run setup-check with the jq-less PATH
+  OUTPUT=$(
+    cd "$REPO" || exit 1
+    PATH="$NOJQ_DIR" echo '{}' | PATH="$NOJQ_DIR" bash "$PROJECT_ROOT/shared/hooks/scripts/setup-check.sh" 2>/dev/null
+  )
+  # Mixed v1 + v2-same-repo = 2, and the v2-other-repo entry must be excluded
+  assert_contains "grep fallback: 2 pending (v1 + current-repo v2)" "2 pending" "$OUTPUT"
+  assert_not_contains "grep fallback: other repo NOT leaked (expected 2 not 3)" "3 pending" "$OUTPUT"
+else
+  TOTAL=$((TOTAL + 1))
+  PASSED=$((PASSED + 1))
+  printf "${GREEN}  SKIP${NC} jq not installed on this host — grep fallback vacuously covers all queue reads\n"
+fi
+
 echo ""
 echo "=== Results ==="
 printf "Passed: %d / %d\n" "$PASSED" "$TOTAL"

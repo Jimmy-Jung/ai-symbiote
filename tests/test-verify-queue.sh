@@ -306,9 +306,19 @@ assert_not_contains "twin entry does NOT carry original path" "\"repo_root\":\"$
 assert_contains "original entry project is basename" "\"project\":\"$REPO_BASENAME\"" "$ORIG_ENTRY"
 assert_contains "twin entry project is same basename" "\"project\":\"$REPO_BASENAME\"" "$TWIN_ENTRY"
 
-# --- Test 11: Exit code is always 0 (never blocks agent) ---
+# --- Test 11: tool_name missing → trigger defaults to "write" ---
 echo ""
-echo "--- Test 11: Exit code is 0 even with malformed JSON ---"
+echo "--- Test 11: Missing tool_name defaults trigger to 'write' ---"
+reset_queue
+mkdir -p "$REPO/src"
+INPUT='{"tool_input":{"file_path":"'"$REPO"'/src/no_tool_name.ts"}}'
+run_hook "$INPUT" >/dev/null
+QUEUE_LINE=$(cat "$QUEUE_FILE")
+assert_contains "no tool_name → trigger=write default" '"trigger":"write"' "$QUEUE_LINE"
+
+# --- Test 12: Exit code is always 0 (never blocks agent) ---
+echo ""
+echo "--- Test 12: Exit code is 0 even with malformed JSON ---"
 reset_queue
 set +e
 printf 'not json at all' | bash "$HOOK_SCRIPT" >/dev/null 2>&1

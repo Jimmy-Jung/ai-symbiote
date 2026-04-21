@@ -386,9 +386,13 @@ if [ -f "$VERIFY_QUEUE" ]; then
     else
       # jq unavailable: match entries that contain our repo_root literal OR
       # (lack repo_root AND match project+branch). Two grep passes avoid
-      # false positives.
-      _VQ_V2=$(grep "\"repo_root\":\"$_VQ_REPO_ROOT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
-      _VQ_V1=$(grep -v "\"repo_root\":" "$VERIFY_QUEUE" 2>/dev/null | grep "\"project\":\"$_VQ_PROJECT\"" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      # false positives. Use `grep -F` (fixed-string) so filesystem paths
+      # and branch names containing regex metachars (`.`, `+`, `[`) are
+      # compared literally — this path must stay behaviorally identical
+      # to the jq branch above; update both together when filtering rules
+      # change.
+      _VQ_V2=$(grep -F "\"repo_root\":\"$_VQ_REPO_ROOT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      _VQ_V1=$(grep -v '"repo_root":' "$VERIFY_QUEUE" 2>/dev/null | grep -F "\"project\":\"$_VQ_PROJECT\"" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
       _VQ_PENDING=$((_VQ_V2 + _VQ_V1))
     fi
     _VQ_PENDING=${_VQ_PENDING:-0}

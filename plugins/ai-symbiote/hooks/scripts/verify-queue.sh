@@ -81,7 +81,9 @@ BASE_SHA=$(cd "$REPO_ROOT" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null
 [ -z "$BASE_SHA" ] && BASE_SHA="uncommitted"
 
 # Legacy `sha` field retained for backward compatibility with pre-0.11 consumers.
-# New consumers must read `base_sha`. Remove `sha` at next major version bump.
+# New consumers must read `base_sha`.
+# TODO(0.12.0): drop legacy `sha` field from the emitted queue entry; see
+# CHANGELOG entry for the v2 schema introduction (2026-04-21).
 SHA="$BASE_SHA"
 
 # --- 4. Escape fields for JSON ---
