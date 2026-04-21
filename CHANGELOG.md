@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.1] - 2026-04-21
+
+### Fixed
+- **Issue #14 해결: `guard-shell.sh` 삭제 경로 차단 오탐 완화** — `rm -rf /` 부분 문자열 glob 차단을 실제 실행 구간 기반 검사로 교체. `/tmp`, `/var/tmp`, `/var/folders`, 프로젝트 하위 경로 정리는 허용하고, 루트·시스템 top-level 삭제는 계속 차단
+- **이슈 본문·문서화 예시 문자열 허용** — `gh issue create --body "example: rm -rf /tmp/foo"`처럼 문자열 안에 포함된 예시가 실제 `rm` 실행으로 오인되지 않도록 회귀 테스트 추가
+- **BSD grep 호환성 보정** — SEC-005 export secret 정규식의 문자 범위를 POSIX/BSD grep에서 오류 없이 동작하도록 수정
+
 ## [0.12.0] - 2026-04-21
 
 ### Added
