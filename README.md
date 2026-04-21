@@ -50,6 +50,15 @@ flowchart LR
     E --> F["~/ai-symbiote/{slug}<br/>manifest/context/logs/state"]
     C --> G["platform overlays"]
     G --> H["Claude / Codex / Cursor bundle"]
+
+    style A fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style B fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style C fill:#dcfce7,stroke:#15803d,color:#111827
+    style D fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style E fill:#fef3c7,stroke:#b45309,color:#111827
+    style F fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style G fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style H fill:#dcfce7,stroke:#15803d,color:#111827
 ```
 
 - 공용 스킬: `shared/skills/` 33개 (v0.11에서 `/verify` 추가, v0.12에서 `/security mode` 서브커맨드 추가)
@@ -110,6 +119,16 @@ flowchart LR
     F --> G{"답변이 실제 코드로<br/>뒷받침 되나?"}
     G -->|예| H["✅ 리뷰 기록 저장"]
     G -->|아니오| I["❌ 다시 짜세요"]
+
+    style A fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style B fill:#fef3c7,stroke:#b45309,color:#111827
+    style C fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style D fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style E fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style F fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style G fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style H fill:#dcfce7,stroke:#15803d,color:#111827
+    style I fill:#fee2e2,stroke:#b91c1c,color:#111827
 ```
 
 **세 가지 설계 포인트** (왜 이렇게?):
@@ -472,6 +491,36 @@ flowchart TD
     U["Stop"] --> V["cost-tracker.sh"]
     U --> W["instinct-observer.sh"]
     U --> X["next-action.sh"]
+
+    style A fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style B fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style C fill:#fef3c7,stroke:#b45309,color:#111827
+    style D fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style E fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style F fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style G fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style H fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style I fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style I1 fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style I2 fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style J fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style K fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style L fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style M fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style L2 fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style M2 fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style N fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style O fill:#fef3c7,stroke:#b45309,color:#111827
+    style P fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style Q fill:#fef3c7,stroke:#b45309,color:#111827
+    style R fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style R2 fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style S fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style T fill:#fee2e2,stroke:#b91c1c,color:#111827
+    style U fill:#e5e7eb,stroke:#6b7280,color:#111827
+    style V fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style W fill:#dbeafe,stroke:#1d4ed8,color:#111827
+    style X fill:#dcfce7,stroke:#15803d,color:#111827
 ```
 
 ### 훅/유틸 스크립트 전체 목록
