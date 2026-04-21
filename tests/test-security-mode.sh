@@ -233,9 +233,20 @@ printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
   is_hook_enabled guardShell >/dev/null
 )
 CACHE_PATH="$HARNESS_TEST_STATE_DIR/state/security-mode.cache"
-CACHE_KEYS=$(awk -F= '{print $1}' "$CACHE_PATH" | tr '\n' ',' | sed 's/,$//')
-assert_eq "cache has all 6 expected keys" "mode,guardShell,securityGuard,harnessLearn,commentChecker,verifyQueue" "$CACHE_KEYS"
-# Ensure no tempfile leaked alongside the cache
+# v2 스키마: mode + 5 hook + 22 feature = 28 라인
+TOTAL_LINES=$(wc -l < "$CACHE_PATH" | tr -d ' ')
+# v2 스키마: 1 mode + 5 hooks + 29 features = 35 (또는 마지막 newline 없으면 34+)
+assert_eq "cache has mode+hooks+features (≥34 lines)" "yes" "$([ "$TOTAL_LINES" -ge 34 ] && echo yes || echo no)"
+# 핵심 hook 5개가 모두 hook-level 라인으로 포함됐는지
+for h in guardShell securityGuard harnessLearn commentChecker verifyQueue; do
+  COUNT=$(awk -F= -v k="$h" '$1==k' "$CACHE_PATH" | wc -l | tr -d ' ')
+  assert_eq "cache has hook-level $h" "1" "$COUNT"
+done
+# 대표 feature 샘플 확인
+for f in "guardShell.echoSecrets" "securityGuard.xssRisk" "commentChecker.tagComments"; do
+  COUNT=$(awk -F= -v k="$f" '$1==k' "$CACHE_PATH" | wc -l | tr -d ' ')
+  assert_eq "cache has feature $f" "1" "$COUNT"
+done
 LEAKED=$(find "$HARNESS_TEST_STATE_DIR/state" -name 'security-mode.cache.*' 2>/dev/null | wc -l | tr -d ' ')
 assert_eq "no leaked tempfile beside cache" "0" "$LEAKED"
 
@@ -279,10 +290,102 @@ CACHE_PATH="$HARNESS_TEST_STATE_DIR/state/security-mode.cache"
 HAS_ATTACKER=$(awk -F= '$1=="attackerAdded"' "$CACHE_PATH" 2>/dev/null | wc -l | tr -d ' ')
 HAS_ATTACKER=${HAS_ATTACKER:-0}
 assert_eq "attackerAdded is NOT written to cache" "0" "$HAS_ATTACKER"
-KEYS_COUNT=$(awk -F= '$1!="mode" {print $1}' "$CACHE_PATH" 2>/dev/null | sort -u | wc -l | tr -d ' ')
-KEYS_COUNT=${KEYS_COUNT:-0}
-assert_eq "exactly 5 canonical hooks in cache" "5" "$KEYS_COUNT"
+# v2 스키마: hook-level 5개 + dotted feature 22개 = 27 (mode 제외)
+HOOK_LINES=$(awk -F= '$1!="mode" && $1 !~ /\./ {print $1}' "$CACHE_PATH" 2>/dev/null | sort -u | wc -l | tr -d ' ')
+HOOK_LINES=${HOOK_LINES:-0}
+assert_eq "exactly 5 canonical hook-level keys" "5" "$HOOK_LINES"
+FEATURE_LINES=$(awk -F= '$1 ~ /\./' "$CACHE_PATH" 2>/dev/null | wc -l | tr -d ' ')
+FEATURE_LINES=${FEATURE_LINES:-0}
+assert_eq "29 canonical feature-level keys (16 guardShell + 6 securityGuard + 4 harnessLearn + 3 commentChecker)" "29" "$FEATURE_LINES"
 set -e
+
+# --- Case 16: is_feature_enabled — 신규 feature-level API ---
+echo ""
+echo "--- Case 16: is_feature_enabled semantics ---"
+
+# 16a: balanced 모드에서 모든 feature on
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+FEAT_CHECK=$(
+  source "$LIB"
+  if is_feature_enabled guardShell echoSecrets; then printf on; else printf off; fi
+)
+assert_eq "balanced: guardShell.echoSecrets on" "on" "$FEAT_CHECK"
+
+# 16b: minimal 모드에서 모든 feature off
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+printf '%s' "$MIN" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+FEAT_CHECK=$(
+  source "$LIB"
+  if is_feature_enabled guardShell echoSecrets; then printf on; else printf off; fi
+)
+assert_eq "minimal: guardShell.echoSecrets off" "off" "$FEAT_CHECK"
+
+# 16c: custom 모드에서 feature별 토글 (신 스키마)
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+cat > "$HARNESS_TEST_STATE_DIR/manifest.json" <<'JSON'
+{"security":{"mode":"custom","features":{
+  "guardShell":{"enabled":true,"echoSecrets":false,"chmod777":true},
+  "securityGuard":{"enabled":true,"xssRisk":false}
+}}}
+JSON
+FEAT_OFF=$(source "$LIB"; is_feature_enabled guardShell echoSecrets && printf on || printf off)
+FEAT_ON=$(source "$LIB"; is_feature_enabled guardShell chmod777 && printf on || printf off)
+FEAT_DEFAULT=$(source "$LIB"; is_feature_enabled guardShell authHeaderLeak && printf on || printf off)
+FEAT_XSS=$(source "$LIB"; is_feature_enabled securityGuard xssRisk && printf on || printf off)
+assert_eq "custom: explicit echoSecrets off" "off" "$FEAT_OFF"
+assert_eq "custom: explicit chmod777 on" "on" "$FEAT_ON"
+assert_eq "custom: unspecified authHeaderLeak = fail-open" "on" "$FEAT_DEFAULT"
+assert_eq "custom: explicit xssRisk off" "off" "$FEAT_XSS"
+
+# 16d: hook 전체 off → feature도 자동 off
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+cat > "$HARNESS_TEST_STATE_DIR/manifest.json" <<'JSON'
+{"security":{"mode":"custom","features":{
+  "guardShell":{"enabled":false,"echoSecrets":true}
+}}}
+JSON
+FEAT_CASCADE=$(source "$LIB"; is_feature_enabled guardShell echoSecrets && printf on || printf off)
+assert_eq "hook disabled → feature off (cascade)" "off" "$FEAT_CASCADE"
+
+# 16e: unknown feature 이름 → fail-open
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+printf '%s' "$MIN" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+UNKNOWN_FEAT=$(source "$LIB"; is_feature_enabled guardShell notARealFeature && printf on || printf off)
+assert_eq "unknown feature name → fail-open" "on" "$UNKNOWN_FEAT"
+
+# 16f: 구 스키마 security.hooks.<name>: bool → backward compat (features.<name>.enabled와 동등)
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+cat > "$HARNESS_TEST_STATE_DIR/manifest.json" <<'JSON'
+{"security":{"mode":"custom","hooks":{"guardShell":false,"securityGuard":true}}}
+JSON
+LEGACY_OFF=$(source "$LIB"; is_hook_enabled guardShell && printf on || printf off)
+LEGACY_ON=$(source "$LIB"; is_hook_enabled securityGuard && printf on || printf off)
+LEGACY_FEAT_OFF=$(source "$LIB"; is_feature_enabled guardShell echoSecrets && printf on || printf off)
+LEGACY_FEAT_ON=$(source "$LIB"; is_feature_enabled securityGuard xssRisk && printf on || printf off)
+assert_eq "legacy hooks.guardShell=false → hook off" "off" "$LEGACY_OFF"
+assert_eq "legacy hooks.securityGuard=true → hook on" "on" "$LEGACY_ON"
+assert_eq "legacy hook off → feature cascades off" "off" "$LEGACY_FEAT_OFF"
+assert_eq "legacy hook on → feature fail-open on" "on" "$LEGACY_FEAT_ON"
+
+# 16g: 빈 feature 이름 → is_hook_enabled와 동일하게 동작 (API 편의)
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+EMPTY_FEAT=$(source "$LIB"; is_feature_enabled guardShell "" && printf on || printf off)
+assert_eq "empty feature name → delegates to is_hook_enabled" "on" "$EMPTY_FEAT"
+
+# --- Case 17: get_security_matrix 출력 ---
+echo ""
+echo "--- Case 17: get_security_matrix diagnostic ---"
+rm -rf "$HARNESS_TEST_STATE_DIR" && mkdir -p "$HARNESS_TEST_STATE_DIR/state"
+printf '%s' "$BAL" > "$HARNESS_TEST_STATE_DIR/manifest.json"
+MATRIX_OUT=$(source "$LIB"; get_security_matrix)
+HAS_MODE=$(printf '%s' "$MATRIX_OUT" | grep -c "^mode=" | tr -d ' ')
+HAS_HOOK=$(printf '%s' "$MATRIX_OUT" | grep -c "^guardShell=" | tr -d ' ')
+HAS_FEATURE=$(printf '%s' "$MATRIX_OUT" | grep -c "^guardShell.echoSecrets=" | tr -d ' ')
+assert_eq "matrix includes mode line" "1" "$HAS_MODE"
+assert_eq "matrix includes hook-level entry" "1" "$HAS_HOOK"
+assert_eq "matrix includes feature-level entry" "1" "$HAS_FEATURE"
 
 echo ""
 echo "=== Results ==="

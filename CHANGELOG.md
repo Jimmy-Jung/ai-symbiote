@@ -2,17 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.12.0] - 2026-04-21
 
 ### Added
-- **Configurable AI-restriction security modes** — 사용자가 어느 hook을 켜고 끌지 직접 선택 가능. 네 가지 preset(`minimal` 전부 off / `balanced` 기본 전부 on / `strict` 예약 / `custom` 개별 토글)을 `manifest.json`의 `security.mode` + `security.hooks.*`에 저장. 현재 게이트 대상 5종: `guardShell`, `securityGuard`, `harnessLearn`, `commentChecker`, `verifyQueue`
+- **Configurable AI-restriction security modes** — 사용자가 어느 hook을 켜고 끌지 직접 선택 가능. 네 가지 preset (`minimal` 전부 off / `balanced` 기본 전부 on / `strict` 예약 / `custom` 개별 토글)을 `manifest.json`의 `security.mode` + `security.hooks.*`에 저장. 현재 게이트 대상 5종: `guardShell`, `securityGuard`, `harnessLearn`, `commentChecker`, `verifyQueue`
 - **`shared/hooks/scripts/lib/security-mode.sh` runtime gate** — 매 hook 상단에 `is_hook_enabled "<name>" || exit 0` 1줄로 게이팅. 결과는 `~/ai-symbiote/{slug}/state/security-mode.cache`에 평문 `key=value` 형식으로 캐시되어 hot path 오버헤드 <5ms. 캐시는 manifest mtime 변화 시 자동 재빌드, `/security mode`로 변경 시 즉시 무효화. Claude Code 재시작 없이 적용됨
 - **`/security mode [preset]` 서브커맨드** — 현재 모드 + hook별 효과적 상태 표시 또는 preset 전환. `--hooks JSON`으로 custom 모드의 개별 토글을 한 번에 전달 가능
-- **Setup skill Step 4.6** — AI-driven 2단계 guided flow에 security mode 선택 단계 추가. `security-mode-apply.sh` helper가 manifest.json을 변경
-- **테스트 44 케이스** — `test-security-mode.sh` 39 케이스(unit) + `test-security-mode-integration.sh` 9 케이스(end-to-end, 5개 hook 게이팅 실증). `/verify` adversarial reviewer가 지적한 5건(single-source-of-truth, dead code, atomic write, grep→awk exact match, empty manifest hardening) 회귀 방지 케이스 포함
+- **Setup skill Step 4.6** — AI-driven 2단계 guided flow에 security mode 선택 단계 추가. `security-mode-apply.sh` helper가 manifest.json을 안전하게 변경
+- **Manifest kill-switch 보호** — `config-protection.sh`에 path-based rule 추가. AI의 Write/Edit 도구로 `~/ai-symbiote/<slug>/manifest.json`을 직접 수정하려 하면 차단. `/security mode` 서브커맨드는 Python 직접 호출이라 정당히 통과. 사용자 직접 편집은 `SYMBIOTE_ALLOW_CONFIG_EDIT=1`로 override 가능
+- **테스트 48 케이스** — `test-security-mode.sh` 40 케이스(unit, SYMBIOTE_TESTING gate 회귀 포함) + `test-security-mode-integration.sh` 9 케이스(end-to-end, 5개 hook 게이팅 실증)
 
 ### Fixed
-- **`/verify` skill diff contract — 신규 파일 처리 갭** — `base_sha`에 존재하지 않는 신규 파일을 `git diff <base_sha> -- <file>`로 읽으면 빈 diff 반환. `git cat-file -e`로 base_sha 존재 여부 확인 후 신규 파일이면 `git diff --no-index /dev/null <file>`로 전체 내용을 reviewer에게 전달. Dogfood 중 첫 `/verify` 실행에서 발견
+- **`/verify` skill diff contract — 신규 파일 처리 갭** — `base_sha`에 존재하지 않는 신규 파일을 `git diff <base_sha> -- <file>`로 읽으면 빈 diff 반환. `git cat-file -e`로 base_sha 존재 여부 확인 후 신규 파일이면 `git diff --no-index /dev/null <file>`로 전체 내용을 reviewer에게 전달
+- **Helper source 실패가 hook silent disable로 이어지던 문제** — `source lib/security-mode.sh` 실패 시 `is_hook_enabled`가 command-not-found가 되어 `if ! is_hook_enabled`가 true가 되고 hook이 조용히 exit 0 하던 우회 경로. `_SEC_MODE_LIB_LOADED` sentinel 도입, 5 hook 모두 fail-open으로 전환 (load 실패 시 hook 정상 실행)
+- **Cache poisoning via symlink** — `state/security-mode.cache`가 symlink이면 공격자가 attacker-writable 경로로 리다이렉트 가능. `_sec_mode_cache_path`에 symlink 거부 추가 (`verify-queue.sh`의 symlink guard와 동일 패턴)
+- **`SYMBIOTE_SECURITY_FORCE` 프로덕션 footgun** — 과거에는 env variable 하나만 set되면 모든 gated hook이 무음. 이제 `SYMBIOTE_TESTING=1` double-gate 필요, 게이트 통과 시 stderr에 경고. 게이트 없는 override는 경고 후 무시
+- **Concurrent manifest write 부분 손상 방지** — `security-mode-apply.sh`의 manifest 업데이트를 tempfile + rename 패턴으로 정비 (설계 차원 기본은 이미 python json.dumps이지만 재검증)
+
+### Deferred (v0.13+ 설계 검토)
+- **동시 cache rebuild race** — 두 hook이 동시에 `_sec_mode_rebuild_cache`를 실행하면 파이썬 spawn 이중으로 낭비. correctness는 영향 없음 (atomic rename), 퍼포먼스만 해당. flock 도입은 macOS util-linux 부재로 플랫폼 호환성 검토 필요
+- **Cache integrity via manifest hash** — 현재 symlink 거부로 1차 방어, 추가 강화로 cache 첫 줄에 manifest 내용 해시를 저장해 TOCTOU에도 내성 확보 검토
 
 ## [0.11.0] - 2026-04-21
 
