@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.2] - 2026-04-21
+
+### Fixed
+- **Issue #13 해결: `/verify` 비용·지연 폭증 완화** — `--max-rewrites` 기본값 2를 도입해 V1 실패 또는 `GAMING_DETECTED` 재작성 루프가 무제한 반복되지 않도록 제한
+- **Judge 비용 상한 계약 추가** — V2b judge 입력을 bounded evidence packet으로 제한하고, 추가 repo 탐색은 `--judge-repo-scan` 명시 시에만 허용하도록 스킬 계약을 변경
+- **Reviewer 질문 풀 축소** — reviewer 기본 pool size를 5로 고정하고 `--pool-size`로 조정 가능하게 해 필요한 K=3 답변 대비 과도한 질문 생성을 줄임
+- **Judge strictness 기본값 조정** — `--judge-strictness standard|strict`를 추가하고 standard 모드에서는 factual claim만 엄격 검증하며 명시적 engineering judgment는 검증 대상에서 제외
+- **Round metrics 기록 계약 추가** — artifact에 attempt 수, `budget_exhausted`, judge repo scan 여부, round별 elapsed/tokens를 기록하도록 명시
+
+### Changed
+- **Firebase 로컬 산출물 무시** — `firebase-debug.log*`, `firebase-debug.*.log*`, `.firebase/`를 `.gitignore`에 추가
+
 ## [0.12.1] - 2026-04-21
 
 ### Fixed
