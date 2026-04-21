@@ -346,13 +346,13 @@ Runs MCP Store's `--auto` mode.
 7. After user approval, apply selected MCP configuration
 8. Record in manifest.json `mcpServers` section
 
-#### Execution — AI 주도 2단계 흐름 (권장, 비대화형 환경 필수)
+#### Execution — AI-driven two-phase flow (recommended, required for non-interactive environments)
 
-Cursor/Claude 등 AI agent가 Bash 도구로 스크립트를 실행하면 stdin이 TTY가 아니기 때문에
-`guided` 모드라도 `read` 프롬프트를 띄우지 못하고 모든 선택이 자동으로 `later`로 떨어집니다.
-이를 방지하려면 AI가 **직접 사용자에게 선택을 묻고, 응답을 환경변수로 전달하여 적용**해야 합니다.
+When AI agents (Cursor/Claude) run the script via the Bash tool, stdin is not a TTY, so
+`guided` mode cannot display `read` prompts and every selection silently falls back to `later`.
+To avoid this, the AI must **ask the user directly and pass the answers through environment variables**.
 
-**Phase 1 — 추천 목록만 수집 (`recommend` 모드)**
+**Phase 1 — Collect the recommendation list (`recommend` mode)**
 
 ```bash
 PLUGIN_ROOT="${CURSOR_PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-${CODEX_PLUGIN_ROOT:-$(cd "$(dirname "$0")/../.." && pwd)}}}"
@@ -365,15 +365,16 @@ bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
   --mode recommend
 ```
 
-결과는 `$STATE_DIR/state/setup-store-summary.json`에 기록됩니다 (manifest selections 미기록).
+Results land in `$STATE_DIR/state/setup-store-summary.json` (manifest selections are NOT yet recorded).
 
-**Phase 2 — 사용자에게 질문**
+**Phase 2 — Ask the user**
 
-AI는 summary.json의 `skills.items`, `cli.installable`, `mcp.recommended`를
-한국어 목록으로 출력한 뒤 각 그룹별로 선택을 받습니다.
-허용 응답: `all` / 번호 목록(예: `1,3`) / `skip`.
+The AI renders `skills.items`, `cli.installable`, and `mcp.recommended` from
+summary.json as a localized list (Korean by default for this project) and collects
+a selection for each group.
+Allowed answers: `all` / a numeric list (e.g. `1,3`) / `skip`.
 
-**Phase 3 — 선택값을 환경변수로 전달하여 `guided` 실행**
+**Phase 3 — Pass the answers into `guided` mode via environment variables**
 
 ```bash
 SETUP_STORE_SKILLS_CHOICE="1,3" \
@@ -385,12 +386,12 @@ bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
   --mode guided
 ```
 
-환경변수가 설정되어 있으면 `prompt_or_default`는 `read`를 건너뛰고 해당 값을 그대로 사용합니다.
+When the env vars are set, `prompt_or_default` skips `read` and uses those values verbatim.
 
-#### Execution — 터미널 직접 실행 (대화형)
+#### Execution — direct terminal run (interactive)
 
-사용자가 Cursor/Claude 내장 터미널에서 직접 스크립트를 실행하는 경우에만 stdin이 TTY이므로
-환경변수 없이 `--mode guided` 하나로 대화형 흐름이 동작합니다:
+When the user runs the script directly in a Cursor/Claude built-in terminal, stdin IS a TTY,
+so `--mode guided` alone drives the interactive flow without env vars:
 
 ```bash
 bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
@@ -399,25 +400,25 @@ bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
   --mode guided
 ```
 
-**만약 `manifest.json`이 아직 없으면 runner가 최소 bootstrap manifest를 먼저 만든 뒤 계속합니다.**
+**If `manifest.json` does not yet exist, the runner first creates a minimal bootstrap manifest and continues.**
 
 #### Runner Modes
 
-- `--mode guided` (default): recommendation files를 만든 뒤 사용자 선택을 받습니다. TTY 또는 `SETUP_STORE_*_CHOICE` 환경변수 중 하나가 필요합니다.
-- `--mode recommend`: recommendation과 summary만 생성하고 종료합니다. manifest selections은 기록하지 않으므로 AI가 질문 전 단계로 사용합니다.
-- `--mode fast`: 질문 없이 recommendation/state만 기록하고 선택은 전부 `later`로 둡니다.
-- `--mode dry-run`: 임시 디렉터리에 recommendation summary만 출력하고 실제 state는 건드리지 않습니다.
+- `--mode guided` (default): produces recommendation files and then collects user selections. Requires either a TTY or the `SETUP_STORE_*_CHOICE` env vars.
+- `--mode recommend`: writes only the recommendation and summary then exits. Does NOT record manifest selections; the AI uses this as the pre-question stage.
+- `--mode fast`: records recommendations/state without asking and leaves every selection as `later`.
+- `--mode dry-run`: emits the recommendation summary to a temp directory and never touches real state.
 
 #### Guided Setup Rules
 
-- 사용자가 직접 고를 수 있도록 **skill / cli / mcp**를 묶음 질문으로 나눕니다.
-- 선택지는 `all`, 번호 목록(`1,2`), `skip`, `later` 중 하나를 기본으로 사용합니다.
-- 비대화형 실행이라 질문을 받을 수 없으면 기본값은 `later`로 떨어지므로, AI agent는 반드시 위의 **AI 주도 2단계 흐름**을 사용해야 합니다.
-- AI가 받은 사용자 응답은 `SETUP_STORE_SKILLS_CHOICE`, `SETUP_STORE_CLI_CHOICE`, `SETUP_STORE_MCP_CHOICE` 환경변수로 전달합니다.
-- 응답 결과는 `~/ai-symbiote/{slug}/state/setup-store-preferences.json`과 `manifest.json`의 `setupSelections`에 기록합니다.
-- 선택된 CLI는 즉시 설치를 시도합니다.
-- 선택된 skill은 `manifest.plugins`와 state에 즉시 반영합니다.
-- 선택된 MCP는 `manifest.mcpServers`와 state에 즉시 반영합니다.
+- Split questions into three groups so the user can pick directly: **skill / cli / mcp**.
+- Default allowed answers per group: one of `all`, a numeric list (`1,2`), `skip`, `later`.
+- In non-interactive runs, unanswered prompts default to `later`; AI agents MUST use the **AI-driven two-phase flow** above in that case.
+- Forward the user's answers as `SETUP_STORE_SKILLS_CHOICE`, `SETUP_STORE_CLI_CHOICE`, `SETUP_STORE_MCP_CHOICE`.
+- Record answers in `~/ai-symbiote/{slug}/state/setup-store-preferences.json` and in `manifest.json`'s `setupSelections`.
+- Selected CLIs are installed immediately.
+- Selected skills update `manifest.plugins` and state immediately.
+- Selected MCPs update `manifest.mcpServers` and state immediately.
 
 ### Step 5: Generate manifest.json
 

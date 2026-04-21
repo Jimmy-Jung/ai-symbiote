@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2026-04-21
+
+### Added
+- **Write-time Verification Layer** — AI가 작성한 코드가 "왜" 그렇게 쓰였는지를 사람이 재구성할 수 없는 opacity 문제를 행동적으로 측정·제거하는 신규 파이프라인. `/verify` 스킬이 큐잉된 편집 각각에 대해 cold-read reviewer(Codex) + LLM judge를 돌려 검증 아티팩트(`.ai-symbiote/qa/<project>/<date>/<sha>.md`)를 생성. 코드 자체가 아니라 Q&A 트랜스크립트가 1급 리뷰 대상이 됨
+- **PostToolUse(Write|Edit) 훅 `verify-queue.sh`** — 편집 메타데이터를 `~/.ai-symbiote/state/verify-queue.jsonl`에 <100ms로 append. `hooks.json`의 `timeout: 10s` 제약 안에서 Judge 호출(~30s)을 분리하는 Option D 아키텍처
+- **SessionStart `[Verify] N pending verification(s)` 알림** — `setup-check.sh`가 현재 레포의 pending 건수를 감지해 세션 시작 시 노출. `/verify` 누락 방지
+- **3-role reviewer 프롬프트** — Intent / Structural / Alternative 관점을 통합해 reviewer에게 전달. 단일 프롬프트로 멀티-에이전트 대체
+- **V2c 랜덤 질문 subset (필수)** — Reviewer pool N=5~8에서 저자는 K=3만 무작위로 답변. 예상 질문 전체에 답변을 미리 준비하는 seeding 공격 차단. `--all-questions` 디버그 플래그만 bypass 허용
+- **Pre-flight 기계검증 (Step 2.5)** — `/verify` 실행 시 프로젝트 네이티브 typecheck/lint/test를 먼저 돌려 결과를 reviewer 프롬프트에 주입. unused import·type drift·실패 test를 reviewer 질문으로 직접 전환
+- **배치 캡 (`--max-batch`, 기본 10)** — pending이 10건 초과일 때 첫 10건만 처리하고 나머지는 큐 유지. Codex judge 비용 폭주 차단
+- **Queue schema v2** — `repo_root` 절대경로 + `base_sha`(편집 직전 HEAD) 필드 추가. `~/work/app`과 `~/tmp/app` 같은 동명 레포 충돌, 편집 후 HEAD 이동 시 잘못된 diff 참조 차단. 레거시 `sha` 필드는 v1 호환용 mirror 유지 (v0.12에서 제거 예정)
+- **`docs/02-아키텍처.md` Write-time Verification Layer 섹션** — Option D 데이터 흐름, validator 계층(V1a~d, V2a~c), 플랫폼 지원 매트릭스, artifact 영속성 정책, queue schema v2 표 문서화
+- **`docs/09-검증-레이어-동작원리.md` (신규, 359줄)** — 12개 mermaid 다이어그램으로 동작원리를 초보자 친화적으로 설명. AlphaGo 비유, 공격 시나리오, FAQ 포함
+- **테스트 인프라** — `tests/test-verify-queue.sh` 44 케이스 + `tests/test-setup-check-verify.sh` 20 케이스 총 64. JSON escaping, trigger lowercase, non-git fallback, orphan edit 격리, symlink 거부, newline 경로 보존, 멀티레포 분리, v1/v2 혼재, jq 부재 시 grep fallback, zero-match 산술 회귀 모두 커버
+
+### Changed
+- **Skill 8개 한글 prose → 영어** (`verify`, `synapse`, `setup`, `auto`, `plan`, `review`, `team-templates`, `roles`). SKILL.md 파일은 LLM 컨텍스트에 매번 로드되므로 한글 본문은 영어 대비 2-3배 더 많이 tokenize됨. 실제 파일명·한국어 트리거 키워드 예시·validator 키워드 패턴은 의미상 필요해 유지
+- **Codex 플랫폼 지원** — Write|Edit PostToolUse 훅 부재로 자동 큐잉 불가. `/verify --sha <sha>` / `--file <path>` 수동 호출만 지원. `build-codex.sh`가 `shared/skills/verify/SKILL.md`를 `dist/codex-symbiote/`에 자동 복사하므로 스킬 자체는 노출됨
+- **`/verify` Fallback Mode 재기술** — Codex CLI 부재 시 reviewer/judge를 **별도 Claude subagent**로 띄우고, 단일 세션 collusion을 명시적으로 금지. `allowed-tools`에 `Agent` 추가 (이전에는 누락되어 fallback이 차단됨)
+
+### Fixed
+- **diff 수집 계약 버그 (Codex Finding 1, High)** — 저장된 `sha`는 편집 전 HEAD인데 `git show <sha>`로 읽어 이전 커밋 diff를 reviewer에게 노출시키던 논리 오류. `base_sha` 필드로 분리 후 `HEAD==base_sha`/`HEAD!=base_sha` 분기로 재작성. 커밋 후 추가 편집이 누락되지 않도록 `git diff HEAD` + `--cached`까지 병합
+- **Fallback mode 실행 차단 (Codex Finding 2, Medium)** — `allowed-tools`에 `Agent` 누락으로 Codex 부재 시 Claude subagent fallback이 실행되지 않던 문제 해결
+- **동명 레포 queue 충돌 (Codex Finding 3)** — 레포 basename만으로 필터링해 교차 오염되던 문제. `repo_root` 절대경로를 1차 필터로, `project + branch`는 v1 legacy fallback으로 사용
+- **setup-check 산술 silently 0 반환 (Claude adversarial, Critical)** — `grep -c ... || echo 0`가 grep의 `0` 출력 + fallback `0`을 모두 캡처해 `0\n0`을 arithmetic context에 넣어 `$((...))` 실패. `tr -dc '0-9'` + 기본값으로 정규화해 notification이 무음 억제되는 steady-state 버그 해소
+- **크로스 프로젝트 오염 (Cross-confirmed High)** — 레포 외부 편집 시 hook의 cwd 레포로 fallback해 잘못된 프로젝트에 집계되던 문제. `repo_root=""` + `project="unknown"` placeholder로 대체
+- **`json_escape` newline/CR silent corruption (Claude High)** — `tr '\n' ' '`이 `a\nb.ts` 같은 POSIX-legal 경로를 `a b.ts`로 변환. python3 기반 full-JSON escape로 교체, sed 폴백에서도 `\\, \", \t, \n, \r` 모두 처리
+- **`source ~/.claude/skills/...` 샌드박스 우회 (Codex High #1)** — `/verify`가 read-only 샌드박스 전에 홈 디렉터리 임의 코드에 제어권을 넘기던 패턴 제거. Prompt는 temp file로 전달해 argv 주입도 차단
+- **Symlink write amplifier (Claude Medium)** — QUEUE_DIR/QUEUE_FILE이 symlink이면 편집마다 타 경로에 누적 기록될 위험. `[ -L ... ]` 체크 후 silent exit로 차단
+- **pool<3 무언 우회 (Codex Medium #5)** — 질문 풀이 3개 미만일 때 `/verify`가 "trivial"로 판정해 Step 7 스킵하던 경로를 `reviewer_underrun` FAIL로 변경. reviewer 파싱 실패/guardrail 트립이 검증 우회가 되지 않도록
+
+### Deferred (v0.12+ 설계 검토)
+- **Queue concurrent write race (flock)** — 병렬 편집 시 atomic append가 PIPE_BUF에 의존. flock 도입은 macOS 기본 미포함 등 플랫폼 호환성 검토 필요
+- **Queue rotation / TTL** — `gc` 스킬 확장으로 30일 이상 된 pending entry 정리 예정
+- **Cursor 플랫폼 통합** — hooks 이벤트 규약(lower camelCase)과 matcher(`Shell`, `Read`, `Write`)가 Claude와 상이해 별도 설계 필요
+
 ## [0.10.9] - 2026-04-20
 
 ### Added

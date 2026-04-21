@@ -41,46 +41,48 @@ For PRD-based headless autonomous execution, use the separate PRD/ralph integrat
 
 ### Loop Behavior
 
-- Inspector PASS -> Outside Voice 제안 -> Complete
+- Inspector PASS -> Propose Outside Voice -> Complete
 - Inspector FAIL + iterations remaining -> Issue analysis -> Re-dispatch Builder
 - Inspector FAIL + same error 2x -> Change approach -> Re-dispatch Architect
 - Iteration limit reached -> Escalation
 
 ### Outside Voice (Phase 8)
 
-Inspector PASS 후, Synapse Phase 8 Smart Activation 조건에 해당하면 Outside Voice를 제안한다.
-조건: Inspector 결과에 warning 이상 항목이 있거나, 변경 파일 10개 이상이거나, 고복잡도 작업인 경우.
-조건 미충족 시 Outside Voice를 건너뛰고 바로 Complete한다.
+After Inspector PASS, propose Outside Voice if Synapse Phase 8 Smart Activation conditions are met.
+Conditions: Inspector results contain warning-or-higher items, or 10+ changed files, or a high-complexity task.
+When conditions are not met, skip Outside Voice and complete directly.
+
+Prompt template (render in user's locale; Korean shown as example):
 
 ```text
-[Auto] Inspector PASS - 작업이 완료되었습니다. (iteration {N}/{M})
-Inspector가 warning 이상 {W}건을 감지했습니다.
+[Auto] Inspector PASS - work is complete. (iteration {N}/{M})
+Inspector detected {W} warning-or-higher items.
 
-완료 전 독립적인 외부 검토를 받아보시겠습니까?
+Run an independent external review before completing?
 
-1. 예 - Outside Voice 실행 후 완료
-2. 아니오 - 바로 완료
-3. 이 세션에서 묻지 않기
+1. Yes - run Outside Voice, then complete
+2. No - complete now
+3. Don't ask again this session
 ```
 
-#### Outside Voice verdict에 따른 분기
+#### Branching by Outside Voice verdict
 
-- **agree** → Complete (추가 코멘트와 함께)
-- **partially-disagree** → 사용자에게 충돌점 제시
-  - 수정 선택 시: 새로운 iteration으로 Builder 재배포
-  - 유지 선택 시: Complete
-- **disagree** → 상세 Tension Report 제시
-  - 근본적 접근법 변경 시: Architect부터 재시작
-  - 유지 선택 시: Complete
+- **agree** → Complete (append the reviewer's comment)
+- **partially-disagree** → Surface the conflict to the user
+  - If they choose to revise: start a new iteration by re-dispatching Builder
+  - If they choose to keep the work: Complete
+- **disagree** → Present a detailed Tension Report
+  - If fundamental approach change is chosen: restart from Architect
+  - If they choose to keep the work: Complete
 
-#### maxOutsideVoiceRework 제한
+#### maxOutsideVoiceRework limit
 
-Outside Voice disagree/partially-disagree로 인한 재작업은 maxIterations와 별도로 관리하되,
-**최대 1회**로 제한한다 (`maxOutsideVoiceRework: 1`).
+Rework triggered by Outside Voice disagree/partially-disagree is tracked
+separately from maxIterations and capped at **1 pass** (`maxOutsideVoiceRework: 1`).
 
-- 1회 재작업 후 다시 Outside Voice를 실행하지 않는다 (바로 Complete)
-- 이는 무한 루프를 방지하면서도 사용자의 의도적 수정을 허용한다
-- manifest.json에서 `maxOutsideVoiceRework` 값을 재정의할 수 있다 (기본값: 1)
+- After one rework cycle, do not run Outside Voice again (complete directly)
+- This prevents infinite loops while still allowing the user's intentional revisions
+- The `maxOutsideVoiceRework` value can be overridden in manifest.json (default: 1)
 
 ---
 
@@ -110,11 +112,11 @@ Outside Voice disagree/partially-disagree로 인한 재작업은 maxIterations�
 
 ### Loop Behavior
 
-- Inspector PASS -> Outside Voice 제안 -> Complete
+- Inspector PASS -> Propose Outside Voice -> Complete
 - Inspector FAIL + iterations remaining -> Change approach -> Re-dispatch Architect
 - 3 failures unresolved -> Escalation
 
-Outside Voice는 autonomous 모드와 동일한 Phase 8 흐름을 따른다.
+Outside Voice follows the same Phase 8 flow as in autonomous mode.
 
 ---
 

@@ -30,7 +30,7 @@ Dynamically loaded from `~/ai-symbiote/{slug}/context.md`:
 
 ### Skill Direct Routes
 
-특정 키워드가 감지되면 팀 구성 없이 해당 스킬/워크플로우를 직접 실행한다:
+When specific keywords are detected, run the matching skill/workflow directly without composing a team:
 
 | Pattern | Action |
 |---------|--------|
@@ -74,59 +74,62 @@ Rules:
 
 ### Intent-Based Team Selection
 
-Skill Direct Routes에 매칭되지 않는 요청은 아래 Intent Contract로 팀을 선택한다.
+For requests that do not match Skill Direct Routes, pick a team using the Intent Contract below.
 
-**모호한 프롬프트 해소 규칙:**
-- 코드 변경 의도가 조금이라도 있으면 implementation 우선
-- "봐줘"처럼 변경/평가 모두 가능한 표현은 review 우선 (비파괴적 선택)
-- 복합 의도("분석하고 수정해줘")는 planning 또는 요청 분해
+**Ambiguous-prompt resolution rules:**
+- Any hint of code-change intent → prefer implementation
+- Phrases that could mean either change or evaluate (e.g. Korean "봐줘" / "take a look") → prefer review (non-destructive)
+- Compound intents (e.g. "analyze and fix") → planning, or decompose the request
+
+(Korean example prompts below are preserved verbatim because the project's users
+speak Korean — they document actual trigger phrases, not LLM instructions.)
 
 #### none (direct handling)
-- intent_description: 단순하고 명확한 요청. 1개 파일 수정, 변경 내용이 구체적.
-- when_to_use: "이 함수 이름 바꿔줘", "타입 에러 고쳐줘", "console.log 추가해줘", "이 변수명 수정해줘"
-- when_not_to_use: 여러 파일 변경, 탐색 필요, 불확실한 요구사항
+- intent_description: Simple, well-scoped request. Single-file edit with concrete changes.
+- when_to_use: "rename this function", "fix this type error", "add a console.log", "rename this variable"
+- when_not_to_use: multi-file changes, exploration needed, uncertain requirements
 
 #### analysis
-- intent_description: 코드베이스의 구조, 패턴, 의존성, 아키텍처를 깊이 이해해야 할 때
-- when_to_use: 구조 분석, 아키텍처 파악, 의존성 탐색, "이거 어떻게 동작해?", "전체 구조 알려줘"
-- when_not_to_use: 코드 수정이 필요한 경우, 단순 질문
-- example_prompts: "이 모듈 아키텍처 분석해줘", "의존성 구조가 어떻게 되어있어?", "이 패턴이 코드베이스에서 어떻게 사용되는지 찾아줘"
+- intent_description: Need to deeply understand codebase structure, patterns, dependencies, or architecture
+- when_to_use: structural analysis, architecture comprehension, dependency exploration, "how does this work?", "show me the overall structure"
+- when_not_to_use: code changes are required, simple questions
+- example_prompts: "analyze the architecture of this module", "what does the dependency graph look like?", "find how this pattern is used across the codebase"
 
 #### implementation
-- intent_description: 코드를 실제로 변경, 추가, 수정해야 할 때. 버그 수정 포함. 여러 파일이 관련되거나 탐색이 필요한 경우.
-- when_to_use: 기능 구현, 버그 수정, 리팩토링, "이거 고쳐줘", "이 기능 만들어줘", "끝까지 해줘", "끝까지 완성해줘"
-- when_not_to_use: 코드 변경 없이 이해만 필요한 경우, 계획만 필요한 경우
-- example_prompts: "이 버그 수정해줘", "새로운 API 엔드포인트 추가해줘", "이 함수를 리팩토링해줘", "끝까지 완성해줘", "max performance"
+- intent_description: Actual code changes, additions, or fixes, including bug fixes. Multi-file scope or exploration required.
+- when_to_use: feature implementation, bug fixes, refactoring, "fix this", "build this feature", "finish it completely"
+- when_not_to_use: understanding without code changes, planning-only requests
+- example_prompts: "fix this bug", "add a new API endpoint", "refactor this function", "finish it completely", "max performance"
 
 #### review
-- intent_description: 기존 코드나 변경사항의 품질, 정확성, 보안을 평가할 때
-- when_to_use: 코드 리뷰, PR 검토, 보안 점검, "이 코드 봐줘", "리뷰해줘"
-- when_not_to_use: 코드를 직접 수정해야 하는 경우 (→ implementation)
-- example_prompts: "이 PR 리뷰해줘", "이 코드에 문제 없어?", "보안 점검 해줘", "코드 리뷰해줘"
+- intent_description: Evaluating quality, correctness, or security of existing code or changes
+- when_to_use: code review, PR review, security check, "take a look at this code", "please review"
+- when_not_to_use: when direct code changes are needed (→ implementation)
+- example_prompts: "review this PR", "any issues with this code?", "do a security check", "code review please"
 
 #### planning
-- intent_description: 구현 전에 계획을 세우고 설계를 확정해야 할 때
-- when_to_use: 구현 계획, 설계 논의, 접근법 결정, "어떻게 하면 좋을까?", "계획 세워줘"
-- when_not_to_use: 이미 계획이 있고 바로 구현해야 하는 경우 (→ implementation)
-- example_prompts: "이 기능 어떻게 구현하면 좋을까?", "리팩토링 계획 세워줘", "접근법을 정리해줘"
+- intent_description: Need to plan and lock the design before implementation
+- when_to_use: implementation planning, design discussion, approach decisions, "what's the best way to do this?", "plan this out"
+- when_not_to_use: when the plan is already set and implementation should start (→ implementation)
+- example_prompts: "what's the best way to implement this feature?", "plan the refactor", "nail down the approach"
 
 #### research
-- intent_description: 외부 문서, API, 라이브러리에 대한 조사가 필요할 때
-- when_to_use: 외부 API 조사, 라이브러리 비교, 기술 조사, "이거 찾아줘", "어떤 라이브러리가 좋아?", "마이그레이션 가이드"
-- when_not_to_use: 내부 코드만 분석하면 되는 경우 (→ analysis)
-- example_prompts: "이 API의 사용법 찾아줘", "마이그레이션 가이드 조사해줘", "React 19의 새 기능 정리해줘"
+- intent_description: Need to investigate external docs, APIs, or libraries
+- when_to_use: external API research, library comparison, technical surveys, "look this up", "which library is better?", "migration guide"
+- when_not_to_use: when internal code analysis alone suffices (→ analysis)
+- example_prompts: "look up how this API is used", "research the migration guide", "summarize what's new in React 19"
 
 #### dynamic
-- intent_description: 위 카테고리에 명확히 맞지 않거나 복합적인 의도일 때의 기본값
-- when_to_use: 모호한 요청, 복합 의도, 탐색 후 결정이 필요한 경우
-- when_not_to_use: 의도가 명확한 경우 (위 카테고리 중 하나로 라우팅)
-- example_prompts: "이거 좀 도와줘" (모호), "이 파일 관련해서 할 일이 있어" (복합)
+- intent_description: Default when the request does not fit any category cleanly or is compound
+- when_to_use: ambiguous requests, compound intents, cases that require exploration before deciding
+- when_not_to_use: when the intent is clear (route to one of the above)
+- example_prompts: "can you help with this?" (ambiguous), "I have something to do about this file" (compound)
 
 ### Routing Behavior Rules
 
-- 두 팀 이상이 동등하게 적합한 경우: 사용자에게 "어떤 방향으로 진행할까요?"라고 묻는다
-- 요청에 두 가지 이상의 독립된 의도가 포함된 경우: planning 팀으로 라우팅하거나 요청을 분해
-- 어떤 팀에도 매칭되지 않는 경우: dynamic 팀으로 라우팅하고 경고 로그 기록
+- Two or more teams equally suitable: ask the user "Which direction should I take?"
+- Request contains two or more independent intents: route to the planning team or decompose the request
+- No team matches: route to the dynamic team and write a warning log
 
 ## Orchestration Lifecycle
 
@@ -166,35 +169,35 @@ Determines next action based on PASS, FAIL, remaining iterations, or escalation 
 
 ### Phase 8: OUTSIDE VOICE (Optional)
 
-Phase 7에서 DELIVER로 진행이 결정된 후, 사용자에게 Outside Voice 옵션을 제안한다.
-Outside Voice는 현재 런타임과 **다른 AI 모델**의 독립적인 의견을 수렴하는 기능이다.
+After Phase 7 decides to proceed to DELIVER, offer the user an Outside Voice option.
+Outside Voice collects an independent opinion from an **AI model different from the current runtime**.
 
-#### 제안 조건 (Smart Activation)
+#### Activation Conditions (Smart Activation)
 
-Outside Voice는 모든 완료 작업에 대해 제안하지 않는다.
-다음 조건 중 하나 이상 해당될 때만 자동으로 제안한다:
+Outside Voice is NOT proposed for every completed task.
+Auto-propose only when one or more of the following conditions hold:
 
-**자동 제안 조건** (하나 이상 충족 시):
-- Inspector/Review 결과에 `severity: warning` 이상의 항목이 존재하면서 PASS로 판정된 경우
-- 복잡도가 `high` 이상인 작업 (여러 모듈에 걸친 변경, 아키텍처 변경)
-- Architect 계획에 `risk: high`로 평가된 항목이 포함된 경우
-- 변경 파일이 10개 이상인 구현 작업
-- 사용자가 명시적으로 Outside Voice를 요청한 경우
+**Auto-propose when (any of)**:
+- Inspector/Review output contains `severity: warning` or higher items AND the overall verdict is PASS
+- Task complexity is `high` or above (multi-module changes, architectural changes)
+- The Architect plan contains items rated `risk: high`
+- Implementation task changes 10 or more files
+- The user explicitly requested Outside Voice
 
-**제안하지 않는 경우**:
-- none (직접 처리) 라우팅된 단순 작업
-- 사용자가 이전에 세션 내 opt-out을 설정한 경우
-- dynamic 팀의 단순 탐색 작업
-- research 팀 (명시적 요청이 없는 한)
-- Inspector 결과가 모두 `suggestion` 이하인 깨끗한 PASS
-- 복잡도가 `low`인 작업
+**Do NOT propose when**:
+- The request was routed to `none` (direct handling)
+- The user previously opted out in this session
+- Simple exploration on the dynamic team
+- The research team (unless explicitly requested)
+- A clean PASS where every Inspector item is `suggestion` or lower
+- Task complexity is `low`
 
-**비활성 사유 안내**: Outside Voice가 비활성인 경우 사유를 간략히 표시한다.
-예: "[Outside Voice 건너뜀: 리뷰 결과가 깨끗하여 추가 검토 불필요]"
+**Skip reason**: When Outside Voice is disabled, show a brief reason.
+Example: "[Outside Voice skipped: clean review results — no further check needed]"
 
 #### 3-Platform Provider Selection
 
-현재 플랫폼을 감지하여 Outside Voice 대상을 결정한다:
+Detect the current platform to pick the Outside Voice target:
 
 ```
 detect_platform():
@@ -203,54 +206,55 @@ detect_platform():
   if .cursor-plugin/ exists → platform = "cursor"
 ```
 
-| 플랫폼 | Outside Voice 대상 | Fallback (degraded mode) | 사용자 선택 필요 |
+| Platform | Outside Voice target | Fallback (degraded mode) | User choice needed |
 |--------|-------------------|--------------------------|----------------|
-| Claude Code | Codex (GPT-5.4) | Claude adversarial subagent (degraded) | 아니오 (자동) |
-| Codex CLI | Claude (sonnet) | GPT adversarial subagent (degraded) | 아니오 (자동) |
-| Cursor | 사용자 선택 | 선택한 모델의 adversarial subagent (degraded) | 예 |
+| Claude Code | Codex (GPT-5.4) | Claude adversarial subagent (degraded) | No (auto) |
+| Codex CLI | Claude (sonnet) | GPT adversarial subagent (degraded) | No (auto) |
+| Cursor | User picks | adversarial subagent on chosen model (degraded) | Yes |
 
-**Degraded mode 안내**: Cross-model provider가 불가하여 동일 런타임 fallback이 사용될 경우,
-사용자에게 `[Outside Voice - degraded]` 태그와 함께 제한적 모드임을 명시해야 한다.
+**Degraded mode notice**: When the cross-model provider is unavailable and the
+same-runtime fallback is used, the user MUST be told via the `[Outside Voice - degraded]`
+tag that this is a limited mode.
 
-#### 제안 메시지
+#### Prompt templates (render in user's locale)
 
-**Claude Code / Codex CLI (자동 선택):**
-
-```text
-[Outside Voice] 팀 작업이 완료되었습니다.
-독립적인 외부 모델({target_model})의 의견을 들어보시겠습니까?
-
-1. 예 - Outside Voice 실행
-2. 아니오 - 바로 결과 전달
-3. 이 세션에서 묻지 않기
-```
-
-**Cursor (사용자 선택):**
+**Claude Code / Codex CLI (auto target):**
 
 ```text
-[Outside Voice] 팀 작업이 완료되었습니다.
-독립적인 외부 모델의 의견을 들어보시겠습니까?
+[Outside Voice] Team task complete.
+Consult an independent external model ({target_model})?
 
-1. Claude에게 요청 (Anthropic Claude sonnet)
-2. Codex에게 요청 (OpenAI GPT-5.4)
-3. 아니오 - 바로 결과 전달
-4. 이 세션에서 묻지 않기
+1. Yes — run Outside Voice
+2. No — deliver results as-is
+3. Don't ask again this session
 ```
 
-#### 실행 흐름
+**Cursor (user picks):**
 
-1. **플랫폼 감지** → provider 결정
-2. **Provider 가용성 확인**
+```text
+[Outside Voice] Team task complete.
+Consult an independent external model?
+
+1. Ask Claude (Anthropic Claude sonnet)
+2. Ask Codex (OpenAI GPT-5.4)
+3. No — deliver results as-is
+4. Don't ask again this session
+```
+
+#### Execution flow
+
+1. **Detect platform** → determine provider
+2. **Check provider availability**
    - Codex: `codex --version 2>/dev/null`
-   - Claude: `Agent` tool 가용 여부 확인
-3. **Challenger 배포** → `roles/SKILL.md`의 Challenger 역할 참조
-4. **결과 수집** → `{task-folder}/results/outside-voice-{provider}.result.md`
-5. **Tension Report 생성** → 기존 팀 결과와 Outside Voice 결과 비교
+   - Claude: verify `Agent` tool is available
+3. **Dispatch Challenger** → see the Challenger role in `roles/SKILL.md`
+4. **Collect results** → `{task-folder}/results/outside-voice-{provider}.result.md`
+5. **Produce Tension Report** → compare original team results with Outside Voice results
 
 #### Tension Report
 
-기존 팀 결과와 Outside Voice 결과 사이의 충돌점을 식별하여 사용자에게 제시한다.
-`{task-folder}/results/tension-report.result.md`에 저장:
+Identify tension points between the original team output and Outside Voice output and surface them to the user.
+Save to `{task-folder}/results/tension-report.result.md`:
 
 ```markdown
 # Tension Report: {task name}
@@ -264,17 +268,17 @@ detect_platform():
 | 1 | {topic} | {team position} | {outside voice position} | critical/moderate/minor |
 
 ## User Decision Required
-각 충돌점에 대해 어떤 방향으로 진행할지 결정해 주세요.
+Decide how to proceed for each tension point.
 ```
 
-각 Disagreement Point에 대해 사용자에게 개별 판단을 요청한다:
-- A) Outside Voice의 권고를 수용
-- B) 기존 팀의 접근법 유지
-- C) 추가 조사 후 결정
+Ask the user to decide per disagreement point:
+- A) Accept the Outside Voice recommendation
+- B) Keep the original team's approach
+- C) Investigate further before deciding
 
-#### team-manifest.json 상태 추적
+#### team-manifest.json state tracking
 
-Outside Voice 실행 시 team-manifest.json에 다음을 추가:
+When Outside Voice runs, append the following to team-manifest.json:
 
 ```json
 {
@@ -296,16 +300,16 @@ Outside Voice 실행 시 team-manifest.json에 다음을 추가:
 }
 ```
 
-- `status: "not-applicable"`: none 라우팅 등 Outside Voice 대상이 아닌 작업에 사용
-- `degraded`: true이면 동일 런타임 adversarial fallback이 사용됨을 명시
-- `tensionCount`: 식별된 충돌점 수
-- `adoptedCount`: 사용자가 수용한 Outside Voice 권고 수
-- `rejectedCount`: 사용자가 거부한 Outside Voice 권고 수
-- `reworkTriggered`: Outside Voice로 인해 재작업이 발생했는지 여부
+- `status: "not-applicable"`: used for tasks that are not Outside Voice candidates (e.g. `none` routing)
+- `degraded`: true indicates the same-runtime adversarial fallback was used
+- `tensionCount`: number of tension points identified
+- `adoptedCount`: number of Outside Voice recommendations the user accepted
+- `rejectedCount`: number of Outside Voice recommendations the user rejected
+- `reworkTriggered`: whether Outside Voice caused rework
 
-#### 텔레메트리 연동
+#### Telemetry integration
 
-Outside Voice 완료 시 `stats` 스킬의 사용량 추적에 다음 이벤트를 기록한다:
+When Outside Voice completes, log the following event for the `stats` skill's usage tracking:
 
 ```json
 {
@@ -324,24 +328,26 @@ Outside Voice 완료 시 `stats` 스킬의 사용량 추적에 다음 이벤트�
 }
 ```
 
-이 데이터를 통해 다음 지표를 추적할 수 있다:
-- **수용률**: offered 대비 accepted 비율
-- **실효성**: 진짜 이슈를 찾은 비율 (adoptedCount / tensionCount)
-- **degraded 비율**: cross-model 대비 degraded mode 사용 빈도
-- **재작업 빈도**: reworkTriggered 비율
+This data lets us track the following metrics:
+- **Acceptance rate**: accepted / offered
+- **Effectiveness**: adoptedCount / tensionCount (how often Outside Voice surfaced real issues)
+- **Degraded ratio**: share of runs that fell back to degraded mode vs true cross-model
+- **Rework rate**: frequency of `reworkTriggered`
 ```
 
 #### Outside Voice Opt-Out
 
-사용자가 "outside voice 끄기", "외부 의견 안 받을게", 또는 제안에서 "이 세션에서 묻지 않기"를 선택하면:
-- 현재 세션에서 Phase 8를 건너뛴다
-- 다음 세션에서는 다시 제안한다 (영구 비활성화 아님)
+When the user says "turn off outside voice" / "no external opinions" or picks
+"Don't ask again this session" in the prompt (the Korean phrases "outside voice 끄기",
+"외부 의견 안 받을게" are example triggers):
+- Skip Phase 8 for the rest of the current session
+- Resume proposing in future sessions (this is NOT a permanent disable)
 
 #### User Sovereignty Principle
 
-Outside Voice의 모든 결과는 **권고(recommendation)**이며, 결정(decision)이 아니다.
-두 모델이 동일한 결론에 도달했더라도, 사용자에게 제시하고 사용자가 결정한다.
-"Outside Voice가 맞다"고 단정하지 말고, "Outside Voice는 X를 권고합니다 — 진행하시겠습니까?"로 제시한다.
+Every Outside Voice result is a **recommendation**, not a decision.
+Even when both models reach the same conclusion, present it to the user and let them decide.
+Do NOT assert "Outside Voice is right"; instead say "Outside Voice recommends X — proceed?".
 
 ### Phase 9: DELIVER
 
