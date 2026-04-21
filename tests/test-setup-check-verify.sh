@@ -145,6 +145,41 @@ EOF
 OUTPUT=$(run_setup_check "$REPO")
 assert_contains "count is 1 (only feat/xyz counted)" "1 pending" "$OUTPUT"
 
+# --- Test 6: Schema v2 repo_root filtering — same basename, different paths ---
+echo ""
+echo "--- Test 6: repo_root disambiguates same-name repos ---"
+REPO_CANON=$(cd "$REPO" && pwd -P)
+OTHER_PATH="/tmp/elsewhere/myproj"  # same basename, different path
+cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"abc","sha":"abc","file":"a.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","repo_root":"$OTHER_PATH","branch":"feat/xyz","base_sha":"def","sha":"def","file":"x.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:02Z","project":"myproj","repo_root":"$OTHER_PATH","branch":"feat/xyz","base_sha":"ghi","sha":"ghi","file":"y.ts","trigger":"edit"}
+EOF
+OUTPUT=$(run_setup_check "$REPO")
+assert_contains "count is 1 (only current repo_root counted)" "1 pending" "$OUTPUT"
+assert_not_contains "other-path entries NOT leaked (expected 1 not 3)" "3 pending" "$OUTPUT"
+
+# --- Test 7: Schema v1 legacy entries (no repo_root) still match via project+branch ---
+echo ""
+echo "--- Test 7: Legacy v1 entries without repo_root still match ---"
+cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","branch":"feat/xyz","sha":"legacy1","file":"a.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","branch":"feat/xyz","sha":"legacy2","file":"b.ts","trigger":"edit"}
+EOF
+OUTPUT=$(run_setup_check "$REPO")
+assert_contains "legacy v1 entries counted via project+branch" "2 pending" "$OUTPUT"
+
+# --- Test 8: Mixed v1 + v2 entries count correctly ---
+echo ""
+echo "--- Test 8: Mixed schema (v1 legacy + v2 new) counts both ---"
+REPO_CANON=$(cd "$REPO" && pwd -P)
+cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","branch":"feat/xyz","sha":"legacy","file":"old.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"new","sha":"new","file":"fresh.ts","trigger":"write"}
+EOF
+OUTPUT=$(run_setup_check "$REPO")
+assert_contains "1 v1 + 1 v2 == 2 pending" "2 pending" "$OUTPUT"
+
 echo ""
 echo "=== Results ==="
 printf "Passed: %d / %d\n" "$PASSED" "$TOTAL"

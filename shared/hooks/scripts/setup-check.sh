@@ -362,7 +362,14 @@ if [ -d "$STATE_DIR/instincts" ]; then
   done
 fi
 
-# Verify queue: count pending verifications for current project/branch
+# Verify queue: count pending verifications for current repo+branch.
+# Filtering keys (priority order):
+#   1. repo_root (absolute path) + branch  — schema v2, precise
+#   2. project (basename) + branch         — schema v1 fallback, may collide
+#      across same-name repos (~/work/app vs ~/tmp/app)
+# When jq is available we accept an entry as "current" if repo_root matches, OR
+# (repo_root missing on legacy entries AND project+branch matches). This gives
+# v2 precision on new entries while preserving v1 compatibility.
 VERIFY_QUEUE="$HOME/.ai-symbiote/state/verify-queue.jsonl"
 if [ -f "$VERIFY_QUEUE" ]; then
   _VQ_REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
@@ -370,10 +377,19 @@ if [ -f "$VERIFY_QUEUE" ]; then
     _VQ_PROJECT=$(basename "$_VQ_REPO_ROOT")
     _VQ_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
     if command -v jq >/dev/null 2>&1; then
-      _VQ_PENDING=$(jq -rc --arg p "$_VQ_PROJECT" --arg b "$_VQ_BRANCH" \
-        'select(.project==$p and .branch==$b)' "$VERIFY_QUEUE" 2>/dev/null | wc -l | tr -d ' ')
+      _VQ_PENDING=$(jq -rc \
+        --arg root "$_VQ_REPO_ROOT" \
+        --arg p "$_VQ_PROJECT" \
+        --arg b "$_VQ_BRANCH" \
+        'select(.branch==$b and ((.repo_root // "") == $root or ((.repo_root // "") == "" and .project == $p)))' \
+        "$VERIFY_QUEUE" 2>/dev/null | wc -l | tr -d ' ')
     else
-      _VQ_PENDING=$(grep "\"project\":\"$_VQ_PROJECT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      # jq unavailable: match entries that contain our repo_root literal OR
+      # (lack repo_root AND match project+branch). Two grep passes avoid
+      # false positives.
+      _VQ_V2=$(grep "\"repo_root\":\"$_VQ_REPO_ROOT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      _VQ_V1=$(grep -v "\"repo_root\":" "$VERIFY_QUEUE" 2>/dev/null | grep "\"project\":\"$_VQ_PROJECT\"" 2>/dev/null | grep -c "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      _VQ_PENDING=$((_VQ_V2 + _VQ_V1))
     fi
     _VQ_PENDING=${_VQ_PENDING:-0}
     if [ "$_VQ_PENDING" -gt 0 ] 2>/dev/null; then

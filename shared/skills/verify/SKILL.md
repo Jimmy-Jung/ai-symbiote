@@ -3,7 +3,7 @@ name: verify
 description: "Write-time Verification Layer. Processes queued edits via cold-read reviewer + LLM judge to expose opaque decisions. Triggers on: verify, run verify, process verification, check reasoning, verify queue."
 argument-hint: [--all | --sha <sha> | --file <path> | --dry-run]
 user-invocable: true
-allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Skill]
+allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Skill, Agent]
 ---
 
 # Verify -- Write-time Verification Layer
@@ -27,11 +27,16 @@ AI가 작성한 코드의 opacity를 행동적으로 측정하고 제거하는 �
 
 ```bash
 QUEUE_FILE="$HOME/.ai-symbiote/state/verify-queue.jsonl"
-PROJECT=$(basename "$(git rev-parse --show-toplevel)")
+REPO_ROOT=$(git rev-parse --show-toplevel)
+PROJECT=$(basename "$REPO_ROOT")
 BRANCH=$(git branch --show-current)
 ```
 
-현재 project + branch로 필터링한 pending entries를 수집한다. `--sha`/`--file` 인자가 있으면 해당 항목만.
+필터링 기준 (우선순위 순):
+1. **Schema v2 (권장)**: `repo_root == $REPO_ROOT AND branch == $BRANCH`
+2. **Schema v1 호환**: `repo_root` 필드가 없는 legacy entry는 `project == $PROJECT AND branch == $BRANCH`로 매칭
+
+`--sha`/`--file` 인자가 있으면 해당 조건을 추가로 AND. `--sha`는 엔트리의 `base_sha` 또는 legacy `sha` 둘 다와 비교한다.
 
 pending이 0개면:
 ```
@@ -92,9 +97,26 @@ PRE-FLIGHT MACHINE CHECKS:
 
 각 entry에 대해:
 
-1. **Diff 수집**
-   - `sha`가 uncommitted가 아니면: `git show <sha> -- <file>`
-   - `uncommitted`면: `git diff HEAD -- <file>` (unstaged) 또는 `git diff --cached -- <file>` (staged)
+1. **Diff 수집 — base_sha 계약**
+
+   큐의 `base_sha`는 **편집 직전 HEAD**다. `git show <base_sha>`는 **이전 커밋**의 변경을 보여주므로 절대 사용 금지. 올바른 계약:
+
+   - `base_sha == "uncommitted"` (repo에 커밋 전혀 없음)
+     → `git diff --no-index /dev/null <file>` 또는 `git diff -- <file>` (현재 작업 상태 전체)
+
+   - 현재 `HEAD == base_sha` (편집 후 아직 커밋 안 함)
+     → `git diff <base_sha> -- <file>` (unstaged edit)
+     → `git diff --cached <base_sha> -- <file>` (staged edit)
+     → 두 결과를 합쳐 reviewer에게 전달
+
+   - 현재 `HEAD != base_sha` (편집 후 하나 이상의 커밋이 있음)
+     → `git diff <base_sha>..HEAD -- <file>` (base 이후 누적 변경)
+     → 선택적으로 `git log --oneline <base_sha>..HEAD -- <file>`로 커밋 목록도 첨부
+
+   - `base_sha` 필드가 없는 legacy entry (schema v1)
+     → `sha` 필드를 `base_sha`로 간주하고 위 규칙 재적용
+
+   **경계 케이스**: file이 이미 삭제됐거나 reverted된 경우 diff가 비면 "`(no changes — file reverted or deleted)`"로 표기하고 Step 7으로 스킵.
 
 2. **Reviewer prompt 조립** (아래 "Reviewer Prompt Template" 참조)
 3. **Codex 호출**:
@@ -311,12 +333,18 @@ Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b ju
 
 ## Fallback Mode
 
-`codex` CLI 없거나 `codex login` 안 된 경우:
-1. Reviewer는 Claude subagent (Agent tool)로 fallback — diversity 손실 경고
-2. Judge는 별도 Claude subagent — collusion risk 경고
-3. 최종 결과에 `DEGRADED_MODE` 표시
+`codex` CLI가 PATH에 없거나 `codex login`이 안 된 경우의 degraded 모드. **이 모드에서 Agent tool 사용은 이 스킬의 `allowed-tools`에 `Agent`가 명시되어 있어야 작동한다** (frontmatter 참조).
 
-사용자에게 `codex login` 권장 메시지 출력.
+1. **Reviewer fallback**: Claude subagent를 `Agent` tool로 띄워 cold-read reviewer 역할 수행. 질문 pool 생성 (3 roles 통합 프롬프트 그대로). Diversity 손실 경고를 artifact에 기록
+2. **Judge fallback**: Reviewer와 **별개의** Claude subagent를 새로 띄워 V2b verifiability check 수행. 동일 subagent 재사용 금지 (의심의 여지 없이 collusion). Collusion risk 경고를 artifact에 기록
+3. **Artifact 플래그**: `degraded_mode: true`, `reviewer: claude-subagent`, `judge: claude-subagent`를 Validator Report에 각인
+4. **사용자 알림**: 결과 요약에 "⚠️ DEGRADED_MODE — reviewer/judge 모두 Claude 기반. Codex 복구 권장: `codex login`" 출력
+
+**허용되지 않는 fallback 패턴**:
+- 저자 모델과 **같은** 세션 컨텍스트로 reviewer/judge 역할만 바꿔 호출 (= 사실상 self-review)
+- Reviewer subagent의 출력을 judge subagent 프롬프트에 그대로 붙여넣고 한 번에 처리 (= 단일 세션 collusion)
+
+Subagent 간 **대화 컨텍스트 격리**가 원칙. Agent tool의 각 호출이 독립 세션임을 이용한다.
 
 ## Arguments
 

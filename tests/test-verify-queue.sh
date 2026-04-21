@@ -125,10 +125,21 @@ assert_contains "queue line has file path" '"file":"'"$REPO"'/src/foo.ts"' "$QUE
 assert_contains "queue line trigger lowercased" '"trigger":"write"' "$QUEUE_LINE"
 assert_not_contains "trigger is not capitalized Write" '"trigger":"Write"' "$QUEUE_LINE"
 
-# Extract sha from queue and compare with repo HEAD
+# Schema v2: repo_root (absolute path) for multi-repo disambiguation.
+# Hook stores the git-canonical path; macOS /tmp → /private/tmp symlink means
+# we must resolve with `pwd -P` before comparing.
+REPO_CANON=$(cd "$REPO" && pwd -P)
+assert_contains "queue line has repo_root (schema v2)" '"repo_root":"'"$REPO_CANON"'"' "$QUEUE_LINE"
+
+# Schema v2: base_sha (pre-edit HEAD) for diff contract. Must match HEAD at
+# queue-append time, NOT whatever HEAD resolves to later when /verify runs.
+BASE_SHA_IN_QUEUE=$(printf '%s' "$QUEUE_LINE" | sed -n 's/.*"base_sha":"\([^"]*\)".*/\1/p')
+REPO_HEAD=$(cd "$REPO" && git rev-parse --short HEAD)
+assert_eq "base_sha captures HEAD at edit time" "$REPO_HEAD" "$BASE_SHA_IN_QUEUE"
+
+# Legacy sha field mirrors base_sha for backward compat (pre-0.11 consumers)
 SHA_IN_QUEUE=$(printf '%s' "$QUEUE_LINE" | sed -n 's/.*"sha":"\([^"]*\)".*/\1/p')
-REPO_SHA=$(cd "$REPO" && git rev-parse --short HEAD)
-assert_eq "sha matches repo HEAD" "$REPO_SHA" "$SHA_IN_QUEUE"
+assert_eq "legacy sha field mirrors base_sha" "$BASE_SHA_IN_QUEUE" "$SHA_IN_QUEUE"
 
 # --- Test 2: Edit trigger lowercase ---
 echo ""
@@ -226,9 +237,78 @@ STDOUT=$(printf '' | bash "$HOOK_SCRIPT")
 assert_eq "empty stdin returns continue" '{"continue":true}' "$STDOUT"
 assert_eq "empty stdin creates no queue line" "false" "$([ -f "$QUEUE_FILE" ] && echo true || echo false)"
 
-# --- Test 9: Exit code is always 0 (never blocks agent) ---
+# --- Test 9 (renumbered to 10): base_sha is pre-edit HEAD, unaffected by later commits ---
 echo ""
-echo "--- Test 9: Exit code is 0 even with malformed JSON ---"
+echo "--- Test 9: base_sha captures pre-edit HEAD, not moving HEAD ---"
+reset_queue
+mkdir -p "$REPO/src"
+# Record HEAD at edit time
+HEAD_AT_EDIT=$(cd "$REPO" && git rev-parse --short HEAD)
+run_hook '{"tool_name":"Write","tool_input":{"file_path":"'"$REPO"'/src/moving.ts"}}' >/dev/null
+# Now create a new commit so HEAD moves
+(
+  cd "$REPO"
+  echo "later change" > another.txt
+  git add another.txt
+  git commit -q -m "later-commit"
+)
+NEW_HEAD=$(cd "$REPO" && git rev-parse --short HEAD)
+# base_sha in the queue entry must still be HEAD_AT_EDIT, not NEW_HEAD
+QUEUE_LINE=$(cat "$QUEUE_FILE")
+BASE_SHA_IN_QUEUE=$(printf '%s' "$QUEUE_LINE" | sed -n 's/.*"base_sha":"\([^"]*\)".*/\1/p')
+assert_eq "HEAD moved between edit and inspection" "1" "$([ "$HEAD_AT_EDIT" != "$NEW_HEAD" ] && echo 1 || echo 0)"
+assert_eq "base_sha stays at pre-edit HEAD" "$HEAD_AT_EDIT" "$BASE_SHA_IN_QUEUE"
+assert_not_contains "base_sha is NOT the new HEAD" "\"base_sha\":\"$NEW_HEAD\"" "$QUEUE_LINE"
+
+# --- Test 10: Same-basename repos in different paths do not share queue identity ---
+echo ""
+echo "--- Test 10: Multi-repo disambiguation via repo_root ---"
+reset_queue
+# Repo #1 already exists at $REPO. Build a second repo with the SAME basename
+# but in a different parent directory.
+REPO_BASENAME=$(basename "$REPO")
+TWIN_PARENT="$TMPROOT/other-workspace"
+mkdir -p "$TWIN_PARENT"
+TWIN_REPO="$TWIN_PARENT/$REPO_BASENAME"
+mkdir -p "$TWIN_REPO"
+(
+  cd "$TWIN_REPO" || exit 1
+  git init -q
+  git config user.email twin@example.com
+  git config user.name Twin
+  git checkout -q -b feat/test-branch 2>/dev/null || true
+  echo twin > seed.txt
+  git add seed.txt
+  git commit -q -m twin-seed
+)
+mkdir -p "$TWIN_REPO/src"
+
+# Append one entry from each repo
+run_hook '{"tool_name":"Write","tool_input":{"file_path":"'"$REPO"'/src/from-original.ts"}}' >/dev/null
+run_hook '{"tool_name":"Write","tool_input":{"file_path":"'"$TWIN_REPO"'/src/from-twin.ts"}}' >/dev/null
+
+# Both entries coexist
+LINE_COUNT=$(wc -l < "$QUEUE_FILE" | tr -d ' ')
+assert_eq "both twin repos contribute one entry each" "2" "$LINE_COUNT"
+
+# Each entry's repo_root must point to the correct absolute path.
+# On macOS, /tmp is a symlink to /private/tmp and `git rev-parse --show-toplevel`
+# returns the canonical (symlink-resolved) path. Resolve both sides to compare.
+REPO_CANON=$(cd "$REPO" && pwd -P)
+TWIN_REPO_CANON=$(cd "$TWIN_REPO" && pwd -P)
+ORIG_ENTRY=$(grep "\"repo_root\":\"$REPO_CANON\"" "$QUEUE_FILE")
+TWIN_ENTRY=$(grep "\"repo_root\":\"$TWIN_REPO_CANON\"" "$QUEUE_FILE")
+assert_contains "original entry has original repo_root" "\"repo_root\":\"$REPO_CANON\"" "$ORIG_ENTRY"
+assert_contains "twin entry has twin repo_root" "\"repo_root\":\"$TWIN_REPO_CANON\"" "$TWIN_ENTRY"
+assert_not_contains "original entry does NOT carry twin path" "\"repo_root\":\"$TWIN_REPO_CANON\"" "$ORIG_ENTRY"
+assert_not_contains "twin entry does NOT carry original path" "\"repo_root\":\"$REPO_CANON\"" "$TWIN_ENTRY"
+# Basename (project) collides, by design — disambiguation must come from repo_root
+assert_contains "original entry project is basename" "\"project\":\"$REPO_BASENAME\"" "$ORIG_ENTRY"
+assert_contains "twin entry project is same basename" "\"project\":\"$REPO_BASENAME\"" "$TWIN_ENTRY"
+
+# --- Test 11: Exit code is always 0 (never blocks agent) ---
+echo ""
+echo "--- Test 11: Exit code is 0 even with malformed JSON ---"
 reset_queue
 set +e
 printf 'not json at all' | bash "$HOOK_SCRIPT" >/dev/null 2>&1

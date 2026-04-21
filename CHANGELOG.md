@@ -18,6 +18,12 @@ All notable changes to this project will be documented in this file.
 - **Codex 플랫폼 제한 명시** — Codex의 hooks.json은 Write|Edit matcher를 지원하지 않아 자동 큐잉 불가. Codex 유저는 `/verify --sha <sha>` 또는 `--file <path>`로 수동 호출만 지원 (`build-codex.sh`가 `shared/skills/verify/SKILL.md`를 `dist/codex-symbiote/`로 자동 복사하므로 스킬 노출은 유지)
 - **V2c 질문 랜덤화 필수화** — 설계의 `(optional)` 표기 제거. Reviewer가 생성한 pool N=5~8 중 저자는 K=3만 무작위 답변. seeding 공격의 사전 준비 비용을 증가시키는 필수 방어선으로 승격. `--all-questions` 플래그는 디버깅 전용, production artifact에 `v2c_bypassed: true` 경고 각인
 
+### Fixed (Codex adversarial review)
+- **Finding 1 (High) — diff 수집 계약 버그**: `verify-queue.sh`가 저장한 `sha`는 **편집 전 HEAD**인데 `SKILL.md` Step 3이 `git show <sha>`로 읽어 **이전 커밋의 diff**를 reviewer에게 보여주던 논리 오류. Queue schema에 `base_sha` 필드를 분리 추가하고 Step 3 계약을 `HEAD==base_sha`/`HEAD!=base_sha` 분기로 재작성 (`git diff <base_sha>` / `git diff <base_sha>..HEAD`). legacy `sha` 필드는 v1 호환을 위해 mirror로 유지
+- **Finding 2 (Medium) — Fallback mode 실행 차단**: `SKILL.md` frontmatter `allowed-tools`에 `Agent`가 누락되어 Codex CLI 부재 시 Claude subagent fallback이 차단되던 문제. `Agent` 툴 추가, Fallback Mode 섹션을 reviewer/judge **별도 subagent** 격리 원칙으로 재기술
+- **Finding 3 (Medium/Low) — 동명 레포 queue 충돌**: `~/work/app`과 `~/tmp/app`처럼 basename이 같은 레포끼리 queue가 섞이던 문제. Schema v2에 `repo_root` 절대경로 필드 추가, `setup-check.sh` 필터링을 `repo_root + branch` 우선·`project + branch` v1 fallback으로 확장
+- **테스트 확장**: 새 schema(base_sha pre-edit capture, repo_root 멀티레포 격리, v1/v2 혼재)에 대한 회귀 방지 케이스 추가. `test-verify-queue.sh` 22→34 케이스, `test-setup-check-verify.sh` 9→13 케이스
+
 ### Deferred
 - **Cursor 플랫폼 통합** — 현재 배포에는 포함되지 않음. hooks 이벤트 규약(lower camelCase)과 matcher(`Shell`, `Read`, `Write`)가 Claude와 상이해 별도 설계 필요. 후속 릴리즈(v0.11+)에서 검토
 
