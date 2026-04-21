@@ -41,34 +41,34 @@ Synapse aggregates all Inspector results into a unified review report:
 
 ## Outside Voice Option
 
-모든 Inspector 리뷰 완료 및 통합 리포트 생성 후, Synapse Phase 8에 따라 Outside Voice를 제안한다.
+After all Inspector reviews finish and the aggregated report is produced, propose Outside Voice per Synapse Phase 8.
 
-### 제안 조건
+### Trigger conditions
 
-Synapse Phase 8 Smart Activation 조건에 따라 제안한다.
-리뷰 결과에 `severity: warning` 이상 항목이 존재하면서 PASS 판정된 경우에만 자동 제안.
-모든 항목이 `suggestion` 이하이면 Outside Voice를 건너뛰고 사유를 안내한다.
+Propose based on Synapse Phase 8 Smart Activation criteria.
+Auto-propose only when review results contain `severity: warning` or higher items AND the overall verdict is PASS.
+If every item is `suggestion` or lower, skip Outside Voice and explain why.
 
-### 제안 메시지
+### Prompt template (render in user's locale)
 
 ```text
-[Review Complete] 리뷰가 완료되었습니다.
-- Critical: {N}건 / Warning: {M}건 / Suggestion: {K}건
+[Review Complete] Review finished.
+- Critical: {N} / Warning: {M} / Suggestion: {K}
 
-Warning 이상 항목이 {M+N}건 감지되었습니다.
-독립적인 외부 모델의 교차 검증을 받아보시겠습니까?
+Detected {M+N} warning-or-higher items.
+Run independent cross-model verification?
 ```
 
-### Review 특화 Outside Voice 프롬프트
+### Review-specific Outside Voice prompt
 
-Outside Voice 실행 시, Challenger에게 다음을 전달:
-- Inspector들의 리뷰 결과 전체
-- "Inspector들이 PASS로 판단한 영역"에 대한 재검증 요청
-- 보안, 성능, 아키텍처 관점의 교차 검증
+When Outside Voice runs, pass the Challenger:
+- The full aggregated Inspector review results
+- A request to re-verify areas the Inspectors marked PASS
+- A cross-model check focused on security, performance, and architecture perspectives
 
-### 결과 통합
+### Result integration
 
-Outside Voice 결과는 기존 리뷰 리포트에 별도 섹션으로 추가:
+Append Outside Voice output as a separate section of the existing review report:
 
 ```markdown
 ## Outside Voice Review ({provider})

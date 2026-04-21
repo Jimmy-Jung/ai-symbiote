@@ -32,39 +32,40 @@ offers an Outside Voice review of the plan.
 
 ### Outside Voice Option (Phase 8)
 
-Architect 결과가 완성된 후, 사용자에게 계획을 제시하기 전에 Outside Voice를 제안한다.
+After the Architect finishes, propose Outside Voice before presenting the plan to the user.
+
+Prompt template (render in user's locale):
 
 ```text
-[Plan Ready] 구현 계획이 준비되었습니다.
+[Plan Ready] Implementation plan is ready.
 
-계획을 바로 보시겠습니까, 아니면 먼저 독립적인 외부 모델의
-검토를 받아보시겠습니까?
+Review the plan directly, or get an independent external-model review first?
 
-1. Outside Voice 검토 후 계획 확인
-2. 바로 계획 확인
+1. Run Outside Voice, then review the plan
+2. Review the plan directly
 ```
 
-### Planning 특화 Outside Voice 프롬프트
+### Planning-specific Outside Voice prompt
 
-Outside Voice 실행 시, Challenger에게 다음을 포커스:
-- 계획의 전제 조건 검증
-- 빠진 단계 식별
-- 리스크 평가 적절성
-- 대안 접근법 제시
-- Builder 할당 전략의 효율성
+When Outside Voice runs, focus the Challenger on:
+- Validating plan premises
+- Identifying missing steps
+- Assessing risk coverage
+- Proposing alternative approaches
+- Evaluating Builder allocation efficiency
 
-### 결과 통합
+### Result integration
 
-Outside Voice 결과가 있으면, EnterPlanMode에서 함께 제시:
+When Outside Voice results exist, include them alongside the plan in EnterPlanMode:
 
 ```markdown
-## 계획 (Architect)
+## Plan (Architect)
 {original plan}
 
-## 독립 검토 (Outside Voice - {provider})
+## Independent Review (Outside Voice - {provider})
 {outside voice feedback}
 
-## 충돌점
+## Tension Points
 {tension items if any}
 ```
 

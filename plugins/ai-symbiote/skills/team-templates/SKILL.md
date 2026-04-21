@@ -35,8 +35,8 @@ Deep analysis team. Explores the codebase from multiple angles and produces stru
 |-------|------|-------|-----------|---------|
 | Wave 3 | Challenger | 1 | Sequential | Challenge analysis conclusions and assumptions |
 
-- Trigger: Wave 2 (Architect synthesis) 완료 후, Synapse Phase 8에 따라 사용자에게 제안
-- Focus: 분석 결론의 근거 충분성, 놓친 코드 패턴/의존성, 대안적 해석
+- Trigger: After Wave 2 (Architect synthesis) completes; proposed to user per Synapse Phase 8
+- Focus: Evidence sufficiency for the analysis, missed code patterns/dependencies, alternative interpretations
 
 ### Result Synthesis
 The orchestrator reads the Architect's result file and reports to the user.
@@ -89,9 +89,9 @@ If Codex is unavailable, skip this section and proceed with Claude agents only.
 |-------|------|-------|-----------|---------|
 | Phase 4 | Challenger | 1 | Sequential | Independent review of completed implementation |
 
-- Trigger: Phase 3 (Inspector) PASS 후, Synapse Phase 8에 따라 사용자에게 제안
-- Focus: 구현 접근법의 대안, 성능/보안/유지보수성 우려, 놓친 엣지 케이스, 아키텍처 일관성
-- Note: 기존 Codex Integration의 에러 복구 배포와 구분된다. Outside Voice는 PASS된 완성된 작업에 대한 독립 리뷰이다.
+- Trigger: After Phase 3 (Inspector) PASS; proposed to user per Synapse Phase 8
+- Focus: Alternative implementation approaches, performance/security/maintainability concerns, missed edge cases, architectural consistency
+- Note: Distinct from the Codex Integration error-recovery deployment. Outside Voice is an independent review of completed, passing work.
 
 ### Mode Variants
 
@@ -156,9 +156,9 @@ If Codex is unavailable, review with Inspectors only.
 |-------|------|-------|-----------|---------|
 | Wave 3 | Challenger | 1 | Sequential | Cross-model adversarial review of completed review |
 
-- Trigger: Wave 2 (Inspectors) 완료 및 결과 합산 후, Synapse Phase 8에 따라 사용자에게 제안
-- Focus: Inspector들이 동의한 "pass" 항목에 대한 재검증, 리뷰 관점의 사각지대, cross-cutting concerns
-- Note: 기존 Codex Integration의 병렬 dual review와 구분된다. Codex review는 Wave 2에서 Inspector와 병렬 실행되지만, Outside Voice는 모든 리뷰 완료 후 독립적으로 실행된다.
+- Trigger: After Wave 2 (Inspectors) complete and results are aggregated; proposed to user per Synapse Phase 8
+- Focus: Re-verification of "pass" items agreed by Inspectors, review blind spots, cross-cutting concerns
+- Note: Distinct from the Codex Integration parallel dual review. Codex review runs in parallel with Inspector during Wave 2, whereas Outside Voice runs independently after all reviews complete.
 
 ### Result Synthesis
 The orchestrator aggregates all Inspector + Codex results into a unified review report.
@@ -194,8 +194,8 @@ Planning team. Creates actionable plans before implementation.
 |-------|------|-------|-----------|---------|
 | Wave 3 | Challenger | 1 | Sequential | Challenge plan assumptions and propose alternatives |
 
-- Trigger: Wave 2 (Architect plan) 완료 후, 사용자에게 계획 제시 전에 Outside Voice 제안
-- Focus: 계획의 전제 조건 유효성, 더 단순한 접근법 존재 여부, 리스크 평가 충분성, 누락된 구현 단계, 대안 아키텍처
+- Trigger: After Wave 2 (Architect plan) completes; Outside Voice is proposed before presenting the plan to the user
+- Focus: Validity of plan premises, whether a simpler approach exists, adequacy of risk assessment, missing implementation steps, alternative architectures
 
 ### Result Synthesis
 The orchestrator presents the Architect's result to the user via EnterPlanMode.
@@ -225,7 +225,7 @@ Research team. Combines external information with internal codebase information.
 - Wave 2: Architect synthesizes after all results are collected
 
 ### Outside Voice
-Outside Voice는 research 템플릿에서 기본 비활성이다. 사용자가 명시적으로 요청한 경우에만 실행한다.
+Outside Voice is disabled by default in the research template. Run only when the user explicitly requests it.
 
 ### Applicable Skills
 - "investigate", "research", "migration" natural language triggers
@@ -255,7 +255,7 @@ Scout result analysis
 ```
 
 ### Outside Voice
-Outside Voice는 dynamic 템플릿에서 기본 비활성이다. 사용자가 명시적으로 요청한 경우에만 실행한다.
+Outside Voice is disabled by default in the dynamic template. Run only when the user explicitly requests it.
 
 ---
 

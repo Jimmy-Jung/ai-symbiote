@@ -536,7 +536,7 @@ for independent review during Phase 8 of the Synapse lifecycle.
 - subagent_type: `reviewer`
 - model: platform-dependent (see Provider Selection)
 - Injected skill: none (no skill injection to maintain independent review perspective)
-- Injected context: `~/ai-symbiote/{slug}/context.md` (프로젝트 컨텍스트는 주입하여 informed review 보장)
+- Injected context: `~/ai-symbiote/{slug}/context.md` (project context is injected to ensure an informed review)
 
 ### Key Difference from Codex Role
 
@@ -586,15 +586,15 @@ provider = "claude"
 
 #### Cursor Environment
 
-Present choice to user:
+Present choice to user (localize the prompt to the user's language at render time):
 
 ```text
-[Outside Voice] 어떤 모델의 의견을 들어보시겠습니까?
+[Outside Voice] Which model's opinion would you like to consult?
 
-1. Claude에게 요청 (Anthropic Claude sonnet)
-2. Codex에게 요청 (OpenAI GPT-5.4)
-3. 아니오 - 바로 결과 전달
-4. 이 세션에서 묻지 않기
+1. Ask Claude (Anthropic Claude sonnet)
+2. Ask Codex (OpenAI GPT-5.4)
+3. No — deliver results as-is
+4. Don't ask again in this session
 ```
 
 ### Self-Invocation Prevention
@@ -688,9 +688,9 @@ independence — it is a persona-based approximation within the same model famil
 to distinguish from true cross-model reviews. The user must be informed:
 
 ```text
-[Outside Voice - degraded] 외부 모델({target})을 사용할 수 없어
-동일 런타임의 adversarial 서브에이전트로 대체합니다.
-진정한 cross-model 리뷰가 아닌 제한적 모드임을 참고해 주세요.
+[Outside Voice - degraded] External model ({target}) is unavailable;
+falling back to an adversarial subagent on the same runtime.
+Note: this is a limited mode, not a true cross-model review.
 ```
 
 ```

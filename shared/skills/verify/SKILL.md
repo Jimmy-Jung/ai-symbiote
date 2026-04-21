@@ -8,22 +8,25 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Skill, Agent]
 
 # Verify -- Write-time Verification Layer
 
-AI가 작성한 코드의 opacity를 행동적으로 측정하고 제거하는 스킬. PostToolUse 훅이 edit 이벤트를 `~/.ai-symbiote/state/verify-queue.jsonl`에 큐잉하면, `/verify`가 이를 꺼내어 cold-read reviewer + LLM judge 파이프라인으로 검증한다.
+Measure and remove opacity in AI-authored code behaviorally. The PostToolUse hook
+queues edit events into `~/.ai-symbiote/state/verify-queue.jsonl`; `/verify`
+drains that queue through the cold-read reviewer + LLM judge pipeline.
 
-자세한 설계 배경은 `docs/02-아키텍처.md`("Write-time Verification Layer" 섹션)와 office-hours 디자인 문서(Stage 0/1) 참조.
+Design background: `docs/02-아키텍처.md` ("Write-time Verification Layer" section)
+and the office-hours design doc (Stage 0 / Stage 1).
 
 ## Entry Conditions
 
-- `~/.ai-symbiote/state/verify-queue.jsonl`에 현재 프로젝트/브랜치의 pending entry가 1개 이상 존재
-- OR `--sha`/`--file`로 명시적 target 지정
-- `codex` CLI가 PATH에 존재하고 `codex login` 완료 상태
-- 현재 디렉토리가 git 저장소
+- One or more pending entries for the current project/branch exist in `~/.ai-symbiote/state/verify-queue.jsonl`
+- OR `--sha` / `--file` specifies an explicit target
+- The `codex` CLI is on PATH and `codex login` has completed
+- The current directory is a git repository
 
-`codex`가 없으면 Claude 하위 에이전트로 fallback (degraded mode).
+If `codex` is unavailable, fall back to a Claude subagent (degraded mode).
 
 ## Workflow
 
-### Step 1: Queue 읽기 및 필터링
+### Step 1: Queue read + filtering
 
 ```bash
 QUEUE_FILE="$HOME/.ai-symbiote/state/verify-queue.jsonl"
@@ -32,19 +35,19 @@ PROJECT=$(basename "$REPO_ROOT")
 BRANCH=$(git branch --show-current)
 ```
 
-필터링 기준 (우선순위 순):
-1. **Schema v2 (권장)**: `repo_root == $REPO_ROOT AND branch == $BRANCH`
-2. **Schema v1 호환**: `repo_root` 필드가 없는 legacy entry는 `project == $PROJECT AND branch == $BRANCH`로 매칭
+Filter key priority:
+1. **Schema v2 (preferred)**: `repo_root == $REPO_ROOT AND branch == $BRANCH`
+2. **Schema v1 fallback**: legacy entries without a `repo_root` field match on `project == $PROJECT AND branch == $BRANCH`
 
-`--sha`/`--file` 인자가 있으면 해당 조건을 추가로 AND. `--sha`는 엔트리의 `base_sha` 또는 legacy `sha` 둘 다와 비교한다.
+`--sha` / `--file` AND additional conditions on top. `--sha` compares against
+both `base_sha` and legacy `sha` fields.
 
-pending이 0개면:
+When zero entries remain, exit with:
 ```
 No pending verifications for {project}/{branch}. Queue empty.
 ```
-로 종료.
 
-### Step 2: 사용자 확인 + 배치 캡
+### Step 2: User confirmation + batch cap
 
 ```
 [Verify] {N} pending verifications for {project}/{branch}:
@@ -56,36 +59,41 @@ Estimated: ~60s × {N} = ~{total}s, ~${cost} USD.
 Proceed? [Y/n]
 ```
 
-**배치 캡 규칙** (비용 안전장치):
-- `N ≤ 10` → 단일 확인으로 전체 처리
-- `N > 10` → 기본 첫 10건만 처리. 나머지는 queue에 유지. 사용자 재호출로 다음 배치 진행
-- `--max-batch <n>` 인자로 기본 10을 override 가능 (상한은 자기 판단)
-- `{cost}` 산정은 entry당 ~$0.15 USD (Codex medium reasoning reviewer + judge) 보수적 추정
+**Batch cap (cost safety)**:
+- `N ≤ 10` → process everything with a single confirmation
+- `N > 10` → process the first 10 only; leave the rest in the queue; user
+  re-invokes for the next batch
+- `--max-batch <n>` overrides the default of 10 (cap is the operator's judgment)
+- `{cost}` estimate is ~$0.15 USD per entry (Codex medium-reasoning reviewer +
+  judge), deliberately conservative
 
-`Y` → Step 2.5 진행.
-`n` → 종료 (queue 그대로 유지).
-`--dry-run` → 큐 내용만 표시하고 종료.
+`Y` → proceed to Step 2.5.
+`n` → exit (queue untouched).
+`--dry-run` → print queue contents and exit.
 
-### Step 2.5: Pre-flight 기계검증
+### Step 2.5: Pre-flight machine checks
 
-Reviewer 호출 전에 각 entry의 diff에 대해 프로젝트 네이티브 기계검증을 먼저 실행한다. 결과는 reviewer 프롬프트의 `INPUT` 섹션에 포함되어 cold-read reviewer가 AI-generated 코드의 전형적 opacity 패턴(unused import, any-type drift, 실패 test 등)을 직접 질문으로 전환할 수 있게 한다.
+Before calling the reviewer, run the project's native machine checks against
+each entry's diff. Inject results into the reviewer prompt's `INPUT` section so
+the cold-read reviewer can convert AI-generated-code opacity patterns (unused
+imports, any-type drift, failing tests, etc.) directly into sharper questions.
 
-**감지 규칙** (repo root 기준, 감지된 것만 실행):
+**Detection rules** (executed only when detected at repo root):
 - `package.json` + `scripts.typecheck` → `npm run typecheck`
-- `tsconfig.json` 존재, typecheck 스크립트 없으면 → `npx tsc --noEmit`
-- `pyproject.toml` 또는 `setup.cfg` → `ruff check .` (있으면) + `python -m pytest --collect-only`
+- `tsconfig.json` without a typecheck script → `npx tsc --noEmit`
+- `pyproject.toml` or `setup.cfg` → `ruff check .` (if installed) + `python -m pytest --collect-only`
 - `Cargo.toml` → `cargo check --message-format=short`
 - `go.mod` → `go vet ./...`
 - `.swiftlint.yml` → `swiftlint lint --quiet`
-- 공통 lint: `npm run lint` / `eslint` / `shellcheck` / `bats` 감지 시 실행
+- Generic lint: run `npm run lint` / `eslint` / `shellcheck` / `bats` when detected
 
-**실행 규칙**:
-- 각 명령은 30초 timeout. 초과 → `"(pre-flight: timeout)"` 기록 후 계속
-- exit code 비零 → stdout/stderr 앞 30줄만 캡처해 reviewer 프롬프트에 전달
-- 감지 실패 → `"(pre-flight: no machine checks configured)"` 기록
-- **Hard gate 아님**. 실패해도 reviewer 호출은 진행. opacity 힌트 제공 목적.
+**Execution rules**:
+- Each command has a 30-second timeout. On timeout, record `"(pre-flight: timeout)"` and continue
+- Non-zero exit: capture the first 30 lines of stdout/stderr and pass to the reviewer prompt
+- No detection: record `"(pre-flight: no machine checks configured)"`
+- **Not a hard gate**. A failing check does NOT block the reviewer; the goal is to provide opacity hints.
 
-**출력 형식** (reviewer 프롬프트 INPUT 섹션에 삽입):
+**Output format** (inlined into the reviewer prompt's INPUT section):
 ```
 PRE-FLIGHT MACHINE CHECKS:
 - typecheck: PASS (0 errors)
@@ -93,79 +101,86 @@ PRE-FLIGHT MACHINE CHECKS:
 - test: (pre-flight: timeout)
 ```
 
-### Step 3: Reviewer 호출 (per entry)
+### Step 3: Reviewer call (per entry)
 
-각 entry에 대해:
+For each entry:
 
-1. **Diff 수집 — base_sha 계약**
+1. **Diff collection — base_sha contract**
 
-   큐의 `base_sha`는 **편집 직전 HEAD**다. `git show <base_sha>`는 **이전 커밋**의 변경을 보여주므로 절대 사용 금지. 올바른 계약:
+   The queue's `base_sha` is the **pre-edit HEAD**. Do NOT use `git show <base_sha>`:
+   it returns the **prior commit's** changes. The correct contract:
 
-   - `base_sha == "uncommitted"` (repo에 커밋 전혀 없음)
-     → `git diff --no-index /dev/null <file>` 또는 `git diff -- <file>` (현재 작업 상태 전체)
+   - `base_sha == "uncommitted"` (repo has no commits yet)
+     → `git diff --no-index /dev/null <file>` or `git diff -- <file>` (full working-tree state)
 
-   - 현재 `HEAD == base_sha` (편집 후 아직 커밋 안 함)
+   - Current `HEAD == base_sha` (edit has not been committed yet)
      → `git diff <base_sha> -- <file>` (unstaged edit)
      → `git diff --cached <base_sha> -- <file>` (staged edit)
-     → 두 결과를 합쳐 reviewer에게 전달
+     → merge both outputs into what the reviewer sees
 
-   - 현재 `HEAD != base_sha` (편집 후 하나 이상의 커밋이 있음)
-     → `git diff <base_sha>..HEAD -- <file>` (base 이후 누적 변경)
-     → 선택적으로 `git log --oneline <base_sha>..HEAD -- <file>`로 커밋 목록도 첨부
+   - Current `HEAD != base_sha` (one or more commits landed after the edit)
+     → `git diff <base_sha>..HEAD -- <file>` (cumulative change since base)
+     → optionally append `git log --oneline <base_sha>..HEAD -- <file>` as commit context
 
-   - `base_sha` 필드가 없는 legacy entry (schema v1)
-     → `sha` 필드를 `base_sha`로 간주하고 위 규칙 재적용
+   - Legacy entries without `base_sha` (schema v1)
+     → treat the `sha` field as `base_sha` and reapply the rules above
 
-   **경계 케이스**: file이 이미 삭제됐거나 reverted된 경우 diff가 비면 "`(no changes — file reverted or deleted)`"로 표기하고 Step 7으로 스킵.
+   **Edge case**: if the file was deleted or reverted and the diff is empty,
+   record "`(no changes — file reverted or deleted)`" and skip to Step 7.
 
-2. **Reviewer prompt 조립** (아래 "Reviewer Prompt Template" 참조)
-3. **Codex 호출**:
+2. **Reviewer prompt assembly** (see "Reviewer Prompt Template" below)
+3. **Codex invocation**:
    ```bash
    source ~/.claude/skills/gstack/bin/gstack-codex-probe 2>/dev/null || true
    codex exec "$PROMPT" -C "$(git rev-parse --show-toplevel)" \
      -s read-only -c 'model_reasoning_effort="medium"' --json < /dev/null
    ```
-   JSON 스트림에서 `item.completed` / `agent_message`만 파싱해 질문 수집.
+   Parse only `item.completed` / `agent_message` from the JSON stream to
+   harvest questions.
 
-4. 출력된 질문들을 저장 후 Step 3.5로.
+4. Persist the emitted questions and proceed to Step 3.5.
 
-### Step 3.5: 질문 랜덤 Subset 선택 (V2c Gaming 방어 — 필수)
+### Step 3.5: Random question subset selection (V2c gaming defense — required)
 
-Reviewer가 3개 role × 2-3 질문 = **N = 5~8개** 생성한다. 저자는 그 중 **K = 3개**를 무작위로 선택해서만 답변한다. 저자가 예상 질문 전체에 답변을 미리 준비/seeding 하는 공격을 차단한다.
+The reviewer emits 3 roles × 2-3 questions = **pool size N = 5~8**. The author
+answers a **randomly selected K = 3** subset of that pool. This blocks the
+attack where the author prepares answers to every possible question in advance
+(seeding).
 
-**선택 알고리즘**:
-1. Reviewer 출력에서 "Diversity check"의 중복 쌍 제거 후 남은 유효 질문 = `pool`
-2. `len(pool) < 3` → verification trivial로 판정 후 Step 7로 스킵 (질문이 너무 적으면 randomization 의미 없음)
-3. `len(pool) ≥ 3` → 시드를 `sha + current_timestamp`로 고정해 결정적 무작위성 확보 (로그 재현성 유지). `pool`에서 3개 독립 선택
-4. 선택된 K=3만 Step 4로 전달. 미선택 질문은 artifact에 `skipped_by_v2c` 섹션으로 기록 (투명성)
+**Selection algorithm**:
+1. Drop duplicate pairs flagged in the reviewer's "Diversity check"; the remainder is `pool`
+2. `len(pool) < 3` → verification is trivial; jump to Step 7 (randomization is meaningless with too few questions)
+3. `len(pool) ≥ 3` → seed the RNG with `sha + current_timestamp` for deterministic reproducibility of logs. Pick 3 independent entries from `pool`
+4. Pass only the K=3 to Step 4. Record unselected questions in the artifact's `skipped_by_v2c` section (transparency)
 
-**예외 - `--all-questions` 플래그**:
-- 디버깅 용도로 전체 pool에 답변하고 싶을 때만 사용
-- artifact에 `v2c_bypassed: true` 경고 포함
-- Production 실행에서는 사용 금지 (gaming 저항성 포기 선언)
+**Exception — `--all-questions` flag**:
+- Use for debugging only, when answering the full pool is desired
+- The artifact gets `v2c_bypassed: true` as a warning
+- Forbidden in production runs (it is a declaration that gaming resistance has been dropped)
 
-### Step 4: Author 답변 생성
+### Step 4: Author answer generation
 
-현재 Claude 세션(이 스킬이 실행되는 컨텍스트 = 저자 모델)에 질문을 주고 답변 요청.
+Pass the questions to the current Claude session (the context this skill runs
+in = the author model) and request answers.
 
-**답변 규칙** (반드시 명시):
-- 특정 코드 라인/식별자 참조 필수
-- 고려했던 대안 하나 이상 명시
-- "모르겠음", "AI가 그냥 생성함"도 유효 (단, rewrite 트리거)
+**Answer rules** (make them explicit to the author):
+- MUST reference a specific code line / identifier
+- MUST mention at least one alternative that was considered
+- "I don't know" or "the AI just generated it" are valid answers, but they trigger rewrite
 
 ### Step 5: V1 Validator (Basic)
 
-각 답변에 대해:
-- V1a 길이 ≥ 50자
-- V1b 코드 참조 패턴 (`[\w/.-]+:\d+` 또는 backtick identifier)
-- V1c "모르겠음|don't know|그냥" 키워드 부재
-- V1d 최소 1개 대안 언급 ("대신|instead|could have|rejected|considered")
+For each answer:
+- V1a length ≥ 50 chars
+- V1b has a code-reference pattern (`[\w/.-]+:\d+` or a backticked identifier)
+- V1c no "I don't know / no reason" keywords (Korean "모르겠음 / 그냥" also rejected)
+- V1d mentions at least one alternative ("instead / could have / rejected / considered" — Korean "대신" also accepted)
 
-V1 fail → 즉시 rewrite loop (answer만 재생성).
+V1 fail → enter the rewrite loop immediately (regenerate the answer only).
 
 ### Step 6: V2 Validator — LLM Judge Verifiability Check ⭐
 
-**필수 메커니즘**. Codex 판정으로 gaming 탐지.
+**Required mechanism**. Codex adjudication detects gaming.
 
 ```
 You are a strict LLM judge evaluating whether a code author's reasoning is
@@ -184,18 +199,19 @@ For each answer, output:
 Final line: OVERALL: GAMING_DETECTED | GENUINE
 ```
 
-Judge 호출 시 전달: `(CODE, PR_BODY or commit_message, QUESTIONS, ANSWERS)`
+Judge call inputs: `(CODE, PR_BODY or commit_message, QUESTIONS, ANSWERS)`.
 
-Judge 모델: 기본 Codex (저자와 다른 벤더). 저자가 Codex일 경우에만 Claude subagent fallback.
+Judge model: default Codex (must differ in vendor from the author). Fall back
+to a Claude subagent only when the author is Codex.
 
-Judge가 `GAMING_DETECTED` → 전체 rewrite loop.
-Judge가 `GENUINE` + V1 전부 pass → verification pass.
+Judge returns `GAMING_DETECTED` → full rewrite loop.
+Judge returns `GENUINE` + every V1 passes → verification PASS.
 
-### Step 7: Artifact 저장
+### Step 7: Artifact persistence
 
-경로: `.ai-symbiote/qa/<project>/<YYYY-MM-DD>/<sha-or-timestamp>.md`
+Path: `.ai-symbiote/qa/<project>/<YYYY-MM-DD>/<sha-or-timestamp>.md`
 
-포맷:
+Format:
 ```markdown
 # Verification — <sha> (<branch>)
 
@@ -237,11 +253,12 @@ A3: ...
 <feedback to author>
 ```
 
-### Step 8: Queue entry 제거
+### Step 8: Remove queue entry
 
-성공 처리된 entry를 queue에서 삭제. Fail로 끝난 entry는 queue에 남겨 다음 `/verify`에서 재시도.
+Delete entries that finished as PASS. Leave FAIL entries in the queue for the
+next `/verify` retry.
 
-### Step 9: 결과 요약
+### Step 9: Results summary
 
 ```
 [Verify] Completed {N} verifications:
@@ -321,53 +338,58 @@ DIFF:
 
 ### V2 Gaming Resistance (Required Defense)
 - **V2a** PR body vs answer bigram overlap > 40% → seeding suspicion flag
-- **V2b** LLM judge verifiability check → `GAMING_DETECTED` = fail (실 차단선)
-- **V2c** Reviewer가 pool N=5~8 생성, 저자는 K=3 랜덤 subset에만 답변 (Step 3.5 참조). 예측 seeding 방해. `--all-questions` 플래그로만 bypass 가능.
+- **V2b** LLM judge verifiability check → `GAMING_DETECTED` = fail (the real block)
+- **V2c** Reviewer emits a pool of N=5~8; author answers only a random K=3 subset (see Step 3.5). Blocks predictive seeding. Only `--all-questions` can bypass.
 
-Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b judge가 실 차단선. V2c 랜덤화로 seeding 공격의 사전 준비 비용 증가. **셋 모두 필수**.
+Stage 0 empirical (2026-04-20): V1 alone let 3/3 gaming cases through. V2b judge
+is the real block; V2c randomization raises the attacker's preparation cost.
+**All three are required.**
 
 ## Platform Support
 
-- **Claude**: hook queue + `/verify` skill 둘 다 지원
-- **Codex**: `/verify` skill만 수동 호출 (Write|Edit post-hook 부재로 queue 자동 append 불가). `/verify --sha <sha>` 또는 `--file <path>`로 수동 지정 사용.
+- **Claude**: both hook queue and `/verify` skill supported
+- **Codex**: only the `/verify` skill is available (no Write|Edit PostToolUse hook, so no auto-queue). Use `/verify --sha <sha>` or `--file <path>` explicitly.
 
 ## Fallback Mode
 
-`codex` CLI가 PATH에 없거나 `codex login`이 안 된 경우의 degraded 모드. **이 모드에서 Agent tool 사용은 이 스킬의 `allowed-tools`에 `Agent`가 명시되어 있어야 작동한다** (frontmatter 참조).
+Degraded mode when the `codex` CLI is absent from PATH or `codex login` has
+not completed. **The Agent tool MUST be listed in this skill's frontmatter
+`allowed-tools` for this mode to work.**
 
-1. **Reviewer fallback**: Claude subagent를 `Agent` tool로 띄워 cold-read reviewer 역할 수행. 질문 pool 생성 (3 roles 통합 프롬프트 그대로). Diversity 손실 경고를 artifact에 기록
-2. **Judge fallback**: Reviewer와 **별개의** Claude subagent를 새로 띄워 V2b verifiability check 수행. 동일 subagent 재사용 금지 (의심의 여지 없이 collusion). Collusion risk 경고를 artifact에 기록
-3. **Artifact 플래그**: `degraded_mode: true`, `reviewer: claude-subagent`, `judge: claude-subagent`를 Validator Report에 각인
-4. **사용자 알림**: 결과 요약에 "⚠️ DEGRADED_MODE — reviewer/judge 모두 Claude 기반. Codex 복구 권장: `codex login`" 출력
+1. **Reviewer fallback**: spawn a Claude subagent via `Agent` as the cold-read reviewer. It generates the question pool using the same 3-roles prompt. Record a diversity-loss warning in the artifact.
+2. **Judge fallback**: spawn a **separate** Claude subagent for the V2b verifiability check. Do NOT reuse the reviewer subagent (that would be outright collusion). Record a collusion-risk warning in the artifact.
+3. **Artifact flags**: write `degraded_mode: true`, `reviewer: claude-subagent`, `judge: claude-subagent` into the Validator Report.
+4. **User notice**: the results summary must include "⚠️ DEGRADED_MODE — reviewer and judge are both Claude-based. Recommend restoring Codex: `codex login`".
 
-**허용되지 않는 fallback 패턴**:
-- 저자 모델과 **같은** 세션 컨텍스트로 reviewer/judge 역할만 바꿔 호출 (= 사실상 self-review)
-- Reviewer subagent의 출력을 judge subagent 프롬프트에 그대로 붙여넣고 한 번에 처리 (= 단일 세션 collusion)
+**Forbidden fallback patterns**:
+- Calling reviewer and judge in the **same** session as the author (that is effectively self-review)
+- Pasting the reviewer subagent's output directly into the judge subagent's prompt and handling both in one session (single-session collusion)
 
-Subagent 간 **대화 컨텍스트 격리**가 원칙. Agent tool의 각 호출이 독립 세션임을 이용한다.
+Principle: **conversation-context isolation between subagents**. Rely on the fact
+that each `Agent` invocation is an independent session.
 
 ## Arguments
 
-- `--all` (default): 현재 project/branch의 모든 pending entry 처리 (배치 캡 적용)
-- `--sha <sha>` : 특정 sha만 처리
-- `--file <path>` : 특정 파일과 관련된 entry만
-- `--dry-run` : queue 내용만 표시하고 실제 호출 없이 종료
-- `--max-batch <n>` : 1회 호출당 처리할 entry 최대값 (기본 10, Step 2 배치 캡 참조)
-- `--all-questions` : V2c 랜덤화 bypass. 전체 질문 pool에 답변. 디버깅 전용, production 금지
+- `--all` (default): process every pending entry for the current project/branch (batch cap applies)
+- `--sha <sha>`: process the matching sha only
+- `--file <path>`: process entries related to the given file only
+- `--dry-run`: print queue contents and exit without calling out to models
+- `--max-batch <n>`: override the default 10-entry per-invocation cap (Step 2)
+- `--all-questions`: bypass V2c randomization and answer the full pool. Debug-only, forbidden in production.
 
 ## Related Skills
 
-- `gc` — 오래된 queue entry / qa artifact 정리 (향후 gc 확장)
-- `ship` / `pr` — PR 생성 시 qa/ artifact를 본문에 첨부하는 통합 (향후)
-- `investigate` — FAIL 원인 디버깅 시 참조
+- `gc` — prune stale queue entries / qa artifacts (future gc extension)
+- `ship` / `pr` — attach qa/ artifacts to the PR body (future integration)
+- `investigate` — reference when debugging a FAIL cause
 
 ## Important Rules
 
-- **Never skip V2b judge check**. V1만으로는 gaming 완전 탐지 불가 (Stage 0 실측).
-- **Never skip V2c randomization**. `--all-questions`는 디버깅 전용. production 실행에서 artifact에 `v2c_bypassed: true`가 남으면 그 검증은 무효.
-- **Judge 모델은 저자와 반드시 다름**. config override 금지.
-- **모든 artifact는 `.ai-symbiote/qa/` 저장**. PR 본문에 링크 가능한 영구 경로.
-- **Queue entry 삭제는 PASS 후에만**. FAIL은 queue 유지 → 다음 /verify에서 재시도.
-- **사용자 요청 시에만 실행**. 자동 강제 실행 없음 (edit flow 방해 금지).
-- **배치 캡 우회 금지**. N > 10일 때 한 번에 밀어붙이는 것은 비용 사고 위험. 10건씩 잘라 진행.
-- **Pre-flight는 hard gate 아님**. 기계검증 실패해도 Q&A는 진행. 실패 정보를 reviewer에게 전달해 더 날카로운 질문 유도.
+- **Never skip V2b judge check**. V1 alone cannot detect gaming (Stage 0 empirical).
+- **Never skip V2c randomization**. `--all-questions` is debug-only; any production artifact carrying `v2c_bypassed: true` is an invalid verification.
+- **Judge model MUST differ from the author's vendor**. Config override forbidden.
+- **Every artifact lives under `.ai-symbiote/qa/`**. Permanent path that can be linked from a PR body.
+- **Delete queue entries only after PASS**. FAIL stays in the queue and retries on the next `/verify`.
+- **User-invoked only**. Never auto-run (would disrupt the edit flow).
+- **Do not bypass the batch cap**. Pushing more than 10 entries in one call risks a cost incident. Chunk by 10.
+- **Pre-flight is not a hard gate**. Continue the Q&A even when the machine checks fail; pass the failure text to the reviewer so it can ask sharper questions.
