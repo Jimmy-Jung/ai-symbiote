@@ -8,7 +8,8 @@
 # Design rationale: hooks.json has timeout: 10s, but Judge-based verification
 # (~30s per call) cannot fit in that window. This hook only does O(<100ms) queue
 # append; actual verification runs synchronously inside the `/verify` skill when
-# the user explicitly invokes it. See docs/ARCHITECTURE.md for Option D details.
+# the user explicitly invokes it. See docs/02-아키텍처.md ("Write-time
+# Verification Layer" section) for Option D details.
 #
 # Principle: Silence on success — never blocks edit flow.
 #

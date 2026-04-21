@@ -10,7 +10,7 @@ allowed-tools: [Read, Write, Edit, Glob, Grep, Bash, Skill]
 
 AI가 작성한 코드의 opacity를 행동적으로 측정하고 제거하는 스킬. PostToolUse 훅이 edit 이벤트를 `~/.ai-symbiote/state/verify-queue.jsonl`에 큐잉하면, `/verify`가 이를 꺼내어 cold-read reviewer + LLM judge 파이프라인으로 검증한다.
 
-자세한 설계 배경은 `docs/ARCHITECTURE.md`와 office-hours 디자인 문서(Stage 0/1) 참조.
+자세한 설계 배경은 `docs/02-아키텍처.md`("Write-time Verification Layer" 섹션)와 office-hours 디자인 문서(Stage 0/1) 참조.
 
 ## Entry Conditions
 
@@ -39,7 +39,7 @@ No pending verifications for {project}/{branch}. Queue empty.
 ```
 로 종료.
 
-### Step 2: 사용자 확인
+### Step 2: 사용자 확인 + 배치 캡
 
 ```
 [Verify] {N} pending verifications for {project}/{branch}:
@@ -51,9 +51,42 @@ Estimated: ~60s × {N} = ~{total}s, ~${cost} USD.
 Proceed? [Y/n]
 ```
 
-`Y` → Step 3 진행.
+**배치 캡 규칙** (비용 안전장치):
+- `N ≤ 10` → 단일 확인으로 전체 처리
+- `N > 10` → 기본 첫 10건만 처리. 나머지는 queue에 유지. 사용자 재호출로 다음 배치 진행
+- `--max-batch <n>` 인자로 기본 10을 override 가능 (상한은 자기 판단)
+- `{cost}` 산정은 entry당 ~$0.15 USD (Codex medium reasoning reviewer + judge) 보수적 추정
+
+`Y` → Step 2.5 진행.
 `n` → 종료 (queue 그대로 유지).
 `--dry-run` → 큐 내용만 표시하고 종료.
+
+### Step 2.5: Pre-flight 기계검증
+
+Reviewer 호출 전에 각 entry의 diff에 대해 프로젝트 네이티브 기계검증을 먼저 실행한다. 결과는 reviewer 프롬프트의 `INPUT` 섹션에 포함되어 cold-read reviewer가 AI-generated 코드의 전형적 opacity 패턴(unused import, any-type drift, 실패 test 등)을 직접 질문으로 전환할 수 있게 한다.
+
+**감지 규칙** (repo root 기준, 감지된 것만 실행):
+- `package.json` + `scripts.typecheck` → `npm run typecheck`
+- `tsconfig.json` 존재, typecheck 스크립트 없으면 → `npx tsc --noEmit`
+- `pyproject.toml` 또는 `setup.cfg` → `ruff check .` (있으면) + `python -m pytest --collect-only`
+- `Cargo.toml` → `cargo check --message-format=short`
+- `go.mod` → `go vet ./...`
+- `.swiftlint.yml` → `swiftlint lint --quiet`
+- 공통 lint: `npm run lint` / `eslint` / `shellcheck` / `bats` 감지 시 실행
+
+**실행 규칙**:
+- 각 명령은 30초 timeout. 초과 → `"(pre-flight: timeout)"` 기록 후 계속
+- exit code 비零 → stdout/stderr 앞 30줄만 캡처해 reviewer 프롬프트에 전달
+- 감지 실패 → `"(pre-flight: no machine checks configured)"` 기록
+- **Hard gate 아님**. 실패해도 reviewer 호출은 진행. opacity 힌트 제공 목적.
+
+**출력 형식** (reviewer 프롬프트 INPUT 섹션에 삽입):
+```
+PRE-FLIGHT MACHINE CHECKS:
+- typecheck: PASS (0 errors)
+- lint: FAIL (3 warnings; first: src/foo.ts:42 unused import)
+- test: (pre-flight: timeout)
+```
 
 ### Step 3: Reviewer 호출 (per entry)
 
@@ -72,7 +105,22 @@ Proceed? [Y/n]
    ```
    JSON 스트림에서 `item.completed` / `agent_message`만 파싱해 질문 수집.
 
-4. 출력된 질문들을 저장 후 다음 단계로.
+4. 출력된 질문들을 저장 후 Step 3.5로.
+
+### Step 3.5: 질문 랜덤 Subset 선택 (V2c Gaming 방어 — 필수)
+
+Reviewer가 3개 role × 2-3 질문 = **N = 5~8개** 생성한다. 저자는 그 중 **K = 3개**를 무작위로 선택해서만 답변한다. 저자가 예상 질문 전체에 답변을 미리 준비/seeding 하는 공격을 차단한다.
+
+**선택 알고리즘**:
+1. Reviewer 출력에서 "Diversity check"의 중복 쌍 제거 후 남은 유효 질문 = `pool`
+2. `len(pool) < 3` → verification trivial로 판정 후 Step 7로 스킵 (질문이 너무 적으면 randomization 의미 없음)
+3. `len(pool) ≥ 3` → 시드를 `sha + current_timestamp`로 고정해 결정적 무작위성 확보 (로그 재현성 유지). `pool`에서 3개 독립 선택
+4. 선택된 K=3만 Step 4로 전달. 미선택 질문은 artifact에 `skipped_by_v2c` 섹션으로 기록 (투명성)
+
+**예외 - `--all-questions` 플래그**:
+- 디버깅 용도로 전체 pool에 답변하고 싶을 때만 사용
+- artifact에 `v2c_bypassed: true` 경고 포함
+- Production 실행에서는 사용 금지 (gaming 저항성 포기 선언)
 
 ### Step 4: Author 답변 생성
 
@@ -135,20 +183,33 @@ Reviewer: codex / <model>
 Judge: codex / <model>
 Result: PASS | FAIL
 
-## Questions
+## Pre-flight Machine Checks
+- typecheck: PASS | FAIL | (skipped)
+- lint: ...
+- test: ...
+
+## Questions (answered, K=3 selected from pool of N)
 Q1: ...
 Q2: ...
+Q3: ...
+
+## Questions (skipped_by_v2c)
+Q4: ...
+Q5: ...
 
 ## Answers
 A1: ...
 A2: ...
+A3: ...
 
 ## Validator Report
 - V1a~d: PASS/FAIL per rule
+- V2a bigram overlap: {%}
 - V2b judge verdict:
   - A1: PASS — ...
   - A2: FAIL — ...
   - OVERALL: GENUINE | GAMING_DETECTED
+- V2c pool size: N, answered: K, bypassed: false
 
 ## Rewrite Notes (if applicable)
 <feedback to author>
@@ -238,10 +299,10 @@ DIFF:
 
 ### V2 Gaming Resistance (Required Defense)
 - **V2a** PR body vs answer bigram overlap > 40% → seeding suspicion flag
-- **V2b** LLM judge verifiability check → `GAMING_DETECTED` = fail
-- **V2c** (optional) reviewer generates N=5 questions, author answers randomly selected K=3
+- **V2b** LLM judge verifiability check → `GAMING_DETECTED` = fail (실 차단선)
+- **V2c** Reviewer가 pool N=5~8 생성, 저자는 K=3 랜덤 subset에만 답변 (Step 3.5 참조). 예측 seeding 방해. `--all-questions` 플래그로만 bypass 가능.
 
-Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b judge가 실 차단선. 반드시 필수로 실행.
+Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b judge가 실 차단선. V2c 랜덤화로 seeding 공격의 사전 준비 비용 증가. **셋 모두 필수**.
 
 ## Platform Support
 
@@ -259,10 +320,12 @@ Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b ju
 
 ## Arguments
 
-- `--all` (default): 현재 project/branch의 모든 pending entry 처리
+- `--all` (default): 현재 project/branch의 모든 pending entry 처리 (배치 캡 적용)
 - `--sha <sha>` : 특정 sha만 처리
 - `--file <path>` : 특정 파일과 관련된 entry만
 - `--dry-run` : queue 내용만 표시하고 실제 호출 없이 종료
+- `--max-batch <n>` : 1회 호출당 처리할 entry 최대값 (기본 10, Step 2 배치 캡 참조)
+- `--all-questions` : V2c 랜덤화 bypass. 전체 질문 pool에 답변. 디버깅 전용, production 금지
 
 ## Related Skills
 
@@ -273,7 +336,10 @@ Stage 0 실측(2026-04-20): V1만으로는 3/3 gaming case 전부 통과. V2b ju
 ## Important Rules
 
 - **Never skip V2b judge check**. V1만으로는 gaming 완전 탐지 불가 (Stage 0 실측).
+- **Never skip V2c randomization**. `--all-questions`는 디버깅 전용. production 실행에서 artifact에 `v2c_bypassed: true`가 남으면 그 검증은 무효.
 - **Judge 모델은 저자와 반드시 다름**. config override 금지.
 - **모든 artifact는 `.ai-symbiote/qa/` 저장**. PR 본문에 링크 가능한 영구 경로.
 - **Queue entry 삭제는 PASS 후에만**. FAIL은 queue 유지 → 다음 /verify에서 재시도.
 - **사용자 요청 시에만 실행**. 자동 강제 실행 없음 (edit flow 방해 금지).
+- **배치 캡 우회 금지**. N > 10일 때 한 번에 밀어붙이는 것은 비용 사고 위험. 10건씩 잘라 진행.
+- **Pre-flight는 hard gate 아님**. 기계검증 실패해도 Q&A는 진행. 실패 정보를 reviewer에게 전달해 더 날카로운 질문 유도.
