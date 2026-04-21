@@ -30,11 +30,25 @@ case "$FILE_PATH" in
     ;;
 esac
 
-COMMENT_COUNT=0
+# 3가지 자명 주석 패턴을 feature별로 독립 게이트. 끈 기능은 카운트 0으로 처리.
+P1=0
+P2=0
+P3=0
 
-P1=$(grep -cE '^\s*(//|#|/\*)\s*(Initialize|Set|Get|Return|Create|Update|Delete|Check|Handle|Process)\s' "$FILE_PATH" 2>/dev/null) || P1=0
-P2=$(grep -cE '^\s*(//|#)\s*(if |for |while |function |def |class |return |import |from |require |include |export |const |var |let )' "$FILE_PATH" 2>/dev/null) || P2=0
-P3=$(grep -cE '^\s*(//|#)\s*(TODO|FIXME|HACK|XXX)\s*$' "$FILE_PATH" 2>/dev/null) || P3=0
+# obviousComments: Initialize/Set/Get/Return/Create/Update/Delete/Check/Handle/Process 류 자명 주석
+if is_feature_enabled commentChecker obviousComments; then
+  P1=$(grep -cE '^\s*(//|#|/\*)\s*(Initialize|Set|Get|Return|Create|Update|Delete|Check|Handle|Process)\s' "$FILE_PATH" 2>/dev/null) || P1=0
+fi
+
+# keywordComments: // if / // for / // function 같은 코드 키워드 에코 주석
+if is_feature_enabled commentChecker keywordComments; then
+  P2=$(grep -cE '^\s*(//|#)\s*(if |for |while |function |def |class |return |import |from |require |include |export |const |var |let )' "$FILE_PATH" 2>/dev/null) || P2=0
+fi
+
+# tagComments: 내용 없는 // TODO / // FIXME / // HACK / // XXX 단독 주석
+if is_feature_enabled commentChecker tagComments; then
+  P3=$(grep -cE '^\s*(//|#)\s*(TODO|FIXME|HACK|XXX)\s*$' "$FILE_PATH" 2>/dev/null) || P3=0
+fi
 
 COMMENT_COUNT=$((P1 + P2 + P3))
 

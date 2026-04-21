@@ -68,8 +68,15 @@ case "$SUBCOMMAND" in
       ${2:+--action "$2"} \
       ${3:+--hooks "$3"}
     ;;
+  feature)
+    # /security feature [hook.name on|off]  또는 인자 없이 matrix 표시
+    bash "$PLUGIN_ROOT/skills/security/scripts/security-feature.sh" \
+      --state-dir "$STATE_DIR" \
+      ${2:+--target "$2"} \
+      ${3:+--value "$3"}
+    ;;
   *)
-    echo "Usage: /security [scan|status|install-tools [--execute]|mode [minimal|balanced|strict|custom]]"
+    echo "Usage: /security [scan|status|install-tools [--execute]|mode [preset]|feature [hook.name on|off]]"
     exit 1
     ;;
 esac

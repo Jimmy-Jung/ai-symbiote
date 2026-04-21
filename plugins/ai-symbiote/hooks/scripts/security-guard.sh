@@ -97,12 +97,14 @@ fi
 CONTENT_LOWER=$(printf '%s' "$CONTENT" | tr '[:upper:]' '[:lower:]')
 
 # --- 6. Security pattern scanning ---
-# NOTE: Use grep on $FILE_PATH directly to avoid shell quoting issues with printf.
+# 각 SEC-W 규칙은 is_feature_enabled로 개별 게이트. `/security feature
+# securityGuard.xssRisk off` 같은 식으로 하나만 끌 수 있음.
 WARNINGS=""
 WARN_COUNT=0
 
 # Pattern: Hardcoded secrets (secret-like variable names with long string values)
-if grep -qiE '(api_key|api_secret|secret_key|access_key|private_key|auth_token|client_secret|database_url|db_password)\s*[:=]\s*.*[A-Za-z0-9_/+=]{16,}' "$FILE_PATH" 2>/dev/null; then
+if is_feature_enabled securityGuard hardcodedSecrets && \
+  grep -qiE '(api_key|api_secret|secret_key|access_key|private_key|auth_token|client_secret|database_url|db_password)\s*[:=]\s*.*[A-Za-z0-9_/+=]{16,}' "$FILE_PATH" 2>/dev/null; then
   WARNINGS="${WARNINGS}[SEC-W01/HIGH] Hardcoded secret detected in $BASENAME. Use environment variables instead.\n"
   WARN_COUNT=$((WARN_COUNT + 1))
 fi
@@ -110,7 +112,8 @@ fi
 # Pattern: .env file with actual values (not placeholders)
 case "$BASENAME_LOWER" in
   .env|.env.local|.env.production|.env.staging)
-    if grep -qE '^[A-Z_]+=.{8,}' "$FILE_PATH" 2>/dev/null; then
+    if is_feature_enabled securityGuard envFileLeak && \
+      grep -qE '^[A-Z_]+=.{8,}' "$FILE_PATH" 2>/dev/null; then
       if ! grep -qiE '(your_|changeme|placeholder|example|xxx|TODO|REPLACE)' "$FILE_PATH" 2>/dev/null; then
         WARNINGS="${WARNINGS}[SEC-W02/CRITICAL] .env file contains real secret values. Ensure this file is in .gitignore.\n"
         WARN_COUNT=$((WARN_COUNT + 1))
@@ -120,25 +123,29 @@ case "$BASENAME_LOWER" in
 esac
 
 # Pattern: SQL string concatenation (injection risk)
-if grep -qiE "(select|insert|update|delete|drop)\s.*\+\s*(req\.|request\.|params\.|user|input|args)" "$FILE_PATH" 2>/dev/null; then
+if is_feature_enabled securityGuard sqlInjection && \
+  grep -qiE "(select|insert|update|delete|drop)\s.*\+\s*(req\.|request\.|params\.|user|input|args)" "$FILE_PATH" 2>/dev/null; then
   WARNINGS="${WARNINGS}[SEC-W03/HIGH] SQL query with string concatenation detected. Use parameterized queries.\n"
   WARN_COUNT=$((WARN_COUNT + 1))
 fi
 
 # Pattern: innerHTML / dangerouslySetInnerHTML (XSS risk)
-if grep -qE '(\.innerHTML\s*=|dangerouslySetInnerHTML|v-html\s*=)' "$FILE_PATH" 2>/dev/null; then
+if is_feature_enabled securityGuard xssRisk && \
+  grep -qE '(\.innerHTML\s*=|dangerouslySetInnerHTML|v-html\s*=)' "$FILE_PATH" 2>/dev/null; then
   WARNINGS="${WARNINGS}[SEC-W04/MEDIUM] innerHTML/dangerouslySetInnerHTML usage. Sanitize input to prevent XSS.\n"
   WARN_COUNT=$((WARN_COUNT + 1))
 fi
 
 # Pattern: Debug mode left enabled
-if grep -qE '^\s*(DEBUG|VERBOSE|DEV_MODE)\s*[:=]\s*(true|1|yes|on)\b' "$FILE_PATH" 2>/dev/null; then
+if is_feature_enabled securityGuard debugModeOn && \
+  grep -qE '^\s*(DEBUG|VERBOSE|DEV_MODE)\s*[:=]\s*(true|1|yes|on)\b' "$FILE_PATH" 2>/dev/null; then
   WARNINGS="${WARNINGS}[SEC-W05/MEDIUM] Debug mode is enabled. Disable before deploying to production.\n"
   WARN_COUNT=$((WARN_COUNT + 1))
 fi
 
 # Pattern: eval/exec with variable input
-if grep -qiE '\beval\s*\(' "$FILE_PATH" 2>/dev/null; then
+if is_feature_enabled securityGuard evalUsage && \
+  grep -qiE '\beval\s*\(' "$FILE_PATH" 2>/dev/null; then
   if grep -qE 'eval\s*\([^)]*(\$|req\.|request\.|params\.|user_|input)' "$FILE_PATH" 2>/dev/null; then
     WARNINGS="${WARNINGS}[SEC-W06/HIGH] eval() with dynamic input is a code injection risk.\n"
     WARN_COUNT=$((WARN_COUNT + 1))
