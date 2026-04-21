@@ -119,7 +119,11 @@ For each entry:
      → merge both outputs into what the reviewer sees
 
    - Current `HEAD != base_sha` (one or more commits landed after the edit)
-     → `git diff <base_sha>..HEAD -- <file>` (cumulative change since base)
+     → `git diff <base_sha>..HEAD -- <file>` (committed change since base)
+     → **ALSO** `git diff HEAD -- <file>` (unstaged) and `git diff --cached -- <file>` (staged):
+       the queued edit may have been committed *and* then further modified.
+       Concatenate all three diffs so the reviewer sees the current state of
+       the file, not just the committed delta
      → optionally append `git log --oneline <base_sha>..HEAD -- <file>` as commit context
 
    - Legacy entries without `base_sha` (schema v1)
@@ -128,12 +132,24 @@ For each entry:
    **Edge case**: if the file was deleted or reverted and the diff is empty,
    record "`(no changes — file reverted or deleted)`" and skip to Step 7.
 
-2. **Reviewer prompt assembly** (see "Reviewer Prompt Template" below)
-3. **Codex invocation**:
+2. **Reviewer prompt assembly** (see "Reviewer Prompt Template" below).
+   Pass the prompt via a temp file, not via argv interpolation, so diff
+   content containing backticks, `$(...)`, or other shell metacharacters
+   cannot affect the invocation:
    ```bash
-   source ~/.claude/skills/gstack/bin/gstack-codex-probe 2>/dev/null || true
-   codex exec "$PROMPT" -C "$(git rev-parse --show-toplevel)" \
+   PROMPT_FILE=$(mktemp /tmp/verify-prompt-XXXXXX)
+   printf '%s' "$PROMPT" > "$PROMPT_FILE"
+   ```
+
+3. **Codex invocation**. Do NOT `source` anything from `~/.claude/` before
+   running Codex, the read-only sandbox depends on Codex's own workdir
+   argument; sourcing arbitrary home files first gives uncontrolled code
+   control over `$PROMPT`, `$PATH`, and the child's environment. Invoke
+   Codex directly with an explicit workdir and pass the prompt via stdin:
+   ```bash
+   codex exec "$(cat "$PROMPT_FILE")" -C "$(git rev-parse --show-toplevel)" \
      -s read-only -c 'model_reasoning_effort="medium"' --json < /dev/null
+   rm -f "$PROMPT_FILE"
    ```
    Parse only `item.completed` / `agent_message` from the JSON stream to
    harvest questions.
@@ -149,7 +165,13 @@ attack where the author prepares answers to every possible question in advance
 
 **Selection algorithm**:
 1. Drop duplicate pairs flagged in the reviewer's "Diversity check"; the remainder is `pool`
-2. `len(pool) < 3` → verification is trivial; jump to Step 7 (randomization is meaningless with too few questions)
+2. `len(pool) < 3` → verification FAILS with `reviewer_underrun` status.
+   Record the raw reviewer output in the artifact under `## Reviewer Errors`
+   and leave the entry in the queue for retry. Do NOT skip to Step 7:
+   a too-small pool usually means the reviewer parser hit an error, the
+   reviewer hit a guardrail, or the reviewer produced near-duplicate output.
+   Any of these would let an opaque edit bypass verification silently if we
+   treated them as "trivial verification"
 3. `len(pool) ≥ 3` → seed the RNG with `sha + current_timestamp` for deterministic reproducibility of logs. Pick 3 independent entries from `pool`
 4. Pass only the K=3 to Step 4. Record unselected questions in the artifact's `skipped_by_v2c` section (transparency)
 

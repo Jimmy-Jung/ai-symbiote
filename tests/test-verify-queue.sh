@@ -306,9 +306,90 @@ assert_not_contains "twin entry does NOT carry original path" "\"repo_root\":\"$
 assert_contains "original entry project is basename" "\"project\":\"$REPO_BASENAME\"" "$ORIG_ENTRY"
 assert_contains "twin entry project is same basename" "\"project\":\"$REPO_BASENAME\"" "$TWIN_ENTRY"
 
-# --- Test 11: tool_name missing → trigger defaults to "write" ---
+# --- Test 11.a: File path outside any git repo — no cross-project contamination ---
+# Regression for Codex/Claude finding #3: editing /tmp/foo.ts while hook cwd
+# is in another repo must NOT tag the entry with that other repo's identity.
 echo ""
-echo "--- Test 11: Missing tool_name defaults trigger to 'write' ---"
+echo "--- Test 11.a: Non-git file path does NOT steal current repo identity ---"
+reset_queue
+ORPHAN_DIR="$TMPROOT/orphan-tmp"
+mkdir -p "$ORPHAN_DIR"
+# Run hook while cwd is inside the twin repo, but edit a file OUTSIDE any repo.
+TWIN_REPO="$TMPROOT/other-workspace/repo"
+if [ ! -d "$TWIN_REPO" ]; then
+  # Reuse Test 10's twin repo setup if it exists, else build a minimal one
+  TWIN_PARENT="$TMPROOT/other-workspace"
+  mkdir -p "$TWIN_PARENT"
+  TWIN_REPO="$TWIN_PARENT/repo"
+  mkdir -p "$TWIN_REPO"
+  (
+    cd "$TWIN_REPO" || exit 1
+    git init -q 2>/dev/null
+    git config user.email twin@example.com
+    git config user.name Twin
+    git checkout -q -b feat/twin 2>/dev/null || true
+    echo twin > seed.txt
+    git add seed.txt
+    git commit -q -m twin-seed 2>/dev/null
+  )
+fi
+INPUT='{"tool_name":"Write","tool_input":{"file_path":"'"$ORPHAN_DIR"'/loose.ts"}}'
+(
+  cd "$TWIN_REPO" || exit 1
+  run_hook "$INPUT" >/dev/null
+)
+QUEUE_LINE=$(cat "$QUEUE_FILE")
+# The entry MUST NOT claim the twin repo's identity
+TWIN_REPO_CANON=$(cd "$TWIN_REPO" && pwd -P)
+assert_not_contains "orphan edit: twin repo_root NOT leaked" "\"repo_root\":\"$TWIN_REPO_CANON\"" "$QUEUE_LINE"
+assert_not_contains "orphan edit: twin branch NOT leaked" "\"branch\":\"feat/twin\"" "$QUEUE_LINE"
+# And repo_root should be empty string (unknown sentinel)
+assert_contains "orphan edit: repo_root=empty" '"repo_root":""' "$QUEUE_LINE"
+assert_contains "orphan edit: project=unknown" '"project":"unknown"' "$QUEUE_LINE"
+
+# --- Test 11.b: Symlinked queue file is refused (write amplifier guard) ---
+echo ""
+echo "--- Test 11.b: Hook refuses to write through a symlinked queue file ---"
+reset_queue
+mkdir -p "$HOME/.ai-symbiote/state"
+DECOY="$TMPROOT/symlink-decoy"
+: > "$DECOY"
+ln -s "$DECOY" "$HOME/.ai-symbiote/state/verify-queue.jsonl"
+mkdir -p "$REPO/src"
+run_hook '{"tool_name":"Write","tool_input":{"file_path":"'"$REPO"'/src/through-symlink.ts"}}' >/dev/null
+# The decoy (symlink target) must remain empty — hook must detect the symlink and bail
+DECOY_LINES=$(wc -l < "$DECOY" | tr -d ' ')
+assert_eq "symlinked queue file: decoy untouched" "0" "$DECOY_LINES"
+# Cleanup for subsequent tests
+rm -f "$HOME/.ai-symbiote/state/verify-queue.jsonl"
+
+# --- Test 11.c: file path with newline is escaped, not silently rewritten ---
+# Regression for Claude adversarial finding: json_escape previously ran
+# `tr '\n' ' '` which turned `a\nb.ts` into `a b.ts` silently.
+echo ""
+echo "--- Test 11.c: Newline in file path is JSON-escaped ---"
+reset_queue
+mkdir -p "$REPO/src"
+# Embed a literal newline in the path (POSIX-legal filename)
+NEWLINE_PATH=$(printf '%s/src/a\nb.ts' "$REPO")
+# Build hook input via python to escape cleanly
+INPUT_JSON=$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Write","tool_input":{"file_path":sys.argv[1]}}))' "$NEWLINE_PATH")
+printf '%s' "$INPUT_JSON" | bash "$HOOK_SCRIPT" >/dev/null
+# The queue line must be a single valid JSON line (newline escaped, not raw)
+LINE_COUNT=$(wc -l < "$QUEUE_FILE" | tr -d ' ')
+assert_eq "newline path: still a single JSONL line" "1" "$LINE_COUNT"
+# The stored file field must NOT be silently rewritten to `a b.ts`
+QUEUE_LINE=$(cat "$QUEUE_FILE")
+assert_not_contains "newline path: NOT silently flattened to space" '"file":"'"$REPO"'/src/a b.ts"' "$QUEUE_LINE"
+# The escaped file field should contain \\n (two chars: backslash + n)
+assert_contains "newline path: escaped as \\n in JSON" 'a\nb.ts' "$QUEUE_LINE"
+# And the full JSONL must parse
+VALIDATION=$(python3 -c 'import json; print("OK" if json.loads(open("'"$QUEUE_FILE"'").read()) else "BAD")' 2>/dev/null || echo "INVALID")
+assert_eq "newline path: JSONL is valid JSON" "OK" "$VALIDATION"
+
+# --- Test 12: tool_name missing → trigger defaults to "write" ---
+echo ""
+echo "--- Test 12: Missing tool_name defaults trigger to 'write' ---"
 reset_queue
 mkdir -p "$REPO/src"
 INPUT='{"tool_input":{"file_path":"'"$REPO"'/src/no_tool_name.ts"}}'
@@ -318,7 +399,7 @@ assert_contains "no tool_name → trigger=write default" '"trigger":"write"' "$Q
 
 # --- Test 12: Exit code is always 0 (never blocks agent) ---
 echo ""
-echo "--- Test 12: Exit code is 0 even with malformed JSON ---"
+echo "--- Test 13: Exit code is 0 even with malformed JSON ---"
 reset_queue
 set +e
 printf 'not json at all' | bash "$HOOK_SCRIPT" >/dev/null 2>&1

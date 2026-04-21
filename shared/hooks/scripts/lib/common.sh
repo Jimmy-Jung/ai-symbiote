@@ -169,9 +169,24 @@ else:
   fi
 }
 
-# JSON escape helper
+# JSON escape helper.
+#
+# Escapes `\`, `"`, tab, newline, and carriage return so the output is always
+# safe to embed inside a JSON string literal. Do NOT collapse `\n` → space
+# (previous behavior) because that silently rewrites filesystem paths that
+# legitimately contain newlines or carriage returns, queueing a different
+# file than the one edited. The Python-based `python3 -c` fallback, when
+# available, handles the full JSON escape rules including all control
+# characters (U+0000..U+001F); the pure-sed path handles the common cases
+# (the only control chars legal in POSIX paths are tab, newline, CR, and the
+# odd 0x0B/0x0C).
 json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | tr '\n' ' '
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json,sys;s=json.dumps(sys.argv[1]);print(s[1:-1],end="")' "$1" 2>/dev/null && return 0
+  fi
+  # Fallback: sed-based escape covering backslash, quote, tab, newline, CR.
+  # sed substitutes are applied in order; tab is a literal <TAB> in the source.
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/	/\\t/g' -e 's/\r/\\r/g' | awk 'BEGIN{ORS=""} NR>1{printf "\\n"} {print}'
 }
 
 hook_uses_cursor_protocol() {

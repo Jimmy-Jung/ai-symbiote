@@ -391,8 +391,17 @@ if [ -f "$VERIFY_QUEUE" ]; then
       # compared literally — this path must stay behaviorally identical
       # to the jq branch above; update both together when filtering rules
       # change.
-      _VQ_V2=$(grep -F "\"repo_root\":\"$_VQ_REPO_ROOT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
-      _VQ_V1=$(grep -v '"repo_root":' "$VERIFY_QUEUE" 2>/dev/null | grep -F "\"project\":\"$_VQ_PROJECT\"" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null || echo 0)
+      #
+      # Note on arithmetic safety: `grep -c` emits "0" to stdout even when
+      # it exits non-zero (zero matches). If we wrote `grep -c ... || echo 0`
+      # the command-substitution captures BOTH "0" and the fallback "0",
+      # yielding "0\n0" which poisons `$((...))` with "bad math expression".
+      # Strip to digits via `tr -dc` and default to "0" so the arithmetic
+      # never fails silently and the [Verify] notification is not suppressed.
+      _VQ_V2=$(grep -F "\"repo_root\":\"$_VQ_REPO_ROOT\"" "$VERIFY_QUEUE" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null | tr -dc '0-9')
+      _VQ_V1=$(grep -v '"repo_root":' "$VERIFY_QUEUE" 2>/dev/null | grep -F "\"project\":\"$_VQ_PROJECT\"" 2>/dev/null | grep -cF "\"branch\":\"$_VQ_BRANCH\"" 2>/dev/null | tr -dc '0-9')
+      _VQ_V2=${_VQ_V2:-0}
+      _VQ_V1=${_VQ_V1:-0}
       _VQ_PENDING=$((_VQ_V2 + _VQ_V1))
     fi
     _VQ_PENDING=${_VQ_PENDING:-0}

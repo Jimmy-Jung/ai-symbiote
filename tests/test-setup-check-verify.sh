@@ -230,6 +230,50 @@ else
   printf "${GREEN}  SKIP${NC} jq not installed on this host — grep fallback vacuously covers all queue reads\n"
 fi
 
+# --- Test 11: grep fallback counts correctly when v1 has zero matches ---
+# Regression for Codex/Claude adversarial finding: `grep -c ... || echo 0`
+# previously produced "0\n0" and silently broke the arithmetic, suppressing
+# the [Verify] notification in the steady-state case (v2-only queue, no jq).
+echo ""
+echo "--- Test 11: grep fallback survives zero-match counts ---"
+if command -v jq >/dev/null 2>&1; then
+  REPO_CANON=$(cd "$REPO" && pwd -P)
+  # Only v2 entries, no v1 → V1 grep path must return 0 cleanly
+  cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"a","sha":"a","file":"a.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","repo_root":"$REPO_CANON","branch":"feat/xyz","base_sha":"b","sha":"b","file":"b.ts","trigger":"edit"}
+EOF
+  NOJQ_DIR="$TMPROOT/nojq-bin-11"
+  mkdir -p "$NOJQ_DIR"
+  for bin in bash sh grep sed awk cat ls cd pwd printf wc tr basename dirname git env date mktemp mkdir rm touch head tail sort cut; do
+    if command -v "$bin" >/dev/null 2>&1; then
+      ln -sf "$(command -v "$bin")" "$NOJQ_DIR/$bin" 2>/dev/null || true
+    fi
+  done
+  OUTPUT=$(
+    cd "$REPO" || exit 1
+    PATH="$NOJQ_DIR" echo '{}' | PATH="$NOJQ_DIR" bash "$PROJECT_ROOT/shared/hooks/scripts/setup-check.sh" 2>/dev/null
+  )
+  assert_contains "zero-v1 case: notification NOT suppressed" "[Verify]" "$OUTPUT"
+  assert_contains "zero-v1 case: count is 2" "2 pending" "$OUTPUT"
+
+  # Mirror: v1-only (no v2) should also count cleanly without suppression
+  cat > "$QUEUE_FILE" <<EOF
+{"ts":"2026-04-21T00:00:00Z","project":"myproj","branch":"feat/xyz","sha":"legacy1","file":"a.ts","trigger":"write"}
+{"ts":"2026-04-21T00:00:01Z","project":"myproj","branch":"feat/xyz","sha":"legacy2","file":"b.ts","trigger":"edit"}
+EOF
+  OUTPUT=$(
+    cd "$REPO" || exit 1
+    PATH="$NOJQ_DIR" echo '{}' | PATH="$NOJQ_DIR" bash "$PROJECT_ROOT/shared/hooks/scripts/setup-check.sh" 2>/dev/null
+  )
+  assert_contains "zero-v2 case: notification NOT suppressed" "[Verify]" "$OUTPUT"
+  assert_contains "zero-v2 case: count is 2" "2 pending" "$OUTPUT"
+else
+  TOTAL=$((TOTAL + 1))
+  PASSED=$((PASSED + 1))
+  printf "${GREEN}  SKIP${NC} jq not installed — grep fallback arithmetic vacuously covered\n"
+fi
+
 echo ""
 echo "=== Results ==="
 printf "Passed: %d / %d\n" "$PASSED" "$TOTAL"

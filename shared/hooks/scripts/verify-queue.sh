@@ -39,12 +39,23 @@ if [ -z "$FILE_PATH" ]; then
 fi
 
 # --- 2. Queue directory (global, project-agnostic) ---
+# Refuse to follow symlinks on $QUEUE_DIR or $QUEUE_FILE: PostToolUse runs on
+# every edit, so a symlinked target becomes a write amplifier. Silently exit
+# (never block the agent) rather than write to an unexpected destination.
 QUEUE_DIR="$HOME/.ai-symbiote/state"
+if [ -L "$QUEUE_DIR" ]; then
+  printf '{"continue":true}\n'
+  exit 0
+fi
 mkdir -p "$QUEUE_DIR" 2>/dev/null || {
   printf '{"continue":true}\n'
   exit 0
 }
 QUEUE_FILE="$QUEUE_DIR/verify-queue.jsonl"
+if [ -e "$QUEUE_FILE" ] && [ -L "$QUEUE_FILE" ]; then
+  printf '{"continue":true}\n'
+  exit 0
+fi
 
 # --- 3. Collect metadata ---
 NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -53,21 +64,27 @@ TRIGGER="${TOOL_NAME:-write}"
 # Lowercase the trigger for consistency (Write -> write, Edit -> edit)
 TRIGGER_LC=$(printf '%s' "$TRIGGER" | tr '[:upper:]' '[:lower:]')
 
-# Project: derive from git repo root basename (best-effort, fallback "unknown").
-# NOTE: basename alone collides when two repos share a name (e.g., ~/work/app
-# and ~/tmp/app). We also store repo_root (absolute path) below so /verify and
-# setup-check.sh can filter precisely. `project` stays for human-readable UI.
+# Project: derive from the file's own enclosing repo. Do NOT fall back to the
+# hook's cwd repo — that causes cross-project contamination where editing
+# /tmp/foo.ts while Claude is cd'd into another project queues the entry
+# against the wrong project and setup-check.sh surfaces it in the wrong
+# session. If the file is outside any repo, record repo_root="" and let
+# setup-check.sh ignore it (the filter in setup-check demands a real
+# repo_root or a matching basename).
 FILE_DIR=$(dirname "$FILE_PATH" 2>/dev/null || echo ".")
 REPO_ROOT=$(cd "$FILE_DIR" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null || true)
-if [ -z "$REPO_ROOT" ]; then
-  REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+if [ -n "$REPO_ROOT" ]; then
+  PROJECT=$(basename "$REPO_ROOT" 2>/dev/null || echo "unknown")
+  [ -z "$PROJECT" ] && PROJECT="unknown"
+  BRANCH=$(cd "$REPO_ROOT" 2>/dev/null && git branch --show-current 2>/dev/null || true)
+  [ -z "$BRANCH" ] && BRANCH="unknown"
+else
+  # File is not inside any git worktree. Record a placeholder that
+  # setup-check.sh will not match against any real project+branch pair.
+  REPO_ROOT=""
+  PROJECT="unknown"
+  BRANCH="unknown"
 fi
-PROJECT=$(basename "$REPO_ROOT" 2>/dev/null || echo "unknown")
-[ -z "$PROJECT" ] && PROJECT="unknown"
-
-# Branch
-BRANCH=$(cd "$REPO_ROOT" 2>/dev/null && git branch --show-current 2>/dev/null || true)
-[ -z "$BRANCH" ] && BRANCH="unknown"
 
 # base_sha: HEAD sha captured at edit time. Stored separately from any future
 # commit sha so /verify can compute the correct diff contract:
@@ -77,7 +94,11 @@ BRANCH=$(cd "$REPO_ROOT" 2>/dev/null && git branch --show-current 2>/dev/null ||
 #       → use `git diff <base_sha>..HEAD -- <file>` for combined post-edit diff
 # NEVER use `git show <base_sha> -- <file>`: base_sha is the PRE-edit HEAD so
 # `git show` returns the prior commit's contents, not the edit being reviewed.
-BASE_SHA=$(cd "$REPO_ROOT" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || true)
+if [ -n "$REPO_ROOT" ]; then
+  BASE_SHA=$(cd "$REPO_ROOT" 2>/dev/null && git rev-parse --short HEAD 2>/dev/null || true)
+else
+  BASE_SHA=""
+fi
 [ -z "$BASE_SHA" ] && BASE_SHA="uncommitted"
 
 # Legacy `sha` field retained for backward compatibility with pre-0.11 consumers.
