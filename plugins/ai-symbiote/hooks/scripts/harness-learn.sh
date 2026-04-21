@@ -23,6 +23,13 @@ set +e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+source "$SCRIPT_DIR/lib/security-mode.sh"
+
+# Gate: opted-out projects skip auto-rule-learning entirely.
+if ! is_hook_enabled harnessLearn; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 

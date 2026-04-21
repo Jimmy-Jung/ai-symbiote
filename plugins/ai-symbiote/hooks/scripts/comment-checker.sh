@@ -6,6 +6,13 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+source "$SCRIPT_DIR/lib/security-mode.sh"
+
+# Gate: opted-out projects skip comment-quality checks.
+if ! is_hook_enabled commentChecker; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 

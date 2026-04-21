@@ -113,7 +113,15 @@ For each entry:
    - `base_sha == "uncommitted"` (repo has no commits yet)
      → `git diff --no-index /dev/null <file>` or `git diff -- <file>` (full working-tree state)
 
-   - Current `HEAD == base_sha` (edit has not been committed yet)
+   - **File did not exist at `<base_sha>`** (new file, still untracked or in index
+     after base_sha was captured). Detect with `git cat-file -e <base_sha>:<file> 2>/dev/null`;
+     if that fails the file is new in this branch.
+     → `git diff --no-index /dev/null <file>` (treat entire content as the edit)
+     → this case MUST be checked first, before the `HEAD == base_sha` branch,
+       because a plain `git diff <base_sha> -- <file>` against a nonexistent path
+       silently returns empty and the reviewer sees no diff
+
+   - Current `HEAD == base_sha` (edit has not been committed yet, file existed at base)
      → `git diff <base_sha> -- <file>` (unstaged edit)
      → `git diff --cached <base_sha> -- <file>` (staged edit)
      → merge both outputs into what the reviewer sees

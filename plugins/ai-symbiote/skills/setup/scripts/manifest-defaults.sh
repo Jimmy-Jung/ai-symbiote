@@ -51,6 +51,25 @@ security = data.get("security")
 if not isinstance(security, dict):
     security = {}
 security.setdefault("sessionSummaryLevel", "auto")
+# security.mode governs which AI-restriction hooks are active. Seeded to
+# "balanced" (all hooks on) for existing projects so behavior does not change
+# on upgrade. Users can switch via /security mode or the guided setup flow.
+security.setdefault("mode", "balanced")
+# security.hooks is only read when mode == "custom", but we seed the full
+# shape so downstream tooling and the cache builder always see a consistent
+# structure to read/write.
+hooks_block = security.get("hooks")
+if not isinstance(hooks_block, dict):
+    hooks_block = {}
+for name in (
+    "guardShell",
+    "securityGuard",
+    "harnessLearn",
+    "commentChecker",
+    "verifyQueue",
+):
+    hooks_block.setdefault(name, True)
+security["hooks"] = hooks_block
 data["security"] = security
 
 manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")

@@ -27,6 +27,13 @@ set +e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+source "$SCRIPT_DIR/lib/security-mode.sh"
+
+# Gate: respect security mode. Opted-out projects skip post-write scanning.
+if ! is_hook_enabled securityGuard; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 

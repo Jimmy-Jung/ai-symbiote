@@ -420,6 +420,39 @@ bash "$PLUGIN_ROOT/skills/setup/scripts/run-store-setup.sh" \
 - Selected skills update `manifest.plugins` and state immediately.
 - Selected MCPs update `manifest.mcpServers` and state immediately.
 
+### Step 4.6: Security mode selection (guided)
+
+Ask the user which AI-restriction hooks should run. The answer is stored under
+`security.mode` in `manifest.json` and read by each hook at runtime.
+
+Presets:
+
+| Mode       | guard-shell | security-guard | harness-learn | comment-checker | verify-queue |
+|------------|-------------|----------------|---------------|-----------------|--------------|
+| `minimal`  | off | off | off | off | off |
+| `balanced` (default) | on  | on  | on  | on  | on  |
+| `strict`   | on  | on  | on  | on  | on  (reserved for future tightening)   |
+| `custom`   | per-hook user choice | | | | |
+
+Flow (AI-driven, works in both TTY and non-TTY environments):
+
+1. Ask the user which preset to use via AskUserQuestion, with `balanced` recommended.
+2. If the user chose `custom`, ask one more question per hook via AskUserQuestion
+   (multi-select) to collect the on/off toggles.
+3. Write the chosen mode (and, for custom, the per-hook booleans) into
+   `~/ai-symbiote/{slug}/state/setup-security-mode.json` so Step 5 can merge
+   it into the generated manifest. Helper: `scripts/security-mode-apply.sh`.
+
+Each hook (`guardShell` → `guard-shell.sh`, `securityGuard` → `security-guard.sh`,
+`harnessLearn` → `harness-learn.sh`, `commentChecker` → `comment-checker.sh`,
+`verifyQueue` → `verify-queue.sh`) checks `is_hook_enabled` from
+`shared/hooks/scripts/lib/security-mode.sh` on every invocation. Switching
+modes after setup does NOT require Claude Code restart — the cache under
+`state/security-mode.cache` is rebuilt lazily when manifest mtime bumps.
+
+Post-setup changes go through `/security mode [minimal|balanced|strict|custom]`
+or by editing `manifest.json` directly.
+
 ### Step 5: Generate manifest.json
 
 Run the bundled helper after writing the manifest to ensure ai-symbiote defaults are present:
@@ -445,7 +478,15 @@ Write to `~/ai-symbiote/{slug}/manifest.json`:
     "enableQA": true
   },
   "security": {
-    "sessionSummaryLevel": "auto"
+    "sessionSummaryLevel": "auto",
+    "mode": "balanced",
+    "hooks": {
+      "guardShell": true,
+      "securityGuard": true,
+      "harnessLearn": true,
+      "commentChecker": true,
+      "verifyQueue": true
+    }
   },
   "project": {
     "name": "auto-detected",

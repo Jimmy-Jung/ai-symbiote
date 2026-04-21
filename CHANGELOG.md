@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Configurable AI-restriction security modes** — 사용자가 어느 hook을 켜고 끌지 직접 선택 가능. 네 가지 preset(`minimal` 전부 off / `balanced` 기본 전부 on / `strict` 예약 / `custom` 개별 토글)을 `manifest.json`의 `security.mode` + `security.hooks.*`에 저장. 현재 게이트 대상 5종: `guardShell`, `securityGuard`, `harnessLearn`, `commentChecker`, `verifyQueue`
+- **`shared/hooks/scripts/lib/security-mode.sh` runtime gate** — 매 hook 상단에 `is_hook_enabled "<name>" || exit 0` 1줄로 게이팅. 결과는 `~/ai-symbiote/{slug}/state/security-mode.cache`에 평문 `key=value` 형식으로 캐시되어 hot path 오버헤드 <5ms. 캐시는 manifest mtime 변화 시 자동 재빌드, `/security mode`로 변경 시 즉시 무효화. Claude Code 재시작 없이 적용됨
+- **`/security mode [preset]` 서브커맨드** — 현재 모드 + hook별 효과적 상태 표시 또는 preset 전환. `--hooks JSON`으로 custom 모드의 개별 토글을 한 번에 전달 가능
+- **Setup skill Step 4.6** — AI-driven 2단계 guided flow에 security mode 선택 단계 추가. `security-mode-apply.sh` helper가 manifest.json을 변경
+- **테스트 44 케이스** — `test-security-mode.sh` 39 케이스(unit) + `test-security-mode-integration.sh` 9 케이스(end-to-end, 5개 hook 게이팅 실증). `/verify` adversarial reviewer가 지적한 5건(single-source-of-truth, dead code, atomic write, grep→awk exact match, empty manifest hardening) 회귀 방지 케이스 포함
+
+### Fixed
+- **`/verify` skill diff contract — 신규 파일 처리 갭** — `base_sha`에 존재하지 않는 신규 파일을 `git diff <base_sha> -- <file>`로 읽으면 빈 diff 반환. `git cat-file -e`로 base_sha 존재 여부 확인 후 신규 파일이면 `git diff --no-index /dev/null <file>`로 전체 내용을 reviewer에게 전달. Dogfood 중 첫 `/verify` 실행에서 발견
+
 ## [0.11.0] - 2026-04-21
 
 ### Added

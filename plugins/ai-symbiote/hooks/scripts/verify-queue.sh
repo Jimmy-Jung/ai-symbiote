@@ -23,6 +23,17 @@ set +e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+source "$SCRIPT_DIR/lib/security-mode.sh"
+
+# Gate: respect the project's security mode. User opted out of verify-queue
+# via `security.mode: minimal` or a `security.hooks.verifyQueue: false`
+# toggle ⇒ exit silently without appending. Fail-open default keeps this
+# hook active for projects that have not configured ai-symbiote yet.
+if ! is_hook_enabled verifyQueue; then
+  printf '{"continue":true}\n'
+  exit 0
+fi
 
 INPUT=$(cat)
 

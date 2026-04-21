@@ -18,6 +18,15 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+source "$SCRIPT_DIR/lib/security-mode.sh"
+
+# Gate: opted-out projects skip the shell guard entirely. Fail-open default
+# keeps this PreToolUse Bash guard active wherever the user has not
+# explicitly disabled it.
+if ! is_hook_enabled guardShell; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 
