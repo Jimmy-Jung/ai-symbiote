@@ -39,6 +39,201 @@ RULE_ID=""
 RISK=""
 CATEGORY=""
 
+split_shell_command_segments() {
+  awk '
+    {
+      line = $0 "\n"
+      for (i = 1; i <= length(line); i++) {
+        c = substr(line, i, 1)
+        nextc = substr(line, i + 1, 1)
+
+        if (escaped) {
+          segment = segment c
+          escaped = 0
+          continue
+        }
+        if (c == "\\" && !single_quote) {
+          segment = segment c
+          escaped = 1
+          continue
+        }
+        if (c == "'"'"'" && !double_quote) {
+          single_quote = !single_quote
+          segment = segment c
+          continue
+        }
+        if (c == "\"" && !single_quote) {
+          double_quote = !double_quote
+          segment = segment c
+          continue
+        }
+
+        if (!single_quote && !double_quote) {
+          if (c == "\n" || c == ";") {
+            print segment
+            segment = ""
+            continue
+          }
+          if ((c == "&" && nextc == "&") || (c == "|" && nextc == "|")) {
+            print segment
+            segment = ""
+            i++
+            continue
+          }
+          if (c == "|") {
+            print segment
+            segment = ""
+            continue
+          }
+        }
+
+        segment = segment c
+      }
+    }
+    END {
+      if (segment != "") {
+        print segment
+      }
+    }
+  '
+}
+
+strip_wrapping_quotes() {
+  local value="$1"
+  case "$value" in
+    \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    \'*\') value="${value#\'}"; value="${value%\'}" ;;
+  esac
+  printf '%s' "$value"
+}
+
+is_dangerous_rm_target() {
+  local target
+  target=$(strip_wrapping_quotes "$1")
+  while [ "${#target}" -gt 1 ] && [ "${target%/}" != "$target" ]; do
+    target="${target%/}"
+  done
+
+  case "$target" in
+    ""|"-"*)
+      return 1
+      ;;
+    "/"|"//"|"/."|"/.."|"/*"|"/.*"|"~"|"\$HOME"|"${HOME}"|"${HOME%/}")
+      return 0
+      ;;
+    "/tmp"|"/tmp/"*|"/var/tmp"|"/var/tmp/"*|"/var/folders"|"/var/folders/"*|"/private/tmp"|"/private/tmp/"*|"/private/var/tmp"|"/private/var/tmp/"*|"/private/var/folders"|"/private/var/folders/"*)
+      return 1
+      ;;
+    "/usr"|"/usr/"*|"/etc"|"/etc/"*|"/var"|"/var/"*|"/System"|"/System/"*|"/Applications"|"/Applications/"*|"/Library"|"/Library/"*|"/private"|"/private/"*|"/bin"|"/bin/"*|"/sbin"|"/sbin/"*|"/boot"|"/boot/"*|"/dev"|"/dev/"*|"/proc"|"/proc/"*|"/sys"|"/sys/"*|"/root"|"/root/"*|"/Users")
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+rm_segment_targets_dangerous_path() {
+  local segment trimmed idx token cmd recursive force paths_started arg short_opts
+  trimmed=$(printf '%s' "$1" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+  trimmed="${trimmed#(}"
+  trimmed=$(printf '%s' "$trimmed" | sed -E 's/^[[:space:]]+//')
+
+  [ -n "$trimmed" ] || return 1
+
+  set -f
+  # shellcheck disable=SC2206
+  local tokens=($trimmed)
+  set +f
+
+  idx=0
+  while [ "$idx" -lt "${#tokens[@]}" ]; do
+    token="${tokens[$idx]}"
+    case "$token" in
+      [A-Za-z_][A-Za-z0-9_]*=*)
+        idx=$((idx + 1))
+        ;;
+      command|builtin)
+        idx=$((idx + 1))
+        ;;
+      env)
+        idx=$((idx + 1))
+        while [ "$idx" -lt "${#tokens[@]}" ]; do
+          token="${tokens[$idx]}"
+          case "$token" in
+            -*|[A-Za-z_][A-Za-z0-9_]*=*)
+              idx=$((idx + 1))
+              ;;
+            *)
+              break
+              ;;
+          esac
+        done
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  cmd="${tokens[$idx]:-}"
+  [ "$cmd" = "rm" ] || return 1
+
+  idx=$((idx + 1))
+  while [ "$idx" -lt "${#tokens[@]}" ]; do
+    arg="${tokens[$idx]}"
+    if [ "$paths_started" != "yes" ]; then
+      case "$arg" in
+        --)
+          paths_started="yes"
+          idx=$((idx + 1))
+          continue
+          ;;
+        --recursive)
+          recursive="yes"
+          idx=$((idx + 1))
+          continue
+          ;;
+        --force)
+          force="yes"
+          idx=$((idx + 1))
+          continue
+          ;;
+        --*)
+          idx=$((idx + 1))
+          continue
+          ;;
+        -*)
+          short_opts="${arg#-}"
+          short_opts="${short_opts#-}"
+          case "$short_opts" in *r*|*R*) recursive="yes" ;; esac
+          case "$short_opts" in *f*) force="yes" ;; esac
+          idx=$((idx + 1))
+          continue
+          ;;
+      esac
+    fi
+
+    if [ "$recursive" = "yes" ] && [ "$force" = "yes" ] && is_dangerous_rm_target "$arg"; then
+      return 0
+    fi
+    idx=$((idx + 1))
+  done
+
+  return 1
+}
+
+has_dangerous_recursive_rm() {
+  local segment
+  while IFS= read -r segment; do
+    if rm_segment_targets_dangerous_path "$segment"; then
+      return 0
+    fi
+  done < <(printf '%s' "$1" | split_shell_command_segments)
+
+  return 1
+}
+
 # ============================================================
 # Destructive command guards (existing)
 # ============================================================
@@ -50,10 +245,6 @@ case "$COMMAND" in
   *"git reset --hard"*)
     BLOCKED="Hard reset permanently deletes uncommitted changes."
     WORKAROUND="git stash"
-    ;;
-  *"rm -rf /"*|*"rm -rf ~"*|*"rm -rf /*"*)
-    BLOCKED="Deleting system or home directory is blocked."
-    WORKAROUND=""
     ;;
   *"git clean -fd"*)
     # Warn instead of block — commonly used for cache/build artifact cleanup
@@ -87,6 +278,11 @@ case "$COMMAND" in
     WORKAROUND="Run manually if needed"
     ;;
 esac
+
+if [ -z "$BLOCKED" ] && has_dangerous_recursive_rm "$COMMAND"; then
+  BLOCKED="Deleting system or home directory is blocked."
+  WORKAROUND=""
+fi
 
 CMD_LOWER=$(printf '%s' "$COMMAND" | tr '[:upper:]' '[:lower:]')
 
@@ -144,7 +340,7 @@ fi
 
 # SEC-005: export secrets directly in shell
 if [ -z "$BLOCKED" ] && is_feature_enabled guardShell exportSecret; then
-  if printf '%s' "$COMMAND" | grep -qE 'export\s+(AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|DATABASE_URL|DB_PASSWORD|PRIVATE_KEY)\s*=\s*["\x27]?[A-Za-z0-9_\.\-/+=]{8,}'; then
+  if printf '%s' "$COMMAND" | grep -qE "export[[:space:]]+(AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|DATABASE_URL|DB_PASSWORD|PRIVATE_KEY)[[:space:]]*=[[:space:]]*['\"]?[A-Za-z0-9_./+=-]{8,}"; then
     BLOCKED="Secret is being exported directly to shell environment."
     WORKAROUND="Use a .env file or direnv, not inline export with real values"
     RULE_ID="SEC-005"; RISK="CRITICAL"; CATEGORY="secret_exposure"
