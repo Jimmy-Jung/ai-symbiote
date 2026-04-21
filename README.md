@@ -52,11 +52,11 @@ flowchart LR
     G --> H["Claude / Codex / Cursor bundle"]
 ```
 
-- 공용 스킬: `shared/skills/` 33개 (v0.11에서 `/verify` 추가)
-- 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 23개 (v0.11에서 `verify-queue.sh` 추가)
+- 공용 스킬: `shared/skills/` 33개 (v0.11에서 `/verify` 추가, v0.12에서 `/security mode` 서브커맨드 추가)
+- 훅/유틸 스크립트: `shared/hooks/scripts/` + `lib/common.sh` 포함 24개 (v0.11 `verify-queue.sh` + v0.12 `lib/security-mode.sh` 추가)
 - 시드 규칙: `shared/harness-seeds/` 5개
-- 테스트 스크립트: `tests/` 32개 (v0.11에서 `test-verify-queue.sh`, `test-setup-check-verify.sh` 추가)
-- 현재 버전: `0.11.0`
+- 테스트 스크립트: `tests/` 34개 (v0.11 verify-queue/setup-check-verify + v0.12 security-mode/security-mode-integration 추가)
+- 현재 버전: `0.12.0`
 <!-- AI-SYMBIOTE:END readme:overview -->
 
 ## 빠른 이해를 위한 핵심 개념
@@ -91,6 +91,79 @@ flowchart LR
 ```
 
 이 구조 덕분에 Claude에서 시작한 컨텍스트를 Codex나 Cursor에서도 같은 프로젝트 단위로 재사용할 수 있습니다.
+
+### 4. 코드 리뷰를 코드가 아니라 Q&A로 (v0.11+, `/verify`)
+
+**겪는 문제**: AI가 짠 코드는 읽히긴 하는데 **"왜 이렇게 짰지?"가 설명이 안 됩니다**. 테스트는 통과하고 동작도 맞는데 리뷰에서 막힙니다. 6개월 뒤 본인이 봐도 의도를 재구성하기 어렵습니다.
+
+**이 기능이 하는 일**: 편집 직후에 **다른 AI**를 불러서 "이 코드 왜 이렇게 짰어?" 질문을 만들게 합니다. 내(AI)가 답변하고, 답변이 말이 되는지 또 다른 AI가 판정합니다. 답변 못 하면 다시 짜야 합니다.
+
+리뷰의 대상이 **코드가 아니라 Q&A 대화록**이 됩니다. `.ai-symbiote/qa/<날짜>/<sha>.md`에 저장되어 PR에 링크로 붙습니다.
+
+```mermaid
+flowchart LR
+    A["내가 파일 수정"] -.->|자동으로 큐에 기록<br/>100ms 이하| B["pending 목록"]
+    C["작업 한 덩어리 마무리"] --> D["/verify 실행"]
+    B --> D
+    D --> E["다른 AI가<br/>'왜?' 질문 5~8개"]
+    E --> F["내가 그중 3개에 답변"]
+    F --> G{"답변이 실제 코드로<br/>뒷받침 되나?"}
+    G -->|예| H["✅ 리뷰 기록 저장"]
+    G -->|아니오| I["❌ 다시 짜세요"]
+```
+
+**세 가지 설계 포인트** (왜 이렇게?):
+
+1. **다른 AI로 검증**. 나(Claude) 혼자 자기 검토하면 같은 맹점을 공유해서 놓칩니다. 벤더가 다른 AI(예: Codex)는 학습 분포가 달라 내가 못 본 걸 봅니다. 판정도 또 다른 AI가 합니다
+2. **편집 흐름 방해 없음**. 편집 직후엔 100ms 안에 큐에만 기록하고 끝. 실제 검증은 내가 `/verify`를 부를 때 30초쯤 돌아갑니다. **작업 한 덩어리가 끝난 시점**에 부르는 게 디자인 의도입니다
+3. **질문 랜덤 선택**. 5~8개 질문 중 3개만 무작위로 뽑아서 답변하게 합니다. 저자가 "예상 질문에 답변 미리 준비해두기" 같은 꼼수를 못 쓰게 하는 안전장치
+
+**사용**:
+
+```text
+/ai-symbiote:verify              # 지금까지 편집 전부 검증
+/ai-symbiote:verify --dry-run    # 큐에 뭐가 쌓였는지만 확인 (비용 0)
+/ai-symbiote:verify --file foo.ts # 특정 파일만
+```
+
+한 번 검증에 **약 30초, $0.10** 정도 듭니다. 실제 이슈 발견 효율은 이슈당 $0.02 선.
+
+더 자세히: [docs/09-검증-레이어-동작원리.md](docs/09-검증-레이어-동작원리.md) (그림 12개 + FAQ)로 처음 보는 사람도 이해할 수 있게 설명되어 있습니다.
+
+### 5. AI가 할 수 있는 일의 범위를 프로젝트별로 조절 (v0.12+, `/security mode`)
+
+**겪는 문제**: `ai-symbiote`는 기본적으로 AI가 위험한 명령을 못 치게 막고(guard-shell), 위험한 코드 쓰기를 감시하고(security-guard), 편집 기록을 남기는 hook들을 켭니다. 근데 **어떤 프로젝트에선 이게 방해**가 됩니다 — 빠른 실험, 스파이크, 이미 다른 도구로 검증하는 경우.
+
+**이 기능이 하는 일**: 프로젝트별로 **어떤 제한을 켤지** 고르게 해줍니다. 4가지 프리셋:
+
+| 모드 | 어떤 느낌 | 언제 |
+|------|-----------|------|
+| `minimal` | AI가 뭐든 할 수 있음 (안전장치 전부 off) | 실험, 스파이크, "빨리 시도만" |
+| `balanced` (기본) | 모든 안전장치 on | 프로덕션 작업의 기본 |
+| `strict` | balanced와 같음 (미래에 더 엄격해질 예약) | 고위험 작업용 여유 |
+| `custom` | 5개 기능을 하나씩 on/off | "shell은 제한하되 편집 감시는 끄고 싶어" |
+
+게이트 대상 5개: `guardShell` (위험 shell 차단), `securityGuard` (쓰기 후 보안 스캔), `harnessLearn` (실수 학습), `commentChecker` (주석 품질), `verifyQueue` (위 #4 기능).
+
+**사용**:
+
+```text
+/ai-symbiote:security mode                          # 지금 어떤 상태인지
+/ai-symbiote:security mode minimal                  # 전부 끄기
+/ai-symbiote:security mode balanced                 # 기본 복원
+/ai-symbiote:security mode custom \
+  --hooks '{"guardShell":false,"verifyQueue":true}' # 선택적으로
+```
+
+변경은 **다음 편집부터 즉시 반영**. Claude Code 재시작 필요 없습니다.
+
+**왜 안전한가** (자기 자신을 우회할 수 없도록):
+
+- AI가 `manifest.json`을 직접 편집해서 "너 스스로 보안 끄렴"은 차단됩니다. `config-protection.sh`가 Write/Edit 도구 경로를 막습니다
+- `/security mode` 서브커맨드는 Python 직접 호출이라 그 차단을 합법적으로 우회해 사용자 의도대로 저장합니다
+- 사용자가 터미널에서 직접 `manifest.json`을 수정하고 싶으면 `SYMBIOTE_ALLOW_CONFIG_EDIT=1`로 override 가능
+
+이 부분 보안 설계는 실제 adversarial review (Claude + Codex 교차 확인)에서 발견된 4가지 우회 경로를 막은 결과물입니다. 자세한 건 [CHANGELOG.md](CHANGELOG.md#0120---2026-04-21)의 Fixed 섹션 참고.
 
 ## 설치
 
@@ -291,6 +364,34 @@ bash tests/test-setup-check-summary.sh
 - 오래된 규칙 정리
 - 플러그인 업데이트
 
+### 시나리오 6. AI 편집의 "왜"를 나중이 아니라 write-time에 증명시키고 싶다
+
+```text
+# 한 논리 단위(기능 한 덩어리, 리팩터 한 회) 편집 후
+/ai-symbiote:verify                          # pending 편집 전부 검증 (배치 캡 10)
+/ai-symbiote:verify --sha abc123             # 특정 커밋만
+/ai-symbiote:verify --dry-run                # 큐 내용만 표시
+```
+
+- Codex가 3-role cold-read reviewer로 질문 생성, 저자 Claude가 답변
+- V2b judge가 답변의 verifiability 검사 → `.ai-symbiote/qa/<date>/<sha>.md` 아티팩트
+- 이 아티팩트가 PR 리뷰의 **주된 대상**이 됨 (코드는 구현 증거)
+
+### 시나리오 7. AI의 행동을 어디까지 허용할지 프로젝트별로 조정하고 싶다
+
+```text
+/ai-symbiote:security mode                              # 현재 상태 확인
+/ai-symbiote:security mode minimal                      # 모든 AI-restriction hook 끄기 (최대 자율)
+/ai-symbiote:security mode balanced                     # 기본값 (모든 hook ON)
+/ai-symbiote:security mode custom \
+  --hooks '{"guardShell":false,"verifyQueue":true}'     # 개별 토글
+```
+
+- `minimal`: 속도 우선, 실험/스파이크 작업에 적합
+- `balanced`: 프로덕션 작업 기본값
+- `custom`: hook별 정확한 제어
+- 변경은 다음 hook fire 시 즉시 적용 (Claude Code 재시작 불필요)
+
 ## 기능 전체 맵
 
 ### 오케스트레이션과 자율 실행
@@ -333,7 +434,8 @@ bash tests/test-setup-check-summary.sh
 
 | 스킬 | 역할 | 언제 쓰나 |
 |------|------|------|
-| `security` | 보안 baseline과 상태 확인, 도구 추천 | 보안 점검과 최근 이벤트 확인 |
+| `security` | 보안 baseline, 상태 확인, 도구 추천, AI-restriction hook mode 관리 (`/security mode`) | 보안 점검, hook 토글 제어 |
+| `verify` | Write-time Verification Layer — 큐잉된 편집에 대해 cold-read reviewer + LLM judge 실행 | 편집 후 "왜?" 재구성 검증 |
 | `dev-docs` | README와 번호형 문서 생성/갱신 | 문서 최신화 |
 | `skill-store` | 커뮤니티 스킬 추천/설치 | 새 워크플로우 확장 |
 | `cli-store` | CLI 도구 추천/설치 | MCP보다 가벼운 툴 우선 확장 |
@@ -493,6 +595,7 @@ README는 전체 그림과 빠른 진입을 담당하고, 상세 설계와 운�
 | 06 | [docs/06-문제해결-가이드.md](docs/06-문제해결-가이드.md) | 장애 진단과 복구 |
 | 07 | [docs/07-운영-흐름-및-배포.md](docs/07-운영-흐름-및-배포.md) | 운영 흐름, 배포, 상태 전이 |
 | 08 | [docs/08-메신저-브릿지.md](docs/08-메신저-브릿지.md) | 원격 운영과 승인 흐름 |
+| 09 | [docs/09-검증-레이어-동작원리.md](docs/09-검증-레이어-동작원리.md) | Write-time Verification Layer 동작원리 (mermaid 12개) |
 
 `dev-docs` 스킬은 위 문서들의 AI 소유 마커 블록만 갱신합니다. README를 사람이 더 풍부하게 다듬고 싶다면 마커 바깥 수동 섹션을 유지하는 방식이 가장 안전합니다.
 <!-- AI-SYMBIOTE:END readme:docs-map -->
@@ -515,7 +618,9 @@ bash tests/test-dev-docs-updater.sh
 /ai-symbiote:plan <작업>
 /ai-symbiote:auto <작업>
 /ai-symbiote:review
+/ai-symbiote:verify                     # Write-time Verification Layer
 /ai-symbiote:security status
+/ai-symbiote:security mode [preset]     # AI-restriction hook mode
 /ai-symbiote:dev-docs
 /ai-symbiote:stats
 ```

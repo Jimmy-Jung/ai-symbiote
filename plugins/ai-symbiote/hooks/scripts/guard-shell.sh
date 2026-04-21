@@ -18,6 +18,12 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+# Defensive load: a source failure must not silently disable the guard.
+source "$SCRIPT_DIR/lib/security-mode.sh" 2>/dev/null || true
+if [ "${_SEC_MODE_LIB_LOADED:-0}" = "1" ] && ! is_hook_enabled guardShell; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 
@@ -97,9 +103,11 @@ fi
 # ============================================================
 
 # --- Secret Exposure (SEC-001 ~ SEC-005) ---
+# 각 SEC 규칙은 is_feature_enabled로 개별 게이트. 사용자가 `/security feature
+# guardShell.echoSecrets off` 식으로 규칙 하나만 정확히 끌 수 있도록.
 
 # SEC-001: echo/printf secrets to stdout
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell echoSecrets; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(echo|printf)\s.*\b(api_key|api_secret|secret_key|access_key|private_key|auth_token|bearer)\b.*='; then
     BLOCKED="Secret value is being printed to stdout."
     WORKAROUND="Use a .env file or secret manager instead of printing secrets"
@@ -108,7 +116,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-002: curl/wget with inline token in Authorization header or URL
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell authHeaderLeak; then
   if printf '%s' "$COMMAND" | grep -qE "(curl|wget)\s.*(-H\s*['\"]Authorization:\s*(Bearer|Basic|Token)\s+[A-Za-z0-9_\.\-]{20,})"; then
     BLOCKED="Authorization token is exposed inline in the command."
     WORKAROUND="Store the token in an environment variable: -H \"Authorization: Bearer \$TOKEN\""
@@ -117,7 +125,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-003: git add .env files
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell gitAddEnv; then
   if printf '%s' "$COMMAND" | grep -qE 'git\s+add\s+.*\.env(\s|$|\.)'; then
     BLOCKED=".env file should not be committed to git."
     WORKAROUND="Add .env to .gitignore and use .env.example for templates"
@@ -126,7 +134,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-004: base64 encoded secret assignment
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell base64Secret; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(export\s+)?(api_key|secret|token|password|credentials)\s*=\s*.*base64'; then
     BLOCKED="Base64-encoded secret detected in environment variable."
     WORKAROUND="Use a secret manager or .env file, not inline base64"
@@ -135,7 +143,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-005: export secrets directly in shell
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell exportSecret; then
   if printf '%s' "$COMMAND" | grep -qE 'export\s+(AWS_SECRET_ACCESS_KEY|AWS_SECRET_KEY|GITHUB_TOKEN|OPENAI_API_KEY|ANTHROPIC_API_KEY|DATABASE_URL|DB_PASSWORD|PRIVATE_KEY)\s*=\s*["\x27]?[A-Za-z0-9_\.\-/+=]{8,}'; then
     BLOCKED="Secret is being exported directly to shell environment."
     WORKAROUND="Use a .env file or direnv, not inline export with real values"
@@ -146,7 +154,7 @@ fi
 # --- Dangerous Execution (SEC-006 ~ SEC-011) ---
 
 # SEC-006: eval/exec with remote content
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell remoteEval; then
   if printf '%s' "$CMD_LOWER" | grep -qE 'eval\s+"\$\((curl|wget)'; then
     BLOCKED="eval with remote content is a code injection risk."
     WORKAROUND="Download, review, then source the script"
@@ -155,7 +163,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-007: chmod 777 — block recursive, warn on single file
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell chmod777; then
   if printf '%s' "$COMMAND" | grep -qE 'chmod\s+-R\s+777\b'; then
     BLOCKED="chmod -R 777 recursively grants full permissions to everyone."
     WORKAROUND="chmod -R 755 for directories, chmod -R 644 for files"
@@ -167,7 +175,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-008: npm/pip install with unsafe flags — block unsafe-perm/trusted-host, warn on no-audit
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell unsafeInstallFlags; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(npm\s+install|pip\s+install)\s.*--(unsafe-perm|trusted-host)'; then
     BLOCKED="Package install with security bypass flags detected."
     WORKAROUND="Remove the unsafe flag and fix the underlying issue"
@@ -179,7 +187,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-009: docker run --privileged
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell dockerPrivileged; then
   if printf '%s' "$CMD_LOWER" | grep -qE 'docker\s+run\s.*--privileged'; then
     BLOCKED="docker --privileged gives the container full host access."
     WORKAROUND="Use specific --cap-add flags instead of --privileged"
@@ -188,7 +196,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-010: binding dangerous ports to 0.0.0.0
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell bindAllInterfaces; then
   if printf '%s' "$COMMAND" | grep -qE '0\.0\.0\.0:(22|3306|5432|6379|27017)\b'; then
     BLOCKED="Sensitive service port bound to all interfaces (0.0.0.0)."
     WORKAROUND="Bind to 127.0.0.1 instead of 0.0.0.0 for local development"
@@ -197,7 +205,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-011: inline code execution with network access
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell inlineNetworkExec; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(python3?\s+-c|node\s+-e|ruby\s+-e)\s.*\b(urllib|requests|http|fetch|net|socket)\b'; then
     BLOCKED="Inline code execution with network access detected."
     WORKAROUND="Write to a file first, review, then execute"
@@ -208,7 +216,7 @@ fi
 # --- Data Exfiltration (SEC-012 ~ SEC-016) ---
 
 # SEC-012: archiving sensitive files
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell archiveSensitive; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(tar|zip|7z)\s.*\.(env|ssh|credentials|pem|key)\b'; then
     BLOCKED="Archiving sensitive files (.env, .ssh, credentials, keys)."
     WORKAROUND="Exclude sensitive files from the archive"
@@ -217,7 +225,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-013: scp/rsync sending config files externally
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell sensitiveTransfer; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(scp|rsync)\s.*\.(env|pem|key|credentials)\b.*@'; then
     BLOCKED="Transferring sensitive files to external host."
     WORKAROUND="Verify the destination and consider encrypting the file first"
@@ -226,14 +234,14 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-014: dumping environment variables to file — warn instead of block (common for debugging)
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell envDumpToFile; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(^|\s)(env|printenv|set)\s*>\s'; then
     SEC_WARN="yes"
   fi
 fi
 
 # SEC-015: git push with staged .env or secret files
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell secretsInGitPush; then
   if printf '%s' "$CMD_LOWER" | grep -qE 'git\s+push\b'; then
     # Check if .env or sensitive files are staged
     STAGED_SECRETS=$(cd "$(printf '%s' "$INPUT" | grep -o '"cwd":"[^"]*"' | sed 's/"cwd":"//;s/"$//' 2>/dev/null || pwd)" 2>/dev/null && \
@@ -247,7 +255,7 @@ if [ -z "$BLOCKED" ]; then
 fi
 
 # SEC-016: netcat sending data externally
-if [ -z "$BLOCKED" ]; then
+if [ -z "$BLOCKED" ] && is_feature_enabled guardShell netcatExfiltration; then
   if printf '%s' "$CMD_LOWER" | grep -qE '(nc|ncat|netcat)\s.*\b[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+\b'; then
     BLOCKED="Sending data to external host via netcat."
     WORKAROUND="Use curl or a proper HTTP client for external communication"
@@ -314,15 +322,20 @@ if [ -n "$BLOCKED" ]; then
       SECURITY_LOG="$STATE_DIR/security-log.jsonl"
       printf '{"v":2,"ts":"%s","type":"security","category":"%s","rule_id":"%s","risk":"%s","command":"%s","action":"blocked","session_pid":"%s"}\n' \
         "$NOW" "$CATEGORY" "$RULE_ID" "$RISK" "$ESC_CMD" "$PPID" >> "$SECURITY_LOG" 2>/dev/null
-      # Also record to harness-log for unified view
-      HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
-      printf '{"v":2,"ts":"%s","error_type":"security_blocked","rule_id":"%s","risk":"%s","command":"%s","workaround":"%s","session_pid":"%s"}\n' \
-        "$NOW" "$RULE_ID" "$RISK" "$ESC_CMD" "$ESC_WA" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
+      # Also record to harness-log for unified view.
+      # harnessLearn.guardLogging으로 게이트 — 차단 이벤트를 학습 로그에 남길지.
+      if is_feature_enabled harnessLearn guardLogging; then
+        HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+        printf '{"v":2,"ts":"%s","error_type":"security_blocked","rule_id":"%s","risk":"%s","command":"%s","workaround":"%s","session_pid":"%s"}\n' \
+          "$NOW" "$RULE_ID" "$RISK" "$ESC_CMD" "$ESC_WA" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
+      fi
     else
-      # Destructive command event → harness-log.jsonl (existing behavior)
-      HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
-      printf '{"v":2,"ts":"%s","error_type":"guard_blocked","command":"%s","workaround":"%s","session_pid":"%s"}\n' \
-        "$NOW" "$ESC_CMD" "$ESC_WA" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
+      # Destructive command event → harness-log.jsonl (existing behavior).
+      if is_feature_enabled harnessLearn guardLogging; then
+        HARNESS_LOG="$STATE_DIR/harness-log.jsonl"
+        printf '{"v":2,"ts":"%s","error_type":"guard_blocked","command":"%s","workaround":"%s","session_pid":"%s"}\n' \
+          "$NOW" "$ESC_CMD" "$ESC_WA" "$PPID" >> "$HARNESS_LOG" 2>/dev/null
+      fi
     fi
   fi
   exit 0

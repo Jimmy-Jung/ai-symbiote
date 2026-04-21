@@ -23,6 +23,16 @@ set +e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+# Load the security-mode helper defensively. If it is missing or fails to
+# parse, DO NOT treat that as "disabled" — that would let a helper failure
+# silently bypass the whole gate layer (e.g. `trap 'exit 0' ERR` below
+# would swallow a load error). Fail OPEN: continue with the hook active.
+source "$SCRIPT_DIR/lib/security-mode.sh" 2>/dev/null || true
+if [ "${_SEC_MODE_LIB_LOADED:-0}" = "1" ] && ! is_hook_enabled verifyQueue; then
+  printf '{"continue":true}\n'
+  exit 0
+fi
 
 INPUT=$(cat)
 

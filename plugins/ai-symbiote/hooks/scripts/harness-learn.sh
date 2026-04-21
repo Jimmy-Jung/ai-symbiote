@@ -23,6 +23,12 @@ set +e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/security-mode.sh
+# Defensive load: a source failure must not silently disable the hook.
+source "$SCRIPT_DIR/lib/security-mode.sh" 2>/dev/null || true
+if [ "${_SEC_MODE_LIB_LOADED:-0}" = "1" ] && ! is_hook_enabled harnessLearn; then
+  exit 0
+fi
 
 INPUT=$(read_stdin_safe)
 
@@ -93,7 +99,8 @@ printf '{"ts":"%s","tool":"%s","file":"%s","ext":"%s","status":"%s","error_categ
 # so we detect by file path pattern + content parsing.
 case "$FILE_PATH" in
   */state/*/results/inspector-*.result.md)
-    if [ -f "$FILE_PATH" ]; then
+    # Inspector FAIL → loop_verify_fail 이벤트 기록. errorTracking 기능으로 게이트.
+    if [ -f "$FILE_PATH" ] && is_feature_enabled harnessLearn errorTracking; then
       VERDICT=$(grep -m1 'FAIL\|PASS' "$FILE_PATH" 2>/dev/null)
       if printf '%s' "$VERDICT" | grep -q 'FAIL' 2>/dev/null; then
         # Extract failure reasons (first 20 lines, list items)
@@ -162,8 +169,9 @@ RULE_CANDIDATE=""
 BASENAME=$(basename "$FILE_PATH")
 
 # Pattern 1: Tool returned an error (from tool_response)
-# Error-category-specific rules for precise pattern matching
-if [ "$HAS_ERROR" = "error" ]; then
+# Error-category-specific rules for precise pattern matching.
+# errorTracking 기능으로 게이트 — tool_error, repeated_error를 커버.
+if [ "$HAS_ERROR" = "error" ] && is_feature_enabled harnessLearn errorTracking; then
   FAILURE_DETECTED="yes"
   case "$ERROR_CATEGORY" in
     not_unique)
@@ -199,16 +207,18 @@ if [ "$HAS_ERROR" = "error" ]; then
   esac
 fi
 
-# Pattern 2: Same file had 2+ errors in this session (struggling)
-if [ "$ERROR_COUNT" -ge 2 ] && [ -z "$FAILURE_DETECTED" ]; then
+# Pattern 2: Same file had 2+ errors in this session (struggling).
+# errorTracking 기능으로 게이트 (repeated_error).
+if [ "$ERROR_COUNT" -ge 2 ] && [ -z "$FAILURE_DETECTED" ] && is_feature_enabled harnessLearn errorTracking; then
   FAILURE_DETECTED="yes"
   ERROR_TYPE="repeated_error"
   DESCRIPTION="$BASENAME: ${ERROR_COUNT} errors in session (struggling pattern)"
   RULE_CANDIDATE="Stop and re-read $BASENAME fully before attempting more edits; consider a different approach"
 fi
 
-# Pattern 3: Same file edited 5+ times without errors (churn, higher threshold to reduce false positives)
-if [ "$EDIT_COUNT" -ge 5 ] && [ -z "$FAILURE_DETECTED" ]; then
+# Pattern 3: Same file edited 5+ times without errors (churn, higher threshold).
+# editChurn 기능으로 게이트.
+if [ "$EDIT_COUNT" -ge 5 ] && [ -z "$FAILURE_DETECTED" ] && is_feature_enabled harnessLearn editChurn; then
   FAILURE_DETECTED="yes"
   ERROR_TYPE="churn"
   DESCRIPTION="$BASENAME: edited ${EDIT_COUNT} times in session (churn pattern)"
@@ -235,7 +245,8 @@ if [ -n "$FAILURE_DETECTED" ]; then
       grep "\"file\":\"$ESCAPED_FILE\"" 2>/dev/null | \
       wc -l | tr -d ' ') || PATTERN_COUNT=0
 
-    if [ "$PATTERN_COUNT" -ge 2 ]; then
+    # ruleLearning 기능으로 게이트: 자동 규칙 생성 + 패턴 감지 전체 차단
+    if [ "$PATTERN_COUNT" -ge 2 ] && is_feature_enabled harnessLearn ruleLearning; then
       # --- 6a. Extension-level pattern aggregation (US-005) ---
       # Before creating a file-specific rule, check if 3+ different files with same
       # extension have the same error_type — if so, create a pattern rule instead.
