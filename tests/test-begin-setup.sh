@@ -44,14 +44,27 @@ assert_file_exists() {
   fi
 }
 
+assert_file_not_exists() {
+  local desc="$1" path="$2"
+  TOTAL=$((TOTAL + 1))
+  if [ ! -e "$path" ]; then
+    PASSED=$((PASSED + 1))
+    printf "${GREEN}  PASS${NC} %s\n" "$desc"
+  else
+    FAILED=$((FAILED + 1))
+    printf "${RED}  FAIL${NC} %s\n    unexpected path: %s\n" "$desc" "$path"
+  fi
+}
+
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 TEST_REPO="$TMPDIR/repo"
 PLAN_STATE_DIR="$TMPDIR/plan-state"
 APPROVE_STATE_DIR="$TMPDIR/approve-state"
+OPT_IN_STATE_DIR="$TMPDIR/opt-in-state"
 
-mkdir -p "$TEST_REPO" "$PLAN_STATE_DIR" "$APPROVE_STATE_DIR"
+mkdir -p "$TEST_REPO" "$PLAN_STATE_DIR" "$APPROVE_STATE_DIR" "$OPT_IN_STATE_DIR"
 cat > "$TEST_REPO/package.json" <<'EOF'
 {
   "name": "setup-entry-test",
@@ -78,10 +91,24 @@ APPROVE_OUTPUT=$( \
 
 assert_contains "approve mode acknowledges execution" "[Setup] Approval received. Executing setup..." "$APPROVE_OUTPUT"
 assert_contains "approve mode completes" "[Setup] setup execution complete." "$APPROVE_OUTPUT"
-assert_file_exists "approve mode creates claude settings" "$TEST_REPO/.claude/settings.json"
-assert_file_exists "approve mode creates codex config" "$TEST_REPO/.codex/config.toml"
+assert_contains "approve mode skips project agent config by default" "[Setup] skipped project agent config (.claude/, .codex/, .gitignore). Re-run with --project-agent-config to create it." "$APPROVE_OUTPUT"
+assert_file_not_exists "approve mode does not create claude settings by default" "$TEST_REPO/.claude/settings.json"
+assert_file_not_exists "approve mode does not create codex config by default" "$TEST_REPO/.codex/config.toml"
+assert_file_not_exists "approve mode does not create gitignore by default" "$TEST_REPO/.gitignore"
 assert_file_exists "approve mode creates tracked-since file" "$APPROVE_STATE_DIR/usage-data/.tracked-since"
 assert_file_exists "approve mode creates manifest" "$APPROVE_STATE_DIR/manifest.json"
+
+OPT_IN_OUTPUT=$( \
+  SETUP_STORE_MODE=fast \
+  CLI_STORE_FORCE_STATUS_SUPABASE=ready \
+  bash "$SETUP_ENTRY" --project-root "$TEST_REPO" --state-dir "$OPT_IN_STATE_DIR" --project-agent-config --approve \
+)
+
+assert_contains "opt-in mode acknowledges execution" "[Setup] Approval received. Executing setup..." "$OPT_IN_OUTPUT"
+assert_file_exists "opt-in mode creates claude settings" "$TEST_REPO/.claude/settings.json"
+assert_file_exists "opt-in mode creates codex config" "$TEST_REPO/.codex/config.toml"
+assert_file_exists "opt-in mode creates gitignore" "$TEST_REPO/.gitignore"
+assert_file_exists "opt-in mode creates tracked-since file" "$OPT_IN_STATE_DIR/usage-data/.tracked-since"
 
 echo ""
 echo "=== Results ==="

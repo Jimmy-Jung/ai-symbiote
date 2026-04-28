@@ -13,10 +13,11 @@ PROJECT_ROOT="${SETUP_PROJECT_ROOT:-}"
 STATE_DIR="${SETUP_STATE_DIR:-}"
 OPTIONAL_ITEM="${SETUP_OPTIONAL_ITEM:-}"
 STORE_MODE="${SETUP_STORE_MODE:-guided}"
+PROJECT_AGENT_CONFIG="${SETUP_PROJECT_AGENT_CONFIG:-false}"
 APPROVED="false"
 
 usage() {
-  echo "Usage: begin-setup.sh [--project-root PATH] [--state-dir PATH] [--optional-item TEXT] [--store-mode fast|guided|dry-run] [--approve]" >&2
+  echo "Usage: begin-setup.sh [--project-root PATH] [--state-dir PATH] [--optional-item TEXT] [--store-mode fast|guided|dry-run] [--project-agent-config] [--approve]" >&2
 }
 
 while [ $# -gt 0 ]; do
@@ -36,6 +37,10 @@ while [ $# -gt 0 ]; do
     --store-mode)
       STORE_MODE="${2:-}"
       shift 2
+      ;;
+    --project-agent-config)
+      PROJECT_AGENT_CONFIG="true"
+      shift
       ;;
     --approve)
       APPROVED="true"
@@ -129,7 +134,11 @@ prepare_state_root() {
 execute_setup() {
   echo "[Setup] Approval received. Executing setup..."
   prepare_state_root
-  ensure_project_agent_config
+  if [ "$PROJECT_AGENT_CONFIG" = "true" ]; then
+    ensure_project_agent_config
+  else
+    echo "[Setup] skipped project agent config (.claude/, .codex/, .gitignore). Re-run with --project-agent-config to create it."
+  fi
   bash "$SCRIPT_DIR/run-store-setup.sh" \
     --state-dir "$STATE_DIR" \
     --project-root "$PROJECT_ROOT" \

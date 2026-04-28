@@ -8,13 +8,14 @@ Do not execute Bash commands before presenting this checklist and receiving appr
 
 ```text
 [Setup Plan]
-1. Prepare state/config directories
+1. Prepare state directories and baseline manifest/context
 2. Check optional platform integrations
 3. Detect project stack
 4. Recommend/apply skills, CLI tools, and MCP servers
 5. Generate or normalize manifest/context defaults
 
 Optional items needing approval:
+- project agent config generation (`.claude/`, `.codex/`, `.gitignore`)
 - ralph workflow enable/check
 - codex plugin install or integration check
 - guided store selections (skill / cli / mcp)

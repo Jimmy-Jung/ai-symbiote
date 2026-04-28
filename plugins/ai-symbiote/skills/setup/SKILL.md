@@ -81,13 +81,14 @@ Base shape:
 
 ```text
 [Setup Plan]
-1. Prepare state/config directories
+1. Prepare state directories and baseline manifest/context
 2. Check optional platform integrations
 3. Detect project stack
 4. Recommend/apply skills, CLI tools, and MCP servers
 5. Generate or normalize manifest/context defaults
 
 Optional items needing approval:
+- project agent config generation (`.claude/`, `.codex/`, `.gitignore`)
 - ralph workflow enable/check
 - codex plugin install or integration check
 - guided store selections (skill / cli / mcp)
@@ -108,13 +109,15 @@ Reply with approval before execution.
   ```
 - Record current ISO8601 timestamp in `~/ai-symbiote/{slug}/usage-data/.tracked-since`
 
-### Step 0.1: Create Platform-Specific Project Config Directories and Register in `.gitignore`
+### Step 0.1: Optional Project Agent Config Directories
 
-**Warning: Required step after approval.**
-Without this directory, hooks cannot inject project context and plugin skills will not be utilized.
-Since ai-symbiote is multi-platform, **both** directories are created regardless of the current execution platform.
+This step is **optional**.
 
-#### Execution (run this Bash block only after the user approves the setup plan)
+- Default `setup --approve` should **not** create `.claude/`, `.codex/`, or `.gitignore` entries.
+- Run it only when the user explicitly wants project-scoped agent/tool settings committed to local workspace state.
+- Use the `--project-agent-config` flag to opt in.
+
+#### Execution (run this Bash block only after the user approves the setup plan and opts in)
 
 ```bash
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
@@ -184,7 +187,7 @@ add_to_gitignore '.codex/'
 echo "[Step 0.1] Complete"
 ```
 
-**After approval, execute this entire script as a single Bash tool call.** This is not illustrative code.
+When this step is skipped, setup should continue normally after printing a short note that project agent config was not created.
 
 ### Step 0.5: PRD / Ralph Workflow Availability
 
@@ -663,18 +666,18 @@ Include the following sections based on information detected in Steps 1-4:
 - Directory structure tree detected in Step 1
 ```
 
-**`CLAUDE.md` is different from the `.claude/` directory created in Step 0.1.**
+**`CLAUDE.md` is different from the optional `.claude/` directory in Step 0.1.**
 - `.claude/settings.json` = Claude Code tool permission settings (machine-readable)
 - `CLAUDE.md` = Project context + skill guide (AI-readable)
 
-Both must exist for the plugin to function correctly.
+`CLAUDE.md` is part of the project guidance. `.claude/settings.json` is only needed when the user wants project-scoped Claude tool settings.
 
 ### Step 9: Report
 
 Output setup summary to the user:
 - Detected stack
 - Generated file paths
-- Project config directories: `.claude/` created/already exists, `.codex/` created/already exists, `.gitignore` registered
+- Project config directories: created/already exists/skipped
 - State directory location
 - Installed integration plugins:
   - Ralph workflow: installed / not installed

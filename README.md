@@ -307,6 +307,8 @@ bash platforms/cursor/install.sh
 4. 추천 스킬/CLI/MCP 후보 제시
 5. `manifest.json`, `context.md` 기본값 생성 또는 보정
 
+기본 `setup --approve`는 `~/ai-symbiote/{slug}/` 상태만 초기화합니다. 프로젝트 루트의 `.claude/`, `.codex/`, `.gitignore`는 필요할 때만 `--project-agent-config`로 opt-in 합니다.
+
 ### 4. 바로 써볼 만한 첫 명령
 
 - 구조 파악: `/ai-symbiote:analyze 인증 흐름 분석`

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.3] - 2026-04-28
+
+### Changed
+- **setup 기본 초기화 범위 축소** — `setup --approve`가 더 이상 프로젝트 루트의 `.claude/`, `.codex/`, `.gitignore`를 자동 생성하지 않고 `~/ai-symbiote/{slug}/` 상태 디렉터리와 manifest/context 초기화에만 집중
+- **프로젝트별 에이전트 설정 opt-in 전환** — `.claude/`, `.codex/`, `.gitignore` 생성은 `--project-agent-config` 플래그를 준 경우에만 실행되도록 변경
+- **setup plan/README 문구 정정** — Step 0.1을 필수 단계가 아닌 선택 항목으로 재정의하고, plan/checklist에 project agent config 생성을 optional item으로 노출
+
+### Fixed
+- **`begin-setup.sh` 회귀 테스트 보강** — 기본 approve 경로의 미생성 동작과 opt-in 생성 동작을 각각 검증하도록 `tests/test-begin-setup.sh` 확장
+
 ## [0.12.2] - 2026-04-21
 
 ### Fixed
